@@ -1,0 +1,397 @@
+/* ============================================================
+   Bridger Design System — CSS Custom Properties
+   v1.0
+   
+   Usage:
+     1. Import this file at the root of your project
+     2. Reference tokens via var(--bdg-*)
+     3. Dark mode is automatic via prefers-color-scheme
+   
+   Architecture:
+     Reference tokens  → raw values (--bdg-ref-*)
+     System tokens     → semantic aliases (--bdg-color-*, --bdg-space-*, etc.)
+     Component tokens  → scoped per element (defined in component CSS)
+   ============================================================ */
+
+/* ── Reference Tokens (raw palette) ─────────────────────────── */
+
+:root {
+  /* Primary */
+  --bdg-ref-primary-50:  #EDF0FF;
+  --bdg-ref-primary-100: #D4DBFF;
+  --bdg-ref-primary-200: #B0BBFF;
+  --bdg-ref-primary-300: #8B9AFF;
+  --bdg-ref-primary-400: #6B7CFF;
+  --bdg-ref-primary-500: #4B5EFC;
+  --bdg-ref-primary-600: #3344D1;
+  --bdg-ref-primary-700: #242FA6;
+  --bdg-ref-primary-800: #1A2280;
+  --bdg-ref-primary-900: #101559;
+
+  /* Secondary */
+  --bdg-ref-secondary-50:  #F0FAFB;
+  --bdg-ref-secondary-100: #D0F0F4;
+  --bdg-ref-secondary-200: #A3E2EB;
+  --bdg-ref-secondary-300: #6DCEDE;
+  --bdg-ref-secondary-400: #3AB6CC;
+  --bdg-ref-secondary-500: #1E97AD;
+  --bdg-ref-secondary-600: #17788B;
+  --bdg-ref-secondary-700: #115B6A;
+  --bdg-ref-secondary-800: #0B3F4A;
+  --bdg-ref-secondary-900: #06262D;
+
+  /* Neutral */
+  --bdg-ref-neutral-0:   #FFFFFF;
+  --bdg-ref-neutral-50:  #F8F9FA;
+  --bdg-ref-neutral-100: #F1F3F5;
+  --bdg-ref-neutral-200: #E9ECEF;
+  --bdg-ref-neutral-300: #DEE2E6;
+  --bdg-ref-neutral-400: #CED4DA;
+  --bdg-ref-neutral-500: #ADB5BD;
+  --bdg-ref-neutral-600: #6C757D;
+  --bdg-ref-neutral-700: #495057;
+  --bdg-ref-neutral-800: #343A40;
+  --bdg-ref-neutral-900: #212529;
+  --bdg-ref-neutral-950: #0D1117;
+
+  /* Success */
+  --bdg-ref-success-50:  #ECFDF5;
+  --bdg-ref-success-100: #D1FAE5;
+  --bdg-ref-success-200: #A7F3D0;
+  --bdg-ref-success-400: #34D399;
+  --bdg-ref-success-600: #059669;
+  --bdg-ref-success-800: #065F46;
+
+  /* Warning */
+  --bdg-ref-warning-50:  #FFFBEB;
+  --bdg-ref-warning-100: #FEF3C7;
+  --bdg-ref-warning-200: #FDE68A;
+  --bdg-ref-warning-400: #FBBF24;
+  --bdg-ref-warning-600: #D97706;
+  --bdg-ref-warning-800: #92400E;
+
+  /* Danger */
+  --bdg-ref-danger-50:  #FEF2F2;
+  --bdg-ref-danger-100: #FEE2E2;
+  --bdg-ref-danger-200: #FECACA;
+  --bdg-ref-danger-400: #F87171;
+  --bdg-ref-danger-600: #DC2626;
+  --bdg-ref-danger-800: #991B1B;
+}
+
+
+/* ── System Tokens: Light Mode (default) ────────────────────── */
+
+:root {
+  /* ─ Color ─ */
+  --bdg-color-primary:               var(--bdg-ref-primary-500);
+  --bdg-color-primary-hover:         var(--bdg-ref-primary-400);
+  --bdg-color-primary-active:        var(--bdg-ref-primary-600);
+  --bdg-color-on-primary:            #FFFFFF;
+  --bdg-color-primary-container:     var(--bdg-ref-primary-50);
+  --bdg-color-on-primary-container:  var(--bdg-ref-primary-800);
+
+  --bdg-color-secondary:             var(--bdg-ref-secondary-500);
+  --bdg-color-secondary-hover:       var(--bdg-ref-secondary-400);
+  --bdg-color-secondary-active:      var(--bdg-ref-secondary-600);
+  --bdg-color-on-secondary:          #FFFFFF;
+  --bdg-color-secondary-container:   var(--bdg-ref-secondary-50);
+  --bdg-color-on-secondary-container:var(--bdg-ref-secondary-800);
+
+  --bdg-color-surface:               var(--bdg-ref-neutral-0);
+  --bdg-color-surface-variant:       var(--bdg-ref-neutral-50);
+  --bdg-color-surface-elevated:      var(--bdg-ref-neutral-0);
+  --bdg-color-on-surface:            var(--bdg-ref-neutral-900);
+  --bdg-color-on-surface-variant:    var(--bdg-ref-neutral-600);
+  --bdg-color-on-surface-muted:      var(--bdg-ref-neutral-500);
+
+  --bdg-color-outline:               var(--bdg-ref-neutral-200);
+  --bdg-color-outline-variant:       var(--bdg-ref-neutral-100);
+  --bdg-color-outline-strong:        var(--bdg-ref-neutral-300);
+
+  /* Skeleton loading */
+  --bdg-color-skeleton:              var(--bdg-ref-neutral-200);
+
+  --bdg-color-success:               var(--bdg-ref-success-600);
+  --bdg-color-success-container:     var(--bdg-ref-success-50);
+  --bdg-color-on-success-container:  var(--bdg-ref-success-800);
+
+  --bdg-color-warning:               var(--bdg-ref-warning-600);
+  --bdg-color-warning-container:     var(--bdg-ref-warning-50);
+  --bdg-color-on-warning-container:  var(--bdg-ref-warning-800);
+
+  --bdg-color-danger:                var(--bdg-ref-danger-600);
+  --bdg-color-danger-container:      var(--bdg-ref-danger-50);
+  --bdg-color-on-danger-container:   var(--bdg-ref-danger-800);
+
+  --bdg-color-info:                  var(--bdg-ref-primary-500);
+  --bdg-color-info-container:        var(--bdg-ref-primary-50);
+  --bdg-color-on-info-container:     var(--bdg-ref-primary-800);
+
+  /* ─ Typography ─ */
+  --bdg-font-sans:  'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --bdg-font-mono:  'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+
+  --bdg-type-display-lg-size:       48px;
+  --bdg-type-display-lg-weight:     700;
+  --bdg-type-display-lg-line:       1.1;
+  --bdg-type-display-lg-tracking:   -1.5px;
+
+  --bdg-type-display-md-size:       36px;
+  --bdg-type-display-md-weight:     700;
+  --bdg-type-display-md-line:       1.15;
+  --bdg-type-display-md-tracking:   -0.75px;
+
+  --bdg-type-display-sm-size:       30px;
+  --bdg-type-display-sm-weight:     600;
+  --bdg-type-display-sm-line:       1.2;
+  --bdg-type-display-sm-tracking:   -0.5px;
+
+  --bdg-type-heading-lg-size:       24px;
+  --bdg-type-heading-lg-weight:     600;
+  --bdg-type-heading-lg-line:       1.3;
+  --bdg-type-heading-lg-tracking:   -0.25px;
+
+  --bdg-type-heading-md-size:       20px;
+  --bdg-type-heading-md-weight:     600;
+  --bdg-type-heading-md-line:       1.35;
+  --bdg-type-heading-md-tracking:   0;
+
+  --bdg-type-heading-sm-size:       16px;
+  --bdg-type-heading-sm-weight:     600;
+  --bdg-type-heading-sm-line:       1.4;
+  --bdg-type-heading-sm-tracking:   0;
+
+  --bdg-type-body-lg-size:          18px;
+  --bdg-type-body-lg-weight:        400;
+  --bdg-type-body-lg-line:          1.6;
+
+  --bdg-type-body-md-size:          16px;
+  --bdg-type-body-md-weight:        400;
+  --bdg-type-body-md-line:          1.6;
+
+  --bdg-type-body-sm-size:          14px;
+  --bdg-type-body-sm-weight:        400;
+  --bdg-type-body-sm-line:          1.5;
+
+  --bdg-type-label-lg-size:         14px;
+  --bdg-type-label-lg-weight:       500;
+  --bdg-type-label-lg-line:         1.4;
+  --bdg-type-label-lg-tracking:     0.1px;
+
+  --bdg-type-label-md-size:         12px;
+  --bdg-type-label-md-weight:       500;
+  --bdg-type-label-md-line:         1.4;
+  --bdg-type-label-md-tracking:     0.25px;
+
+  --bdg-type-label-sm-size:         11px;
+  --bdg-type-label-sm-weight:       500;
+  --bdg-type-label-sm-line:         1.3;
+  --bdg-type-label-sm-tracking:     0.5px;
+
+  --bdg-type-caption-size:          12px;
+  --bdg-type-caption-weight:        400;
+  --bdg-type-caption-line:          1.4;
+  --bdg-type-caption-tracking:      0.4px;
+
+  --bdg-type-overline-size:         11px;
+  --bdg-type-overline-weight:       600;
+  --bdg-type-overline-line:         1.3;
+  --bdg-type-overline-tracking:     1.5px;
+
+  /* ─ Spacing ─ */
+  --bdg-space-0:   0px;
+  --bdg-space-0-5: 2px;
+  --bdg-space-1:   4px;
+  --bdg-space-1-5: 6px;
+  --bdg-space-2:   8px;
+  --bdg-space-3:   12px;
+  --bdg-space-4:   16px;
+  --bdg-space-5:   20px;
+  --bdg-space-6:   24px;
+  --bdg-space-8:   32px;
+  --bdg-space-10:  40px;
+  --bdg-space-12:  48px;
+  --bdg-space-16:  64px;
+  --bdg-space-20:  80px;
+  --bdg-space-24:  96px;
+  --bdg-space-32:  128px;
+
+  /* ─ Border Radius ─ */
+  --bdg-radius-none: 0;
+  --bdg-radius-sm:   4px;
+  --bdg-radius-md:   8px;
+  --bdg-radius-lg:   12px;
+  --bdg-radius-xl:   16px;
+  --bdg-radius-2xl:  20px;
+  --bdg-radius-full: 9999px;
+
+  /* ─ Elevation / Shadows ─ */
+  --bdg-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.05);
+  --bdg-shadow-md:  0 2px 8px rgba(0, 0, 0, 0.08);
+  --bdg-shadow-lg:  0 4px 16px rgba(0, 0, 0, 0.10);
+  --bdg-shadow-xl:  0 8px 32px rgba(0, 0, 0, 0.12);
+
+  /* ─ Transitions ─ */
+  --bdg-transition-fast:    100ms ease;
+  --bdg-transition-normal:  150ms ease;
+  --bdg-transition-slow:    250ms ease;
+  --bdg-transition-spring:  300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ─ Z-index scale ─ */
+  --bdg-z-base:      0;
+  --bdg-z-dropdown:  100;
+  --bdg-z-sticky:    200;
+  --bdg-z-overlay:   300;
+  --bdg-z-modal:     400;
+  --bdg-z-popover:   500;
+  --bdg-z-toast:     600;
+  --bdg-z-tooltip:   700;
+
+  /* ─ Breakpoints (for reference — use in @media) ─ */
+  /* sm:  640px  */
+  /* md:  768px  */
+  /* lg:  1024px */
+  /* xl:  1280px */
+  /* 2xl: 1536px */
+}
+
+
+/* ── System Tokens: Dark Mode ───────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bdg-color-primary:               var(--bdg-ref-primary-400);
+    --bdg-color-primary-hover:         var(--bdg-ref-primary-300);
+    --bdg-color-primary-active:        var(--bdg-ref-primary-500);
+    --bdg-color-on-primary:            var(--bdg-ref-primary-900);
+    --bdg-color-primary-container:     var(--bdg-ref-primary-900);
+    --bdg-color-on-primary-container:  var(--bdg-ref-primary-100);
+
+    --bdg-color-secondary:             var(--bdg-ref-secondary-400);
+    --bdg-color-secondary-hover:       var(--bdg-ref-secondary-300);
+    --bdg-color-secondary-active:      var(--bdg-ref-secondary-500);
+    --bdg-color-on-secondary:          var(--bdg-ref-secondary-900);
+    --bdg-color-secondary-container:   var(--bdg-ref-secondary-900);
+    --bdg-color-on-secondary-container:var(--bdg-ref-secondary-100);
+
+    --bdg-color-surface:               var(--bdg-ref-neutral-950);
+    --bdg-color-surface-variant:       #1a1f2e;
+    --bdg-color-surface-elevated:      #161b22;
+    --bdg-color-on-surface:            var(--bdg-ref-neutral-100);
+    --bdg-color-on-surface-variant:    var(--bdg-ref-neutral-500);
+    --bdg-color-on-surface-muted:      var(--bdg-ref-neutral-600);
+
+    --bdg-color-outline:               var(--bdg-ref-neutral-800);
+    --bdg-color-outline-variant:       var(--bdg-ref-neutral-900);
+    --bdg-color-outline-strong:        var(--bdg-ref-neutral-700);
+
+    --bdg-color-skeleton:              var(--bdg-ref-neutral-800);
+
+    --bdg-color-success:               var(--bdg-ref-success-400);
+    --bdg-color-success-container:     #0a2e1f;
+    --bdg-color-on-success-container:  var(--bdg-ref-success-200);
+
+    --bdg-color-warning:               var(--bdg-ref-warning-400);
+    --bdg-color-warning-container:     #2e1f07;
+    --bdg-color-on-warning-container:  var(--bdg-ref-warning-200);
+
+    --bdg-color-danger:                var(--bdg-ref-danger-400);
+    --bdg-color-danger-container:      #2e0a0a;
+    --bdg-color-on-danger-container:   var(--bdg-ref-danger-200);
+
+    --bdg-color-info:                  var(--bdg-ref-primary-300);
+    --bdg-color-info-container:        var(--bdg-ref-primary-900);
+    --bdg-color-on-info-container:     var(--bdg-ref-primary-200);
+
+    --bdg-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.25);
+    --bdg-shadow-md:  0 2px 8px rgba(0, 0, 0, 0.35);
+    --bdg-shadow-lg:  0 4px 16px rgba(0, 0, 0, 0.4);
+    --bdg-shadow-xl:  0 8px 32px rgba(0, 0, 0, 0.5);
+  }
+}
+
+
+/* ── Manual dark mode class (alternative to prefers-color-scheme) */
+
+.bdg-dark {
+  --bdg-color-primary:               var(--bdg-ref-primary-400);
+  --bdg-color-primary-hover:         var(--bdg-ref-primary-300);
+  --bdg-color-primary-active:        var(--bdg-ref-primary-500);
+  --bdg-color-on-primary:            var(--bdg-ref-primary-900);
+  --bdg-color-primary-container:     var(--bdg-ref-primary-900);
+  --bdg-color-on-primary-container:  var(--bdg-ref-primary-100);
+
+  --bdg-color-secondary:             var(--bdg-ref-secondary-400);
+  --bdg-color-on-secondary:          var(--bdg-ref-secondary-900);
+  --bdg-color-secondary-container:   var(--bdg-ref-secondary-900);
+  --bdg-color-on-secondary-container:var(--bdg-ref-secondary-100);
+
+  --bdg-color-surface:               var(--bdg-ref-neutral-950);
+  --bdg-color-surface-variant:       #1a1f2e;
+  --bdg-color-surface-elevated:      #161b22;
+  --bdg-color-on-surface:            var(--bdg-ref-neutral-100);
+  --bdg-color-on-surface-variant:    var(--bdg-ref-neutral-500);
+  --bdg-color-on-surface-muted:      var(--bdg-ref-neutral-600);
+
+  --bdg-color-outline:               var(--bdg-ref-neutral-800);
+  --bdg-color-outline-variant:       var(--bdg-ref-neutral-900);
+  --bdg-color-outline-strong:        var(--bdg-ref-neutral-700);
+
+  --bdg-color-skeleton:              var(--bdg-ref-neutral-800);
+
+  --bdg-color-success:               var(--bdg-ref-success-400);
+  --bdg-color-success-container:     #0a2e1f;
+  --bdg-color-on-success-container:  var(--bdg-ref-success-200);
+
+  --bdg-color-warning:               var(--bdg-ref-warning-400);
+  --bdg-color-warning-container:     #2e1f07;
+  --bdg-color-on-warning-container:  var(--bdg-ref-warning-200);
+
+  --bdg-color-danger:                var(--bdg-ref-danger-400);
+  --bdg-color-danger-container:      #2e0a0a;
+  --bdg-color-on-danger-container:   var(--bdg-ref-danger-200);
+
+  --bdg-color-info:                  var(--bdg-ref-primary-300);
+  --bdg-color-info-container:        var(--bdg-ref-primary-900);
+  --bdg-color-on-info-container:     var(--bdg-ref-primary-200);
+
+  --bdg-shadow-sm:  0 1px 2px rgba(0, 0, 0, 0.25);
+  --bdg-shadow-md:  0 2px 8px rgba(0, 0, 0, 0.35);
+  --bdg-shadow-lg:  0 4px 16px rgba(0, 0, 0, 0.4);
+  --bdg-shadow-xl:  0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+
+/* ── Utility Classes ────────────────────────────────────────── */
+
+/* Type scale utilities */
+.bdg-display-lg    { font-size: var(--bdg-type-display-lg-size); font-weight: var(--bdg-type-display-lg-weight); line-height: var(--bdg-type-display-lg-line); letter-spacing: var(--bdg-type-display-lg-tracking); }
+.bdg-display-md    { font-size: var(--bdg-type-display-md-size); font-weight: var(--bdg-type-display-md-weight); line-height: var(--bdg-type-display-md-line); letter-spacing: var(--bdg-type-display-md-tracking); }
+.bdg-display-sm    { font-size: var(--bdg-type-display-sm-size); font-weight: var(--bdg-type-display-sm-weight); line-height: var(--bdg-type-display-sm-line); letter-spacing: var(--bdg-type-display-sm-tracking); }
+.bdg-heading-lg    { font-size: var(--bdg-type-heading-lg-size); font-weight: var(--bdg-type-heading-lg-weight); line-height: var(--bdg-type-heading-lg-line); letter-spacing: var(--bdg-type-heading-lg-tracking); }
+.bdg-heading-md    { font-size: var(--bdg-type-heading-md-size); font-weight: var(--bdg-type-heading-md-weight); line-height: var(--bdg-type-heading-md-line); }
+.bdg-heading-sm    { font-size: var(--bdg-type-heading-sm-size); font-weight: var(--bdg-type-heading-sm-weight); line-height: var(--bdg-type-heading-sm-line); }
+.bdg-body-lg       { font-size: var(--bdg-type-body-lg-size); font-weight: var(--bdg-type-body-lg-weight); line-height: var(--bdg-type-body-lg-line); }
+.bdg-body-md       { font-size: var(--bdg-type-body-md-size); font-weight: var(--bdg-type-body-md-weight); line-height: var(--bdg-type-body-md-line); }
+.bdg-body-sm       { font-size: var(--bdg-type-body-sm-size); font-weight: var(--bdg-type-body-sm-weight); line-height: var(--bdg-type-body-sm-line); }
+.bdg-label-lg      { font-size: var(--bdg-type-label-lg-size); font-weight: var(--bdg-type-label-lg-weight); line-height: var(--bdg-type-label-lg-line); letter-spacing: var(--bdg-type-label-lg-tracking); }
+.bdg-label-md      { font-size: var(--bdg-type-label-md-size); font-weight: var(--bdg-type-label-md-weight); line-height: var(--bdg-type-label-md-line); letter-spacing: var(--bdg-type-label-md-tracking); }
+.bdg-label-sm      { font-size: var(--bdg-type-label-sm-size); font-weight: var(--bdg-type-label-sm-weight); line-height: var(--bdg-type-label-sm-line); letter-spacing: var(--bdg-type-label-sm-tracking); }
+.bdg-caption       { font-size: var(--bdg-type-caption-size); font-weight: var(--bdg-type-caption-weight); line-height: var(--bdg-type-caption-line); letter-spacing: var(--bdg-type-caption-tracking); }
+.bdg-overline      { font-size: var(--bdg-type-overline-size); font-weight: var(--bdg-type-overline-weight); line-height: var(--bdg-type-overline-line); letter-spacing: var(--bdg-type-overline-tracking); text-transform: uppercase; }
+
+/* Focus ring */
+:root {
+  --bdg-focus-ring: 0 0 0 2px var(--bdg-color-surface), 0 0 0 4px var(--bdg-color-primary);
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bdg-focus-ring: 0 0 0 2px var(--bdg-color-surface), 0 0 0 4px var(--bdg-ref-primary-400); }
+}
+.bdg-dark { --bdg-focus-ring: 0 0 0 2px var(--bdg-color-surface), 0 0 0 4px var(--bdg-ref-primary-400); }
+
+/* Apply focus ring to interactive elements */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--bdg-focus-ring);
+}
