@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "expo",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd /Users/hanwong/code/cardApp && npx expo start --web"],
+      "port": 8081
+    }
+  ]
+}
