@@ -41,3 +41,6 @@ server/.env
 # generated native folders
 /ios
 /android
+
+# Claude worktrees
+.claude/worktrees/
