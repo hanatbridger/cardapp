@@ -251,13 +251,13 @@ function ProfileScreen() {
           <SettingsRow
             icon={<IconFileText size={18} color={colors.onSurfaceVariant} />}
             label="Terms of Use"
-            onPress={() => Linking.openURL('https://cardpulse.app/terms')}
+            onPress={() => router.push('/terms')}
           />
           <SettingsDivider />
           <SettingsRow
             icon={<IconShield size={18} color={colors.onSurfaceVariant} />}
             label="Privacy Policy"
-            onPress={() => Linking.openURL('https://cardpulse.app/privacy')}
+            onPress={() => router.push('/privacy')}
           />
           <SettingsDivider />
           <SettingsRow
