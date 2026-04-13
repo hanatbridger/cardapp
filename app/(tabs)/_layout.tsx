@@ -11,17 +11,17 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { colors, glass } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Left group: Home, Search, Profile
-  const leftTabs = ['index', 'search', 'profile'];
+  // Right group: Search, Notifications, Profile
+  const rightTabs = ['search', 'notifications', 'profile'];
   const icons: Record<string, typeof IconHome> = {
-    index: IconHome,
     search: IconSearch,
+    notifications: IconBell,
     profile: IconUser,
   };
 
-  // Notifications is separate on the right
-  const alertRoute = state.routes.find((r: any) => r.name === 'notifications');
-  const alertFocused = alertRoute ? state.index === state.routes.indexOf(alertRoute) : false;
+  // Home is standalone on the left
+  const homeRoute = state.routes.find((r: any) => r.name === 'index');
+  const homeFocused = homeRoute ? state.index === state.routes.indexOf(homeRoute) : false;
 
   return (
     <View
@@ -35,7 +35,49 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         gap: spacing[2],
       }}
     >
-      {/* Left group — main tabs */}
+      {/* Home button — standalone circle on the left */}
+      <Pressable
+        onPress={() => {
+          if (homeRoute) {
+            Haptics.selectionAsync();
+            navigation.navigate('index');
+          }
+        }}
+        hitSlop={8}
+        accessibilityLabel="Home"
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: glass.backgroundStrong,
+          borderWidth: 1,
+          borderColor: glass.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+          ...(Platform.OS === 'web'
+            ? { backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as any
+            : {}),
+        }}
+      >
+        <View
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: radius.xl,
+            backgroundColor: homeFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconHome
+            size={22}
+            color={homeFocused ? colors.primary : colors.onSurfaceMuted}
+            strokeWidth={homeFocused ? 2 : 1.6}
+          />
+        </View>
+      </Pressable>
+
+      {/* Right group — Search, Notifications, Profile */}
       <View
         style={{
           flex: 1,
@@ -53,12 +95,12 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             : {}),
         }}
       >
-        {leftTabs.map((tabName) => {
+        {rightTabs.map((tabName) => {
           const route = state.routes.find((r: any) => r.name === tabName);
           if (!route) return null;
           const realIndex = state.routes.indexOf(route);
           const isFocused = state.index === realIndex;
-          const IconComponent = icons[tabName] || IconHome;
+          const IconComponent = icons[tabName] || IconSearch;
 
           const onPress = () => {
             const event = navigation.emit({
@@ -94,37 +136,6 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
           );
         })}
       </View>
-
-      {/* Notifications button — separate on the right */}
-      <Pressable
-        onPress={() => {
-          if (alertRoute) {
-            Haptics.selectionAsync();
-            navigation.navigate('notifications');
-          }
-        }}
-        hitSlop={8}
-        accessibilityLabel="Notifications"
-        style={{
-          width: 48,
-          height: 48,
-          borderRadius: radius.xl,
-          backgroundColor: alertFocused ? colors.primary : glass.backgroundStrong,
-          borderWidth: 1,
-          borderColor: alertFocused ? colors.primary : glass.border,
-          alignItems: 'center',
-          justifyContent: 'center',
-          ...(Platform.OS === 'web'
-            ? { backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as any
-            : {}),
-        }}
-      >
-        <IconBell
-          size={22}
-          color={alertFocused ? colors.onPrimary : colors.onSurfaceMuted}
-          strokeWidth={alertFocused ? 2.2 : 1.6}
-        />
-      </Pressable>
     </View>
   );
 }
