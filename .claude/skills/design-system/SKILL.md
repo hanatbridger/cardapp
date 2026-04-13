@@ -133,6 +133,13 @@ All exported via `src/components/index.ts`. **Always reuse before building new.*
 
 **Domain:** `PriceChart`, `CardSearchResult`, `WatchlistCard`, `TrendingCarousel`, `AIPicks`, `AIValuation`, `CardFundamentals`, `NotificationItem`, `PriceAlertModal`, `WatchlistFullModal`, `AuthForm`, `ErrorBoundary` / `withErrorBoundary`
 
+**Navigation (inline in `app/(tabs)/_layout.tsx`):**
+- `FloatingTabBar` — custom floating tab bar with two groups:
+  - **Left:** Home button (48px circle, `glass.backgroundStrong`, 40px inner circle with `withAlpha(primary, 0.15)` when active)
+  - **Right:** Pill (`flex:1`, `glass.backgroundStrong`, `radius['2xl']`) containing Search (`IconSearch`), Notifications (`IconBell`), Profile (`IconUser`) — each 40px with `radius.xl`, active state = `withAlpha(primary, 0.15)` bg + `primary` icon color
+  - Icons: 22px, active `strokeWidth: 2`, inactive `strokeWidth: 1.5`
+  - Positioned absolute bottom with safe area insets, `spacing[4]` horizontal margins
+
 ### Quick reference
 
 ```tsx

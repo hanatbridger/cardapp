@@ -56,6 +56,18 @@ Sizes: `sm`, `md`, `lg`. Auto color from `success`/`danger`. Trending icon prefi
 ### `<GradeBadge grade>`
 Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded amber/gray — to be tokenized.
 
+### `FloatingTabBar` (in `app/(tabs)/_layout.tsx`)
+Custom floating tab bar. Not exported from barrel — defined inline in the tab layout.
+
+**Layout:** `[○ Home]  [Search · Bell · Profile]`
+- **Left:** Home button — standalone 48×48 circle, `glass.backgroundStrong` bg, `glass.border` 1px border, `radius` 24. Contains a 40×40 inner circle (`radius.xl`) that gets `withAlpha(primary, 0.15)` bg when active.
+- **Right:** Pill container — `flex: 1`, `glass.backgroundStrong` bg, `radius['2xl']` (24), `glass.border` 1px. Contains Search (`IconSearch`), Notifications (`IconBell`), Profile (`IconUser`) with `justifyContent: 'space-around'`. Each icon sits in a 40px pressable with `radius.xl` that gets `withAlpha(primary, 0.15)` bg when active.
+- **Active icon:** `colors.primary`, `strokeWidth: 2`
+- **Inactive icon:** `colors.onSurfaceMuted`, `strokeWidth: 1.5` (Home uses 1.6)
+- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`
+- All tabs trigger `Haptics.selectionAsync()` on press.
+- Icon size: 22 for all tabs.
+
 ## Domain components
 
 | Component | Purpose |
