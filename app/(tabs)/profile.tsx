@@ -6,7 +6,7 @@ import {
   IconChevronRight, IconDeviceMobile, IconStar,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, Card, Avatar, Button, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, Card, Button, ScreenBackground, withErrorBoundary } from '../../src/components';
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
@@ -153,7 +153,6 @@ function ProfileScreen() {
         >
           <Card glass style={{ padding: 0, overflow: 'hidden' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3], paddingHorizontal: spacing[4] }}>
-              <Avatar name={profile.displayName} size={56} />
               <View style={{ flex: 1, gap: spacing['0.5'] }}>
                 <Text variant="headingSm">{profile.displayName}</Text>
                 <Text variant="bodySm" color={colors.onSurfaceVariant}>

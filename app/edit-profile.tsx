@@ -5,7 +5,6 @@ import { useTheme } from '../src/theme/ThemeProvider';
 import {
   Input,
   Button,
-  Avatar,
   CollapsingHeader,
   withErrorBoundary,
 } from '../src/components';
@@ -61,12 +60,8 @@ function EditProfileScreen() {
           }}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Avatar */}
-          <View style={{ alignItems: 'center', paddingVertical: spacing[5] }}>
-            <Avatar name={displayName} size={80} />
-          </View>
-
           {/* Form */}
+          <View style={{ height: spacing[4] }} />
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, gap: spacing[4] }}>
             <Input
               label="Display Name"
