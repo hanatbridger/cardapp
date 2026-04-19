@@ -26,6 +26,8 @@ function SettingsRow({ icon, label, value, onPress, destructive, badge }: Settin
   return (
     <Pressable
       onPress={onPress}
+      accessibilityLabel={label}
+      accessibilityRole={onPress ? 'button' : undefined}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

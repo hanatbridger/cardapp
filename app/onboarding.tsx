@@ -28,8 +28,8 @@ interface Slide {
 const SLIDES: Slide[] = [
   {
     icon: (color) => <IconChartLine size={56} color={color} />,
-    title: 'Real-time card prices',
-    body: 'Track Pokémon card values from live eBay sold listings — updated every few minutes.',
+    title: 'Live card prices',
+    body: 'Track Pokémon card values from TCGPlayer and active eBay listings — refresh anytime with a pull.',
   },
   {
     icon: (color) => <IconSparkles size={56} color={color} />,
@@ -85,7 +85,7 @@ function OnboardingScreen() {
             paddingTop: spacing[2],
           }}
         >
-          <Pressable onPress={finish} hitSlop={12} style={{ padding: spacing[2] }}>
+          <Pressable onPress={finish} hitSlop={12} accessibilityLabel="Skip onboarding" accessibilityRole="button" style={{ padding: spacing[2] }}>
             <Text variant="labelLg" color={colors.onSurfaceVariant}>
               Skip
             </Text>

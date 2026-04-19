@@ -1,8 +1,9 @@
 import React, { useState, useCallback } from 'react';
 import { View, FlatList, Pressable, RefreshControl } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
 import { router } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import {
   Text,
@@ -15,26 +16,33 @@ import {
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
-import { useWatchlistStore } from '../../src/stores';
-import { MOCK_CARDS, MOCK_PRICES, getPrice } from '../../src/mocks';
+import { useWatchlistStore, useUserStore } from '../../src/stores';
+import { MOCK_CARDS, getPrice } from '../../src/mocks';
+import type { CardPrice } from '../../src/types/card';
 
 function WatchlistScreen() {
   const { colors } = useTheme();
-  const { items, isPremium, maxFreeItems } = useWatchlistStore();
+  const { items, maxFreeItems } = useWatchlistStore();
+  const isPremium = useUserStore((s) => s.isPremium);
   const [refreshing, setRefreshing] = useState(false);
+  const queryClient = useQueryClient();
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    // Simulate price refresh — will be real API call with JustTCG integration
-    await new Promise((r) => setTimeout(r, 800));
+    // Invalidate every price query so each card re-fetches live data.
+    // useCardPrice is keyed `['prices', ...]` so this catches all of them.
+    await queryClient.invalidateQueries({ queryKey: ['prices'] });
     setRefreshing(false);
-  }, []);
+  }, [queryClient]);
 
-  const trendingItems = MOCK_CARDS.slice(0, 8).map((card) => ({
-    card,
-    price: MOCK_PRICES[card.id],
-  }));
+  // Trending rail — raw (UNGRADED) cards only, with % change from the
+  // seeded mock dataset. Filtered to cards that have an UNGRADED price
+  // entry so every tile shows a real number.
+  const trendingItems = MOCK_CARDS
+    .map((card) => ({ card, price: getPrice(card.id, 'UNGRADED') }))
+    .filter((item): item is { card: typeof item.card; price: CardPrice } => !!item.price)
+    .slice(0, 8);
 
   return (
     <ScreenBackground>
@@ -43,20 +51,28 @@ function WatchlistScreen() {
         keyExtractor={(item) => `${item.cardId}-${item.grade}`}
         ListHeaderComponent={
           <View style={{ gap: spacing[4] }}>
-            {/* Header */}
+            {/* Header — 56-pt row matches CollapsingHeader on the Explore
+                tab so the title sits at the same y-offset across all four
+                tab landing screens (no jump when switching tabs). */}
             <View
               style={{
+                height: 56,
                 flexDirection: 'row',
                 justifyContent: 'space-between',
                 alignItems: 'center',
                 paddingHorizontal: HORIZONTAL_PADDING,
-                paddingTop: spacing[4],
               }}
             >
               <Text variant="headingLg">Home</Text>
               <Pressable
-                onPress={() => router.push('/(tabs)/search')}
+                // `focus=1` opens Explore directly into the X-style focused
+                // search overlay. `from=home` tells Explore that Cancel
+                // should pop back to Home rather than leaving the user on
+                // the Explore tab. See app/(tabs)/search.tsx.
+                onPress={() => router.push('/(tabs)/search?focus=1&from=home')}
                 hitSlop={8}
+                accessibilityLabel="Search"
+                accessibilityRole="button"
                 style={{
                   width: 40,
                   height: 40,
@@ -70,7 +86,7 @@ function WatchlistScreen() {
               </Pressable>
             </View>
 
-            {/* Trending */}
+            {/* Trending — raw card movers */}
             <View style={{ gap: spacing[2] }}>
               <View
                 style={{
@@ -87,24 +103,27 @@ function WatchlistScreen() {
               <TrendingCarousel items={trendingItems} />
             </View>
 
-            {/* Watchlist count */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: HORIZONTAL_PADDING,
-              }}
-            >
-              <Text variant="labelLg" color={colors.onSurfaceVariant}>
-                {items.length} cards tracked
-              </Text>
-              {!isPremium && (
-                <Text variant="caption" color={colors.onSurfaceMuted}>
-                  {items.length}/{maxFreeItems}
+            {/* Watchlist count — hidden on first launch (empty list shows
+                its own EmptyState below with a Search CTA) */}
+            {items.length > 0 && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingHorizontal: HORIZONTAL_PADDING,
+                }}
+              >
+                <Text variant="labelLg" color={colors.onSurfaceVariant}>
+                  {items.length === 1 ? '1 card tracked' : `${items.length} cards tracked`}
                 </Text>
-              )}
-            </View>
+                {!isPremium && (
+                  <Text variant="caption" color={colors.onSurfaceMuted}>
+                    {items.length}/{maxFreeItems}
+                  </Text>
+                )}
+              </View>
+            )}
           </View>
         }
         renderItem={({ item, index }) => (
@@ -115,9 +134,14 @@ function WatchlistScreen() {
               cardName={item.cardName}
               cardImageUrl={item.cardImageUrl}
               setName={item.setName}
+              setNumber={item.setNumber}
               grade={item.grade}
+              language={item.language}
               rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
-              price={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
+              // Fallback shown only briefly while the live query loads, or if it fails.
+              // The real price comes from useCardPrice inside WatchlistCard — same
+              // source as the detail screen, so numbers always agree.
+              fallbackPrice={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
                 cardName: item.cardName,
                 grade: item.grade,
                 currentPrice: item.lastPrice,
