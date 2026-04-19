@@ -93,13 +93,20 @@ function SignupScreen() {
           <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} loading={loading} />
 
           {/* Legal */}
-          <Text
-            variant="caption"
-            color={colors.onSurfaceMuted}
-            style={{ textAlign: 'center' }}
-          >
-            By creating an account, you agree to our Terms of Use and Privacy Policy.
-          </Text>
+          <View style={{ alignItems: 'center', gap: spacing[0.5] }}>
+            <Text variant="caption" color={colors.onSurfaceMuted}>
+              By creating an account, you agree to our
+            </Text>
+            <View style={{ flexDirection: 'row', gap: spacing[1] }}>
+              <Pressable onPress={() => router.push('/terms')} hitSlop={4}>
+                <Text variant="caption" color={colors.primary}>Terms of Use</Text>
+              </Pressable>
+              <Text variant="caption" color={colors.onSurfaceMuted}>and</Text>
+              <Pressable onPress={() => router.push('/privacy')} hitSlop={4}>
+                <Text variant="caption" color={colors.primary}>Privacy Policy</Text>
+              </Pressable>
+            </View>
+          </View>
 
           {/* Footer */}
           <View

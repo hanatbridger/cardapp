@@ -17,6 +17,9 @@
       "bundleIdentifier": "com.cardpulse.app",
       "buildNumber": "1",
       "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
         "UIBackgroundModes": [
           "fetch",
@@ -24,7 +27,12 @@
         ]
       },
       "privacyManifests": {
-        "NSPrivacyAccessedAPITypes": []
+        "NSPrivacyAccessedAPITypes": [
+          {
+            "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
+            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+          }
+        ]
       }
     },
     "android": {
@@ -38,7 +46,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "privacy": "https://cardpulse.app/privacy",
+    "privacy": "https://dist-amber-theta-56.vercel.app/privacy",
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
