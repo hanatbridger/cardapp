@@ -85,8 +85,10 @@ export default function RootLayout() {
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="onboarding" />
               <Stack.Screen name="card/[id]" />
+              <Stack.Screen name="set/[id]" />
               <Stack.Screen name="settings" />
               <Stack.Screen name="edit-profile" />
+              <Stack.Screen name="change-password" />
               <Stack.Screen name="help" />
               <Stack.Screen name="terms" />
               <Stack.Screen name="privacy" />

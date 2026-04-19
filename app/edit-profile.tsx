@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { View, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { router } from 'expo-router';
 import { useTheme } from '../src/theme/ThemeProvider';
 import {
-  Text,
   Input,
   Button,
   CollapsingHeader,
@@ -21,10 +21,6 @@ function EditProfileScreen() {
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [email, setEmail] = useState(profile.email);
   const [username, setUsername] = useState(profile.username);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordError, setPasswordError] = useState('');
   const { scrollHandler, headerAnimatedStyle, headerHeight } = useCollapsingHeader();
 
   const handleSave = () => {
@@ -38,33 +34,6 @@ function EditProfileScreen() {
     }
     updateProfile({ displayName: displayName.trim(), email: email.trim(), username: username.trim() });
     safeGoBack('/(tabs)/profile');
-  };
-
-  const handleChangePassword = () => {
-    setPasswordError('');
-    if (!currentPassword) {
-      setPasswordError('Current password is required');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setPasswordError('New password must be at least 6 characters');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      return;
-    }
-    // In production this would call the backend to verify current password
-    // and update to the new one. Stubbed for MVP.
-    const msg = 'Password updated successfully.';
-    if (Platform.OS === 'web') {
-      window.alert(msg);
-    } else {
-      Alert.alert('Success', msg);
-    }
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
   };
 
   return (
@@ -116,37 +85,13 @@ function EditProfileScreen() {
 
           {/* Change Password — only for email auth users */}
           {authProvider === 'email' && (
-            <View style={{ paddingHorizontal: HORIZONTAL_PADDING, gap: spacing[4], paddingTop: spacing[6] }}>
-              <View style={{ height: 1, backgroundColor: colors.outline }} />
-              <Text variant="labelLg" color={colors.onSurfaceVariant}>
-                Change Password
-              </Text>
-              <Input
-                label="Current Password"
-                value={currentPassword}
-                onChangeText={(t) => { setCurrentPassword(t); setPasswordError(''); }}
-                secureTextEntry
-              />
-              <Input
-                label="New Password"
-                value={newPassword}
-                onChangeText={(t) => { setNewPassword(t); setPasswordError(''); }}
-                secureTextEntry
-                hint="At least 6 characters"
-              />
-              <Input
-                label="Confirm New Password"
-                value={confirmPassword}
-                onChangeText={(t) => { setConfirmPassword(t); setPasswordError(''); }}
-                secureTextEntry
-                error={passwordError || undefined}
-              />
+            <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[6] }}>
               <Button
                 variant="outlined"
-                onPress={handleChangePassword}
+                onPress={() => router.push('/change-password')}
                 fullWidth
               >
-                Update Password
+                Change Password
               </Button>
             </View>
           )}
