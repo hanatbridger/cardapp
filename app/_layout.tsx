@@ -16,11 +16,15 @@ import {
   registerBackgroundAlertTask,
 } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
+import { configureRevenueCat } from '../src/services/revenue-cat';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Initialize Sentry as early as possible — before any rendering.
 initSentry();
+
+// Initialize RevenueCat for in-app purchases.
+configureRevenueCat();
 
 // Define the background task at module-eval time so the OS can dispatch
 // into it when the app is woken up. Configure the foreground notification

@@ -1,14 +1,13 @@
-import React, { useState } from 'react';
-import { View, ScrollView, Pressable, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import {
   IconX,
   IconCheck,
-  IconBell,
-  IconChartLine,
   IconSparkles,
   IconInfinity,
-  IconChartHistogram,
+  IconBellRinging,
+  IconBookmarks,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import {
@@ -20,6 +19,11 @@ import {
 } from '../src/components';
 import { useUserStore } from '../src/stores/user-store';
 import { spacing, radius } from '../src/theme/tokens';
+import {
+  getOfferings,
+  purchasePackage,
+  restorePurchases,
+} from '../src/services/revenue-cat';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 
 type PlanId = 'monthly' | 'annual';
@@ -50,6 +54,11 @@ const PLANS: Plan[] = [
   },
 ];
 
+// Only list features that are actually gated by `isPremium` in code.
+// Everything else — AI valuation, live eBay listings, AI Picks — is
+// available on the free tier, so listing it here would be deceptive and
+// grounds for App Store rejection under Guideline 2.3.1 (Accurate
+// Metadata) and 3.1.2 (Subscriptions must provide ongoing value).
 const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[] = [
   {
     icon: IconInfinity,
@@ -57,32 +66,28 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
     body: 'Track every card you care about — no 5-card cap.',
   },
   {
-    icon: IconBell,
-    title: 'Real-time price alerts',
-    body: 'Get notified the moment a card hits your target price.',
+    icon: IconBookmarks,
+    title: 'Every grade, every card',
+    body: 'Add the same card at multiple grades (Raw, PSA 9, PSA 10) without using up your free slots.',
   },
   {
-    icon: IconSparkles,
-    title: 'AI valuation insights',
-    body: 'See undervalued/overvalued signals across the entire market.',
-  },
-  {
-    icon: IconChartHistogram,
-    title: 'Full price history',
-    body: 'Unlock 1Y and All-time charts plus eBay sale comparables.',
-  },
-  {
-    icon: IconChartLine,
-    title: 'Daily AI Picks',
-    body: 'Curated under-the-radar cards delivered every morning.',
+    icon: IconBellRinging,
+    title: 'Price alerts',
+    body: 'Get pushed the moment any card crosses the price you set — raw or graded.',
   },
 ];
 
 function PaywallScreen() {
   const { colors } = useTheme();
   const setPremium = useUserStore((s) => s.setPremium);
+  const isPremium = useUserStore((s) => s.isPremium);
   const [selected, setSelected] = useState<PlanId>('annual');
   const [purchasing, setPurchasing] = useState(false);
+  const [offerings, setOfferings] = useState<any>(null);
+
+  useEffect(() => {
+    getOfferings().then(setOfferings);
+  }, []);
 
   const close = () => {
     if (router.canGoBack()) router.back();
@@ -90,24 +95,58 @@ function PaywallScreen() {
   };
 
   const purchase = async () => {
+    // Find the selected package from RevenueCat offerings
+    const packageId = selectedPlan === 'monthly' ? '$rc_monthly' : '$rc_annual';
+    const pkg = offerings?.availablePackages?.find(
+      (p: any) => p.packageType === packageId,
+    ) ?? offerings?.availablePackages?.[selectedPlan === 'monthly' ? 0 : 1];
+
+    if (!pkg && Platform.OS !== 'web') {
+      Alert.alert('Error', 'Subscription products are not available yet. Please try again later.');
+      return;
+    }
+
     setPurchasing(true);
-    // In production this would call StoreKit / Google Play Billing via
-    // expo-in-app-purchases or RevenueCat. For now we simulate the success.
-    await new Promise((r) => setTimeout(r, 600));
-    setPremium(true);
-    setPurchasing(false);
-    Alert.alert(
-      'Welcome to Premium',
-      'You now have access to unlimited tracking, alerts, and AI insights.',
-      [{ text: 'Got it', onPress: close }],
-    );
+    try {
+      if (Platform.OS === 'web') {
+        // Web fallback — simulate for dev/preview
+        await new Promise((r) => setTimeout(r, 600));
+        setPremium(true);
+      } else {
+        const success = await purchasePackage(pkg);
+        if (success) setPremium(true);
+        else { setPurchasing(false); return; }
+      }
+      setPurchasing(false);
+      Alert.alert(
+        'Welcome to Premium',
+        'Your watchlist is now unlimited and price alerts are unlocked on every card.',
+        [{ text: 'Got it', onPress: close }],
+      );
+    } catch (e: any) {
+      setPurchasing(false);
+      Alert.alert('Purchase Failed', e.message || 'Something went wrong. Please try again.');
+    }
   };
 
-  const restore = () => {
-    Alert.alert(
-      'Restore Purchases',
-      "We'll check your Apple ID for any active subscriptions.",
-    );
+  const restore = async () => {
+    setPurchasing(true);
+    try {
+      const success = await restorePurchases();
+      setPurchasing(false);
+      if (success) {
+        setPremium(true);
+        Alert.alert('Premium Restored', 'Welcome back! Your premium subscription has been restored.');
+      } else {
+        Alert.alert(
+          'No Subscription Found',
+          "We didn't find an active CardPulse subscription. If you subscribed on another device, sign in with the same Apple ID and try again.",
+        );
+      }
+    } catch {
+      setPurchasing(false);
+      Alert.alert('Restore Failed', 'Could not restore purchases. Please try again.');
+    }
   };
 
   return (
@@ -163,7 +202,7 @@ function PaywallScreen() {
             color={colors.onSurfaceVariant}
             style={{ textAlign: 'center', maxWidth: 320 }}
           >
-            Track every card, get instant alerts, and unlock AI-powered insights.
+            Track unlimited cards and get pushed the moment prices hit your alerts.
           </Text>
         </View>
 
