@@ -17,6 +17,8 @@ interface UserPreferences {
   notificationsEnabled: boolean;
 }
 
+type AuthProvider = 'email' | 'apple' | 'google';
+
 interface UserStore {
   profile: UserProfile;
   preferences: UserPreferences;
@@ -24,6 +26,7 @@ interface UserStore {
   hasCompletedOnboarding: boolean;
   isAuthenticated: boolean;
   isPremium: boolean;
+  authProvider: AuthProvider;
   updateProfile: (updates: Partial<UserProfile>) => void;
   updatePreference: <K extends keyof UserPreferences>(
     key: K,
@@ -33,7 +36,7 @@ interface UserStore {
   removeRecentSearch: (query: string) => void;
   clearRecentSearches: () => void;
   completeOnboarding: () => void;
-  signIn: (profile: Partial<UserProfile>) => void;
+  signIn: (profile: Partial<UserProfile>, provider?: AuthProvider) => void;
   setPremium: (active: boolean) => void;
   signOut: () => void;
   deleteAccount: () => void;
@@ -50,7 +53,7 @@ export const useUserStore = create<UserStore>()(
     (set) => ({
       profile: DEFAULT_PROFILE,
       preferences: {
-        theme: 'system',
+        theme: 'dark',
         hapticEnabled: true,
         defaultGrade: 'PSA10',
         notificationsEnabled: true,
@@ -59,6 +62,7 @@ export const useUserStore = create<UserStore>()(
       hasCompletedOnboarding: false,
       isAuthenticated: false,
       isPremium: false,
+      authProvider: 'email',
 
       updateProfile: (updates) =>
         set((state) => ({
@@ -87,10 +91,11 @@ export const useUserStore = create<UserStore>()(
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 
-      signIn: (profile) => {
+      signIn: (profile, provider = 'email') => {
         setSentryUser({ email: profile.email, username: profile.username });
         set((state) => ({
           isAuthenticated: true,
+          authProvider: provider,
           profile: { ...state.profile, ...profile },
         }));
       },

@@ -19,7 +19,7 @@ function LoginScreen() {
     // and is intentionally stubbed for the App Store launch MVP.
     await new Promise((r) => setTimeout(r, 400));
     const username = '@' + values.email.split('@')[0];
-    signIn({ email: values.email, username, displayName: username.slice(1) });
+    signIn({ email: values.email, username, displayName: username.slice(1) }, 'email');
     setLoading(false);
     router.replace('/(tabs)');
   };
@@ -40,7 +40,7 @@ function LoginScreen() {
       const email = credential.email ?? 'apple-user@privaterelay.appleid.com';
       const username = '@' + displayName.toLowerCase().replace(/\s+/g, '');
 
-      signIn({ email, username, displayName });
+      signIn({ email, username, displayName }, 'apple');
       router.replace('/(tabs)');
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {

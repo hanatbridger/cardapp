@@ -8,6 +8,7 @@ import { Text, AuthForm, ScreenBackground, withErrorBoundary } from '../../src/c
 import { useUserStore } from '../../src/stores/user-store';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { safeGoBack } from '../../src/utils/safeGoBack';
 
 function SignupScreen() {
   const { colors } = useTheme();
@@ -26,7 +27,7 @@ function SignupScreen() {
       email: values.email,
       username,
       displayName: values.displayName || username.slice(1),
-    });
+    }, 'email');
     setLoading(false);
     router.replace('/(tabs)');
   };
@@ -46,7 +47,7 @@ function SignupScreen() {
       const email = credential.email ?? 'apple-user@privaterelay.appleid.com';
       const username = '@' + displayName.toLowerCase().replace(/\s+/g, '');
 
-      signIn({ email, username, displayName });
+      signIn({ email, username, displayName }, 'apple');
       router.replace('/(tabs)');
     } catch (e: any) {
       if (e.code !== 'ERR_REQUEST_CANCELED') {
@@ -73,7 +74,7 @@ function SignupScreen() {
         >
           {/* Back */}
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => safeGoBack('/(auth)/login')}
             hitSlop={8}
             style={{ padding: spacing[1], alignSelf: 'flex-start' }}
           >
