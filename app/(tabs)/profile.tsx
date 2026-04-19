@@ -1,17 +1,15 @@
 import React from 'react';
-import { View, ScrollView, Pressable, Alert, Platform, Share, Linking } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
 import {
-  IconCrown, IconBell, IconShield, IconFileText, IconHelpCircle, IconLogout,
+  IconCrown, IconShield, IconFileText, IconHelpCircle, IconLogout,
   IconChevronRight, IconDeviceMobile, IconStar,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, Card, Avatar, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, Card, Avatar, Button, ScreenBackground, withErrorBoundary } from '../../src/components';
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
-import { useWatchlistStore } from '../../src/stores';
-import { useAlertsStore } from '../../src/stores/alerts-store';
 import { useUserStore } from '../../src/stores/user-store';
 
 interface SettingsRowProps {
@@ -74,9 +72,7 @@ function SettingsDivider() {
 
 function ProfileScreen() {
   const { colors } = useTheme();
-  const { isPremium, items } = useWatchlistStore();
-  const { alerts } = useAlertsStore();
-  const { profile, signOut, deleteAccount } = useUserStore();
+  const { profile, signOut, deleteAccount, isPremium } = useUserStore();
 
   const handleSignOut = () => {
     if (Platform.OS === 'web') {
@@ -116,19 +112,17 @@ function ProfileScreen() {
     }
   };
 
+  // TODO(launch): once CardPulse is live in the App Store / Play Store,
+  // wire this to the real listing. Best path is `expo-store-review`'s
+  // `requestReview()` for the native in-app prompt, falling back to
+  // `Linking.openURL` for a deep link to the listing. Until then this
+  // button is hidden — the placeholder URL `id6740000000` would 404 and
+  // looked broken to anyone who tapped it.
   const handleRate = () => {
-    const url = Platform.OS === 'ios'
-      ? 'https://apps.apple.com/app/cardpulse/id6740000000'
-      : 'https://play.google.com/store/apps/details?id=com.cardpulse.app';
-    Linking.openURL(url).catch(() => {});
-  };
-
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: 'Check out CardPulse — track Pokemon card prices with AI insights! https://cardpulse.app',
-      });
-    } catch {}
+    Alert.alert(
+      'Thanks!',
+      "CardPulse isn't on the App Store yet. We'll prompt you to rate the app once it's live.",
+    );
   };
 
   return (
@@ -137,18 +131,28 @@ function ProfileScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: spacing[24] }}
       >
-        {/* Header */}
-        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[4], paddingBottom: spacing[5] }}>
+        {/* Header — 56-pt row matches Home, Notifications and Explore's
+            CollapsingHeader so the title stays at the same y-offset
+            across tab switches. */}
+        <View
+          style={{
+            height: 56,
+            paddingHorizontal: HORIZONTAL_PADDING,
+            flexDirection: 'row',
+            alignItems: 'center',
+          }}
+        >
           <Text variant="headingLg">Profile</Text>
         </View>
+        <View style={{ height: spacing[2] }} />
 
         {/* Account card */}
         <Pressable
           onPress={() => router.push('/edit-profile')}
           style={{ paddingHorizontal: HORIZONTAL_PADDING, marginBottom: spacing[4] }}
         >
-          <Card glass>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+          <Card glass style={{ padding: 0, overflow: 'hidden' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3], paddingHorizontal: spacing[4] }}>
               <Avatar name={profile.displayName} size={56} />
               <View style={{ flex: 1, gap: spacing['0.5'] }}>
                 <Text variant="headingSm">{profile.displayName}</Text>
@@ -165,15 +169,17 @@ function ProfileScreen() {
         {!isPremium && (
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginBottom: spacing[4] }}>
             <Pressable
-              style={{
+              onPress={() => router.push('/paywall')}
+              style={({ pressed }) => ({
                 flexDirection: 'row',
                 alignItems: 'center',
                 backgroundColor: colors.primary,
                 borderRadius: radius.xl,
                 padding: spacing[4],
                 gap: spacing[3],
+                opacity: pressed ? 0.85 : 1,
                 ...shadows.md,
-              }}
+              })}
             >
               <View
                 style={{
@@ -196,50 +202,6 @@ function ProfileScreen() {
             </Pressable>
           </View>
         )}
-
-        {/* Stats */}
-        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginBottom: spacing[4] }}>
-          <View style={{ flexDirection: 'row', gap: spacing[2] }}>
-            <Card style={{ flex: 1, padding: spacing[3] }}>
-              <View style={{ alignItems: 'center', gap: spacing['0.5'] }}>
-                <Text variant="headingMd">{items.length}</Text>
-                <Text variant="caption" color={colors.onSurfaceMuted}>Cards Tracked</Text>
-              </View>
-            </Card>
-            <Card style={{ flex: 1, padding: spacing[3] }}>
-              <View style={{ alignItems: 'center', gap: spacing['0.5'] }}>
-                <Text variant="headingMd">{alerts.length}</Text>
-                <Text variant="caption" color={colors.onSurfaceMuted}>Price Alerts</Text>
-              </View>
-            </Card>
-            <Card style={{ flex: 1, padding: spacing[3] }}>
-              <View style={{ alignItems: 'center', gap: spacing['0.5'] }}>
-                <Text variant="headingMd">{isPremium ? 'Pro' : 'Free'}</Text>
-                <Text variant="caption" color={colors.onSurfaceMuted}>Plan</Text>
-              </View>
-            </Card>
-          </View>
-        </View>
-
-        {/* General */}
-        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginBottom: spacing[3] }}>
-          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
-            GENERAL
-          </Text>
-        </View>
-        <Card style={{ marginHorizontal: HORIZONTAL_PADDING, padding: 0, overflow: 'hidden' }}>
-          <SettingsRow
-            icon={<IconBell size={18} color={colors.onSurfaceVariant} />}
-            label="Notifications"
-            onPress={() => router.push('/(tabs)/notifications')}
-          />
-          <SettingsDivider />
-          <SettingsRow
-            icon={<IconStar size={18} color={colors.warning} />}
-            label="Rate CardPulse"
-            onPress={handleRate}
-          />
-        </Card>
 
         {/* Legal */}
         <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
@@ -294,6 +256,19 @@ function ProfileScreen() {
             onPress={handleDeleteAccount}
           />
         </Card>
+
+        {/* Rate CardPulse CTA */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[6] }}>
+          <Button
+            variant="outlined"
+            size="lg"
+            fullWidth
+            icon={<IconStar size={18} color={colors.primary} />}
+            onPress={handleRate}
+          >
+            Rate CardPulse
+          </Button>
+        </View>
 
         <View style={{ height: spacing[4] }} />
       </ScrollView>
