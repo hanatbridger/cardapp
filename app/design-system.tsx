@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { View, ScrollView, Pressable, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import {
   IconChevronLeft,
   IconSearch,
   IconHeart,
   IconBell,
+  IconHome,
+  IconUser,
 } from '@tabler/icons-react-native';
 import {
   Text,
@@ -98,6 +101,101 @@ function TokenRow({ name, color, usage }: { name: string; color: string; usage: 
           <Text variant="caption" color={colors.onSurfaceMuted}>{color}</Text>
         </View>
         <Text variant="caption" color={colors.onSurfaceMuted}>{usage}</Text>
+      </View>
+    </View>
+  );
+}
+
+// ── Floating tab bar preview ───────────────────────────────
+// Static mirror of app/(tabs)/_layout.tsx FloatingTabBar used in the
+// design-system screen. Must track it — when the real bar changes,
+// update this preview too so the design system stays faithful.
+const TAB_BAR_HEIGHT = 64;
+const TAB_ICON_SIZE = 26;
+
+function TabBarPreview({ activeIndex }: { activeIndex: number }) {
+  const { colors, isDark } = useTheme();
+  const glassTint = isDark ? 'rgba(22, 27, 34, 0.55)' : 'rgba(255, 255, 255, 0.55)';
+  const hairline = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.08)';
+  const tabs = [
+    { key: 'home', Icon: IconHome, label: 'Home' },
+    { key: 'search', Icon: IconSearch, label: 'Search' },
+    { key: 'notifications', Icon: IconBell, label: 'Notifications' },
+    { key: 'profile', Icon: IconUser, label: 'Profile' },
+  ] as const;
+  const [home, ...right] = tabs;
+  const homeActive = activeIndex === 0;
+
+  const Glass = ({ children, style }: { children?: React.ReactNode; style?: any }) =>
+    Platform.OS === 'web' ? (
+      <View
+        style={[
+          style,
+          { backgroundColor: glassTint, borderWidth: 1, borderColor: hairline },
+          { backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' } as any,
+        ]}
+      >
+        {children}
+      </View>
+    ) : (
+      <BlurView intensity={28} tint={isDark ? 'dark' : 'light'} style={[style, { borderWidth: 1, borderColor: hairline, overflow: 'hidden' }]}>
+        {children}
+      </BlurView>
+    );
+
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center' }}>
+      {/* Home */}
+      <View style={{ width: TAB_BAR_HEIGHT, height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden' }}>
+        {homeActive ? (
+          <View
+            style={{
+              width: TAB_BAR_HEIGHT,
+              height: TAB_BAR_HEIGHT,
+              borderRadius: TAB_BAR_HEIGHT / 2,
+              backgroundColor: colors.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <IconHome size={TAB_ICON_SIZE} color={colors.onPrimary} strokeWidth={2} />
+          </View>
+        ) : (
+          <>
+            <Glass style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }} />
+            <View style={{ width: TAB_BAR_HEIGHT, height: TAB_BAR_HEIGHT, alignItems: 'center', justifyContent: 'center' }}>
+              <home.Icon size={TAB_ICON_SIZE} color={colors.onSurfaceVariant} strokeWidth={1.75} />
+            </View>
+          </>
+        )}
+      </View>
+      {/* Right pill */}
+      <View style={{ flex: 1, height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden' }}>
+        <Glass style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }} />
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[2] }}>
+          {right.map((tab, i) => {
+            const isActive = activeIndex === i + 1;
+            return (
+              <View
+                key={tab.key}
+                style={{
+                  flex: 1,
+                  height: 48,
+                  borderRadius: 9999,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isActive ? withAlpha(colors.primary, 0.15) : 'transparent',
+                }}
+              >
+                <tab.Icon
+                  size={TAB_ICON_SIZE}
+                  color={isActive ? colors.primary : colors.onSurfaceVariant}
+                  strokeWidth={isActive ? 2 : 1.75}
+                />
+              </View>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
@@ -448,6 +546,22 @@ function DesignSystemScreen() {
             </SectionBlock>
 
             {/* SegmentedControl */}
+            {/* Floating tab bar — UI motif #3 */}
+            <SectionBlock title="Floating tab bar" description="Liquid-glass pill navigation. BlurView on native, backdrop-filter on web. 64pt tall, 26pt icons. Home is a standalone circle; active state fills solid indigo. The right group is a glass pill with 3 tabs.">
+              <Card padding={spacing[6]}>
+                <View style={{ gap: spacing[4] }}>
+                  <Text variant="labelMd" color={colors.onSurfaceMuted}>Default state (Home active)</Text>
+                  <View style={{ height: 80, justifyContent: 'center' }}>
+                    <TabBarPreview activeIndex={0} />
+                  </View>
+                  <Text variant="labelMd" color={colors.onSurfaceMuted}>Search active</Text>
+                  <View style={{ height: 80, justifyContent: 'center' }}>
+                    <TabBarPreview activeIndex={1} />
+                  </View>
+                </View>
+              </Card>
+            </SectionBlock>
+
             <SectionBlock title="SegmentedControl" description="Tab-like selector for toggling between options.">
               <View style={{ maxWidth: 320, gap: spacing[3] }}>
                 <SegmentedControl options={['Raw', 'PSA 10']} selected={segmentIndex} onSelect={setSegmentIndex} />

@@ -65,16 +65,20 @@ Sizes: `sm`, `md`, `lg`. Auto color from `success`/`danger`. Trending icon prefi
 Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded amber/gray — to be tokenized.
 
 ### `FloatingTabBar` (in `app/(tabs)/_layout.tsx`)
-Custom floating tab bar. Not exported from barrel — defined inline in the tab layout.
+Custom floating tab bar — brand book motif #3. Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
 
-**Layout:** `[○ Home]  [Search · Bell · Profile]`
-- **Left:** Home button — standalone 48×48 circle, `glass.backgroundStrong` bg, `glass.border` 1px border, `radius` 24. Contains a 40×40 inner circle (`radius.xl`) that gets `withAlpha(primary, 0.15)` bg when active.
-- **Right:** Pill container — `flex: 1`, `glass.backgroundStrong` bg, `radius['2xl']` (24), `glass.border` 1px. Contains Search (`IconSearch`), Notifications (`IconBell`), Profile (`IconUser`) with `justifyContent: 'space-around'`. Each icon sits in a 40px pressable with `radius.xl` that gets `withAlpha(primary, 0.15)` bg when active.
-- **Active icon:** `colors.primary`, `strokeWidth: 2`
-- **Inactive icon:** `colors.onSurfaceMuted`, `strokeWidth: 1.5` (Home uses 1.6)
+**Layout:** `[● Home]  [Search · Bell · Profile]`
+- **Height:** 64pt bar, 26pt icons
+- **Glass surface:** `BlurView` on native (intensity 28, theme-matched tint), `backdrop-filter: blur(20px) saturate(140%)` on web. Hairline border `rgba(255,255,255,0.10)` dark / `rgba(17,24,39,0.08)` light.
+- **Home (left):** 64×64 circle.
+  - Active: solid `colors.primary` fill, `colors.onPrimary` icon, strokeWidth 2
+  - Inactive: glass pill matching right group, `colors.onSurfaceVariant` icon, strokeWidth 1.75
+- **Right pill:** `flex: 1`, 64pt tall, `radius.full`. Contains Search / Bell / Profile in 48pt-tall Pressables, each with `withAlpha(primary, 0.15)` background when active.
+- **Active icon:** `colors.primary`, strokeWidth 2
+- **Inactive icon:** `colors.onSurfaceVariant`, strokeWidth 1.75
 - **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`
+- **Hit testing:** outer wrapper uses `pointerEvents="box-none"` so the bar only captures taps on its actual Pressables — never on empty space between the circle and the pill.
 - All tabs trigger `Haptics.selectionAsync()` on press.
-- Icon size: 22 for all tabs.
 
 ## Domain components
 

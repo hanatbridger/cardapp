@@ -36,5 +36,12 @@ export const AnimatedListItem = React.memo(function AnimatedListItem({
     transform: [{ translateY: translateY.value }],
   }));
 
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
+  // `collapsable={false}` keeps the Android native view hierarchy intact so
+  // Pressable children inside `renderItem` reliably receive touch events
+  // through the animated transform.
+  return (
+    <Animated.View style={animatedStyle} collapsable={false}>
+      {children}
+    </Animated.View>
+  );
 });

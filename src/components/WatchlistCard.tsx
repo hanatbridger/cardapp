@@ -71,6 +71,9 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   return (
     <Pressable
       onPress={() => router.push(`/card/${cardId}`)}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${cardName}`}
       style={({ pressed }) => ({
         flexDirection: 'row',
         padding: spacing[3],

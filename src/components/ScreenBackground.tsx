@@ -80,6 +80,7 @@ export function ScreenBackground({ children, edges = ['top'] }: ScreenBackground
   return (
     <View style={{ flex: 1, overflow: 'hidden' }}>
       <AnimatedGradient
+        pointerEvents="none"
         colors={gradientColors as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
