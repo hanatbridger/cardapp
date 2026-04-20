@@ -96,10 +96,10 @@ function PaywallScreen() {
 
   const purchase = async () => {
     // Find the selected package from RevenueCat offerings
-    const packageId = selectedPlan === 'monthly' ? '$rc_monthly' : '$rc_annual';
+    const packageId = selected === 'monthly' ? '$rc_monthly' : '$rc_annual';
     const pkg = offerings?.availablePackages?.find(
       (p: any) => p.packageType === packageId,
-    ) ?? offerings?.availablePackages?.[selectedPlan === 'monthly' ? 0 : 1];
+    ) ?? offerings?.availablePackages?.[selected === 'monthly' ? 0 : 1];
 
     if (!pkg && Platform.OS !== 'web') {
       Alert.alert('Error', 'Subscription products are not available yet. Please try again later.');

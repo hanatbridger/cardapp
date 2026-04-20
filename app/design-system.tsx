@@ -505,7 +505,7 @@ function DesignSystemScreen() {
                   setName={MOCK_CARDS[0].set.name}
                   grade="PSA10"
                   rarity={MOCK_CARDS[0].rarity}
-                  price={{ cardName: MOCK_CARDS[0].name, grade: 'PSA10', currentPrice: 1560, previousPrice: 1500, percentChange: 4.0, lastSaleDate: '2026-04-10', lastSalePrice: 1555, averagePrice: 1520, highPrice: 1600, lowPrice: 1480, salesCount: 12, source: 'ebay' as const }}
+                  fallbackPrice={{ cardName: MOCK_CARDS[0].name, grade: 'PSA10', currentPrice: 1560, previousPrice: 1500, percentChange: 4.0, lastSaleDate: '2026-04-10', lastSalePrice: 1555, averagePrice: 1520, highPrice: 1600, lowPrice: 1480, salesCount: 12, source: 'ebay' as const }}
                 />
                 <WatchlistCard
                   cardId={MOCK_CARDS[1].id}
@@ -514,7 +514,7 @@ function DesignSystemScreen() {
                   setName={MOCK_CARDS[1].set.name}
                   grade="UNGRADED"
                   rarity={MOCK_CARDS[1].rarity}
-                  price={{ cardName: MOCK_CARDS[1].name, grade: 'UNGRADED', currentPrice: 245, previousPrice: 230, percentChange: 6.52, lastSaleDate: '2026-04-11', lastSalePrice: 248, averagePrice: 235, highPrice: 260, lowPrice: 220, salesCount: 28, source: 'ebay' as const }}
+                  fallbackPrice={{ cardName: MOCK_CARDS[1].name, grade: 'UNGRADED', currentPrice: 245, previousPrice: 230, percentChange: 6.52, lastSaleDate: '2026-04-11', lastSalePrice: 248, averagePrice: 235, highPrice: 260, lowPrice: 220, salesCount: 28, source: 'ebay' as const }}
                 />
               </View>
             </SectionBlock>

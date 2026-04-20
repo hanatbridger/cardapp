@@ -13,6 +13,7 @@ import { formatPrice } from '../utils/format';
 import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getValuation } from '../services/price-prediction';
+import { useCardPrice } from '../hooks/use-card-price';
 import type { GradeType } from '../constants/grades';
 import type { CardPrice } from '../types/card';
 
@@ -21,9 +22,13 @@ interface WatchlistCardProps {
   cardName: string;
   cardImageUrl: string;
   setName: string;
+  /** Card number within set — needed to query the right eBay listings */
+  setNumber?: string;
   grade: GradeType;
   rarity?: string;
-  price?: CardPrice;
+  language?: 'EN' | 'JP';
+  /** Fallback price (mock / last-known) shown while live price loads or if it fails */
+  fallbackPrice?: CardPrice;
 }
 
 export const WatchlistCard = React.memo(function WatchlistCard({
@@ -31,11 +36,25 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   cardName,
   cardImageUrl,
   setName,
+  setNumber,
   grade,
   rarity,
-  price,
+  language,
+  fallbackPrice,
 }: WatchlistCardProps) {
   const { colors } = useTheme();
+
+  // Fetch live price — shares React Query cache with the detail screen,
+  // so the same card always shows the same number across the app.
+  const { data: livePrice } = useCardPrice({
+    cardName,
+    grade,
+    cardId,
+    setName,
+    cardNumber: setNumber,
+    language,
+  });
+  const price = livePrice ?? fallbackPrice;
 
   // AI valuation
   const score = getCardScore(cardId);
