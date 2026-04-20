@@ -17,6 +17,14 @@ import {
 } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
 import { configureRevenueCat } from '../src/services/revenue-cat';
+import {
+  useFonts,
+  SpaceGrotesk_300Light,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -70,12 +78,24 @@ function AlertCheckerHost() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGrotesk_300Light,
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+  });
+
   useEffect(() => {
-    // No custom fonts to load — using system font (SF Pro / Roboto)
-    SplashScreen.hideAsync().catch(() => {});
-    // Register background fetch for price alerts. Idempotent + no-op on web.
-    registerBackgroundAlertTask();
-  }, []);
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+      registerBackgroundAlertTask();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <View style={{ flex: 1 }}>

@@ -200,14 +200,14 @@ export function PriceChart({
               {/* High label */}
               <SvgText
                 x={chartWidth + 8} y={pad + 4}
-                fill={colors.onSurfaceMuted} fontSize={10} fontFamily="Inter"
+                fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
               >
                 ${maxPrice.toFixed(0)}
               </SvgText>
               {/* Low label */}
               <SvgText
                 x={chartWidth + 8} y={chartHeight - pad + 4}
-                fill={colors.onSurfaceMuted} fontSize={10} fontFamily="Inter"
+                fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
               >
                 ${minPrice.toFixed(0)}
               </SvgText>
@@ -231,7 +231,7 @@ export function PriceChart({
             <SvgText
               key={m.label + m.x}
               x={m.x} y={chartHeight + LABEL_HEIGHT - 4}
-              fill={colors.onSurfaceMuted} fontSize={10} fontFamily="Inter"
+              fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
             >
               {m.label}
             </SvgText>

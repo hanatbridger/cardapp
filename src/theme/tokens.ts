@@ -169,9 +169,27 @@ export type ColorTokens = { [K in keyof typeof lightColors]: string };
 
 // ── Typography ──────────────────────────────────────────────
 
+// Space Grotesk weight → loaded font family name. Matches the exports from
+// `@expo-google-fonts/space-grotesk` — kept here so components (Text, Input,
+// PriceChart SVG) can resolve the right family without re-importing the pkg.
+export const spaceGroteskByWeight = {
+  '300': 'SpaceGrotesk_300Light',
+  '400': 'SpaceGrotesk_400Regular',
+  '500': 'SpaceGrotesk_500Medium',
+  '600': 'SpaceGrotesk_600SemiBold',
+  '700': 'SpaceGrotesk_700Bold',
+} as const;
+
+export type SpaceGroteskWeight = keyof typeof spaceGroteskByWeight;
+
+export function fontFamilyForWeight(weight: string | number | undefined): string {
+  const key = String(weight ?? '400') as SpaceGroteskWeight;
+  return spaceGroteskByWeight[key] ?? spaceGroteskByWeight['400'];
+}
+
 export const typography = {
   fontFamily: {
-    sans: undefined as string | undefined, // System font: SF Pro (iOS) / Roboto (Android)
+    sans: 'SpaceGrotesk_400Regular',
     mono: 'JetBrainsMono',
   },
   displayLg: { fontSize: 48, fontWeight: '700' as const, lineHeight: 48 * 1.1, letterSpacing: -1.5 },
