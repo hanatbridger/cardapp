@@ -16,7 +16,7 @@ import Purchases, {
   type CustomerInfo,
 } from 'react-native-purchases';
 
-const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY ?? 'test_NRxVqTieJsJanfwvTsMjqCsduAt';
+const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 const ENTITLEMENT_ID = 'CardPulse Pro';
 
 let isConfigured = false;
@@ -26,6 +26,20 @@ let isConfigured = false;
  */
 export async function configureRevenueCat(): Promise<void> {
   if (isConfigured || Platform.OS === 'web') return;
+
+  if (!API_KEY) {
+    // No silent fallback — a missing key on native means IAP is dead.
+    // Log loudly in dev; stay quiet in prod so we don't spam Sentry,
+    // but leave the SDK unconfigured so purchase attempts fail fast.
+    if (__DEV__) {
+      console.warn(
+        '[RevenueCat] EXPO_PUBLIC_REVENUECAT_API_KEY is not set. ' +
+        'Purchases and restore will not work. ' +
+        'Set it in .env locally and in EAS env for builds.'
+      );
+    }
+    return;
+  }
 
   if (__DEV__) {
     Purchases.setLogLevel(LOG_LEVEL.VERBOSE);
