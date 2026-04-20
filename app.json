@@ -61,6 +61,13 @@
         }
       ],
       "@sentry/react-native"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2aae8829-2a01-4d59-8e95-7219841e27a0"
+      }
+    },
+    "owner": "hanwongz"
   }
 }
