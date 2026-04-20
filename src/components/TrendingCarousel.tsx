@@ -122,6 +122,7 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
       renderItem={({ item }) => <TrendingCard {...item} />}
       horizontal
       showsHorizontalScrollIndicator={false}
+      removeClippedSubviews
       contentContainerStyle={{ gap: ITEM_GAP, paddingHorizontal: spacing[4] }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
