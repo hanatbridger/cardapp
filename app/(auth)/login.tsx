@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert } fr
 import { router, Link } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, AuthForm, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
@@ -66,11 +66,14 @@ function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View style={{ gap: spacing[2] }}>
-            <Text variant="displaySm">Welcome back</Text>
-            <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-              Sign in to keep tracking your collection.
-            </Text>
+          <View style={{ gap: spacing[4] }}>
+            <BrandMark size={56} />
+            <View style={{ gap: spacing[2] }}>
+              <Text variant="displaySm">Welcome back</Text>
+              <Text variant="bodyMd" color={colors.onSurfaceVariant}>
+                Sign in to keep tracking your collection.
+              </Text>
+            </View>
           </View>
 
           {/* Form */}

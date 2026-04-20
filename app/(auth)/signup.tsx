@@ -4,7 +4,7 @@ import { router, Link } from 'expo-router';
 import { IconChevronLeft } from '@tabler/icons-react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, AuthForm, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
@@ -82,11 +82,14 @@ function SignupScreen() {
           </Pressable>
 
           {/* Header */}
-          <View style={{ gap: spacing[2] }}>
-            <Text variant="displaySm">Create your account</Text>
-            <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-              Track prices, build watchlists, and never miss a market move.
-            </Text>
+          <View style={{ gap: spacing[4] }}>
+            <BrandMark size={56} />
+            <View style={{ gap: spacing[2] }}>
+              <Text variant="displaySm">Create your account</Text>
+              <Text variant="bodyMd" color={colors.onSurfaceVariant}>
+                Track prices, build watchlists, and never miss a market move.
+              </Text>
+            </View>
           </View>
 
           {/* Form */}

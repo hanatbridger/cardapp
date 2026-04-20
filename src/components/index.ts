@@ -25,3 +25,4 @@ export { ErrorBoundary, withErrorBoundary } from './ErrorBoundary';
 export { AuthForm } from './AuthForm';
 export { Skeleton, CardDetailSkeleton } from './Skeleton';
 export { AnimatedListItem } from './AnimatedListItem';
+export { BrandMark } from './BrandMark';
