@@ -17,6 +17,10 @@
       "bundleIdentifier": "com.getcardpulse.app",
       "buildNumber": "1",
       "supportsTablet": true,
+      "icon": {
+        "dark": "./assets/icon-dark.png",
+        "tinted": "./assets/icon-tinted.png"
+      },
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -38,7 +42,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0D1117"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
