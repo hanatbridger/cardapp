@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { View, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
 import { router } from 'expo-router';
@@ -22,8 +23,14 @@ import { useWatchlistStore, useUserStore } from '../../src/stores';
 import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
 
+// Floating tab bar occupies 64pt + safe-area bottom + offset. Pad the
+// list enough that the last card clears the glass pill — otherwise its
+// middle sits under the bar and the bar's Pressables steal the tap.
+const TAB_BAR_CLEARANCE = 64 + 4;
+
 function WatchlistScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const { items, maxFreeItems } = useWatchlistStore();
   const isPremium = useUserStore((s) => s.isPremium);
   const [refreshing, setRefreshing] = useState(false);
@@ -192,7 +199,10 @@ function WatchlistScreen() {
             onAction={() => router.push('/(tabs)/search')}
           />
         }
-        contentContainerStyle={{ paddingBottom: spacing[24], gap: spacing[1] }}
+        contentContainerStyle={{
+          paddingBottom: TAB_BAR_CLEARANCE + insets.bottom + spacing[6],
+          gap: spacing[1],
+        }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl

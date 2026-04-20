@@ -129,8 +129,13 @@ function FloatingTabBar({ state, navigation }: any) {
         </View>
       </Pressable>
 
-      {/* Right group — Search, Bell, Profile in a glass pill. */}
+      {/* Right group — Search, Bell, Profile in a glass pill. The wrapper
+          and the inner row are pointerEvents="box-none" so clicks in the
+          dead zones around the 48pt Pressables (top/bottom strips,
+          horizontal padding) pass through to the content beneath instead
+          of being swallowed by the glass. */}
       <View
+        pointerEvents="box-none"
         style={{
           flex: 1,
           height: BAR_HEIGHT,
@@ -140,6 +145,7 @@ function FloatingTabBar({ state, navigation }: any) {
       >
         {renderGlassSurface(BAR_HEIGHT / 2)}
         <View
+          pointerEvents="box-none"
           style={{
             flex: 1,
             flexDirection: 'row',
