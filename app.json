@@ -18,7 +18,9 @@
       "buildNumber": "1",
       "supportsTablet": true,
       "icon": {
-        "tinted": "./assets/icon-tinted.png"
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon.png",
+        "tinted": "./assets/icon.png"
       },
       "config": {
         "usesNonExemptEncryption": false
