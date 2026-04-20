@@ -115,83 +115,86 @@ const TAB_ICON_SIZE = 26;
 
 function TabBarPreview({ activeIndex }: { activeIndex: number }) {
   const { colors, isDark } = useTheme();
-  const glassTint = isDark ? 'rgba(22, 27, 34, 0.55)' : 'rgba(255, 255, 255, 0.55)';
+  const glassTint = isDark ? 'rgba(22, 27, 34, 0.40)' : 'rgba(255, 255, 255, 0.60)';
   const hairline = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.08)';
+  const ACTIVE_PILL = 48;
   const tabs = [
-    { key: 'home', Icon: IconHome, label: 'Home' },
-    { key: 'search', Icon: IconSearch, label: 'Search' },
-    { key: 'notifications', Icon: IconBell, label: 'Notifications' },
-    { key: 'profile', Icon: IconUser, label: 'Profile' },
+    { key: 'home', Icon: IconHome },
+    { key: 'search', Icon: IconSearch },
+    { key: 'notifications', Icon: IconBell },
+    { key: 'profile', Icon: IconUser },
   ] as const;
-  const [home, ...right] = tabs;
+  const [, ...right] = tabs;
   const homeActive = activeIndex === 0;
 
-  const Glass = ({ children, style }: { children?: React.ReactNode; style?: any }) =>
+  const Glass = ({ style }: { style?: any }) =>
     Platform.OS === 'web' ? (
       <View
+        pointerEvents="none"
         style={[
           style,
           { backgroundColor: glassTint, borderWidth: 1, borderColor: hairline },
-          { backdropFilter: 'blur(20px) saturate(140%)', WebkitBackdropFilter: 'blur(20px) saturate(140%)' } as any,
+          { backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)' } as any,
         ]}
-      >
-        {children}
-      </View>
+      />
     ) : (
-      <BlurView intensity={28} tint={isDark ? 'dark' : 'light'} style={[style, { borderWidth: 1, borderColor: hairline, overflow: 'hidden' }]}>
-        {children}
-      </BlurView>
+      <BlurView
+        intensity={40}
+        tint={isDark ? 'dark' : 'light'}
+        style={[style, { borderWidth: 1, borderColor: hairline, overflow: 'hidden' }]}
+      />
     );
+
+  const activePill = (isActive: boolean) => ({
+    width: ACTIVE_PILL,
+    height: ACTIVE_PILL,
+    borderRadius: ACTIVE_PILL / 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: isActive ? withAlpha(colors.primary, 0.15) : 'transparent',
+  });
 
   return (
     <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center' }}>
-      {/* Home */}
-      <View style={{ width: TAB_BAR_HEIGHT, height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden' }}>
-        {homeActive ? (
-          <View
-            style={{
-              width: TAB_BAR_HEIGHT,
-              height: TAB_BAR_HEIGHT,
-              borderRadius: TAB_BAR_HEIGHT / 2,
-              backgroundColor: colors.primary,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <IconHome size={TAB_ICON_SIZE} color={colors.onPrimary} strokeWidth={2} />
-          </View>
-        ) : (
-          <>
-            <Glass style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }} />
-            <View style={{ width: TAB_BAR_HEIGHT, height: TAB_BAR_HEIGHT, alignItems: 'center', justifyContent: 'center' }}>
-              <home.Icon size={TAB_ICON_SIZE} color={colors.onSurfaceVariant} strokeWidth={1.75} />
-            </View>
-          </>
-        )}
+      {/* Home — glass circle with the same inner active pill as the right group. */}
+      <View
+        style={{
+          width: TAB_BAR_HEIGHT,
+          height: TAB_BAR_HEIGHT,
+          borderRadius: TAB_BAR_HEIGHT / 2,
+          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Glass
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }}
+        />
+        <View style={activePill(homeActive)}>
+          <IconHome
+            size={TAB_ICON_SIZE}
+            color={homeActive ? colors.primary : colors.onSurfaceVariant}
+            strokeWidth={homeActive ? 2 : 1.75}
+          />
+        </View>
       </View>
       {/* Right pill */}
       <View style={{ flex: 1, height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden' }}>
-        <Glass style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }} />
+        <Glass
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }}
+        />
         <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[2] }}>
           {right.map((tab, i) => {
             const isActive = activeIndex === i + 1;
             return (
-              <View
-                key={tab.key}
-                style={{
-                  flex: 1,
-                  height: 48,
-                  borderRadius: 9999,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: isActive ? withAlpha(colors.primary, 0.15) : 'transparent',
-                }}
-              >
-                <tab.Icon
-                  size={TAB_ICON_SIZE}
-                  color={isActive ? colors.primary : colors.onSurfaceVariant}
-                  strokeWidth={isActive ? 2 : 1.75}
-                />
+              <View key={tab.key} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={activePill(isActive)}>
+                  <tab.Icon
+                    size={TAB_ICON_SIZE}
+                    color={isActive ? colors.primary : colors.onSurfaceVariant}
+                    strokeWidth={isActive ? 2 : 1.75}
+                  />
+                </View>
               </View>
             );
           })}

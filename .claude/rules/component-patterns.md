@@ -68,15 +68,13 @@ Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded a
 Custom floating tab bar — brand book motif #3. Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
 
 **Layout:** `[● Home]  [Search · Bell · Profile]`
-- **Height:** 64pt bar, 26pt icons
-- **Glass surface:** `BlurView` on native (intensity 28, theme-matched tint), `backdrop-filter: blur(20px) saturate(140%)` on web. Hairline border `rgba(255,255,255,0.10)` dark / `rgba(17,24,39,0.08)` light.
-- **Home (left):** 64×64 circle.
-  - Active: solid `colors.primary` fill, `colors.onPrimary` icon, strokeWidth 2
-  - Inactive: glass pill matching right group, `colors.onSurfaceVariant` icon, strokeWidth 1.75
-- **Right pill:** `flex: 1`, 64pt tall, `radius.full`. Contains Search / Bell / Profile in 48pt-tall Pressables, each with `withAlpha(primary, 0.15)` background when active.
-- **Active icon:** `colors.primary`, strokeWidth 2
-- **Inactive icon:** `colors.onSurfaceVariant`, strokeWidth 1.75
-- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`
+- **Height:** 64pt bar, 26pt icons.
+- **Liquid-glass surface:** `BlurView` on native (intensity 40, theme-matched tint), `backdrop-filter: blur(24px) saturate(180%)` on web. Tint `rgba(22,27,34,0.40)` dark / `rgba(255,255,255,0.60)` light. Hairline border `rgba(255,255,255,0.10)` dark / `rgba(17,24,39,0.08)` light. Both the home circle and the right pill render the **same** surface so they read as one control.
+- **Home (left):** 64×64 glass circle. Uses the identical 48pt active indicator as the right-group tabs — never a solid-fill state.
+- **Right pill:** `flex: 1`, 64pt tall, `radius.full`. Contains Search / Bell / Profile in evenly-divided cells.
+- **Active indicator (all four tabs):** 48pt pill with `withAlpha(primary, 0.15)` background, icon `colors.primary`, strokeWidth 2.
+- **Inactive icon:** `colors.onSurfaceVariant`, strokeWidth 1.75, transparent bg.
+- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`.
 - **Hit testing:** outer wrapper uses `pointerEvents="box-none"` so the bar only captures taps on its actual Pressables — never on empty space between the circle and the pill.
 - All tabs trigger `Haptics.selectionAsync()` on press.
 

@@ -4,7 +4,7 @@
     {
       "name": "expo",
       "runtimeExecutable": "sh",
-      "runtimeArgs": ["-c", "cd /Users/hanwong/code/cardApp && npx expo start --web"],
+      "runtimeArgs": ["-c", "cd /Users/hanwong/code/cardApp/.claude/worktrees/strange-saha && npx expo start --web"],
       "port": 8081
     }
   ]
