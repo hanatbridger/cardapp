@@ -18,6 +18,11 @@ export interface WatchlistItem {
   language?: 'EN' | 'JP';
 }
 
+// Seeded with two highly-recognisable movers so a brand-new user lands
+// on a non-empty Home (empty lists feel broken at first open) without
+// making the screen feel pre-populated. Everything beyond these two is
+// user-added. Keep this list short — the trending rail above already
+// surfaces the rest of the catalogue.
 const DEFAULT_WATCHLIST: WatchlistItem[] = [
   {
     cardId: 'sv3pt5-199',
@@ -29,15 +34,6 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
     addedAt: '2026-03-15T00:00:00Z',
   },
   {
-    cardId: 'sv8-238',
-    cardName: 'Pikachu ex',
-    cardImageUrl: 'https://images.pokemontcg.io/sv8/238.png',
-    setName: 'Surging Sparks',
-    setNumber: '238',
-    grade: 'UNGRADED',
-    addedAt: '2026-03-20T00:00:00Z',
-  },
-  {
     cardId: 'sv8pt5-161',
     cardName: 'Umbreon ex',
     cardImageUrl: 'https://images.pokemontcg.io/sv8pt5/161.png',
@@ -45,24 +41,6 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
     setNumber: '161',
     grade: 'PSA10',
     addedAt: '2026-03-25T00:00:00Z',
-  },
-  {
-    cardId: 'sv2-269',
-    cardName: 'Iono',
-    cardImageUrl: 'https://images.pokemontcg.io/sv2/269.png',
-    setName: 'Paldea Evolved',
-    setNumber: '269',
-    grade: 'PSA10',
-    addedAt: '2026-03-28T00:00:00Z',
-  },
-  {
-    cardId: 'sv3pt5-205',
-    cardName: 'Mew ex',
-    cardImageUrl: 'https://images.pokemontcg.io/sv3pt5/205.png',
-    setName: '151',
-    setNumber: '205',
-    grade: 'PSA10',
-    addedAt: '2026-04-01T00:00:00Z',
   },
 ];
 

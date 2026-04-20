@@ -61,7 +61,13 @@ function FloatingTabBar({ state, navigation }: any) {
         }}
       />
     ) : (
+      // `pointerEvents="none"` on native — otherwise BlurView (default
+      // `auto`) swallows taps that land in the pill's dead zones (the
+      // 8pt strips above/below the 48pt Pressables and the horizontal
+      // padding around the tab row), and the list rows beneath the bar
+      // never receive them.
       <BlurView
+        pointerEvents="none"
         intensity={BLUR_INTENSITY}
         tint={isDark ? 'dark' : 'light'}
         style={{

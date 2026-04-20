@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
+import { useUserStore } from '../stores/user-store';
 import {
   lightColors,
   darkColors,
@@ -35,7 +36,16 @@ const ThemeContext = createContext<Theme | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  // User preference overrides the OS-level scheme. `system` defers to the
+  // OS (`useColorScheme`); `light`/`dark` pin the app regardless of OS. We
+  // subscribe to just the `theme` field so flipping it from the profile
+  // tab triggers a single provider re-render and every themed component
+  // re-resolves with the new palette.
+  const themePreference = useUserStore((s) => s.preferences.theme);
+  const isDark =
+    themePreference === 'system'
+      ? colorScheme === 'dark'
+      : themePreference === 'dark';
 
   const theme = useMemo<Theme>(
     () => ({

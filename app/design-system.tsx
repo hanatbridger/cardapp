@@ -139,6 +139,7 @@ function TabBarPreview({ activeIndex }: { activeIndex: number }) {
       />
     ) : (
       <BlurView
+        pointerEvents="none"
         intensity={40}
         tint={isDark ? 'dark' : 'light'}
         style={[style, { borderWidth: 1, borderColor: hairline, overflow: 'hidden' }]}
@@ -550,7 +551,7 @@ function DesignSystemScreen() {
 
             {/* SegmentedControl */}
             {/* Floating tab bar — UI motif #3 */}
-            <SectionBlock title="Floating tab bar" description="Liquid-glass pill navigation. BlurView on native, backdrop-filter on web. 64pt tall, 26pt icons. Home is a standalone circle; active state fills solid indigo. The right group is a glass pill with 3 tabs.">
+            <SectionBlock title="Floating tab bar" description="Liquid-glass pill navigation. BlurView on native (pointerEvents none so the glass never swallows taps), backdrop-filter on web. 64pt tall, 26pt icons. Home is a standalone glass circle that shares the same 48pt tonal-indigo active indicator as the right-pill tabs — all four tabs read as one control. The right group is a glass pill with Search · Bell · Profile.">
               <Card padding={spacing[6]}>
                 <View style={{ gap: spacing[4] }}>
                   <Text variant="labelMd" color={colors.onSurfaceMuted}>Default state (Home active)</Text>

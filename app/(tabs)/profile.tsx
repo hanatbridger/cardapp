@@ -6,7 +6,7 @@ import {
   IconChevronRight, IconDeviceMobile, IconStar,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, Card, Button, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, Card, Button, ScreenBackground, SegmentedControl, withErrorBoundary } from '../../src/components';
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
@@ -72,9 +72,15 @@ function SettingsDivider() {
   return <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginHorizontal: spacing[4] }} />;
 }
 
+const THEME_OPTIONS = ['System', 'Light', 'Dark'] as const;
+const THEME_VALUES = ['system', 'light', 'dark'] as const;
+
 function ProfileScreen() {
   const { colors } = useTheme();
   const { profile, signOut, deleteAccount, isPremium } = useUserStore();
+  const themePreference = useUserStore((s) => s.preferences.theme);
+  const updatePreference = useUserStore((s) => s.updatePreference);
+  const selectedThemeIndex = Math.max(0, THEME_VALUES.indexOf(themePreference));
 
   const handleSignOut = () => {
     if (Platform.OS === 'web') {
@@ -203,6 +209,23 @@ function ProfileScreen() {
             </Pressable>
           </View>
         )}
+
+        {/* Appearance — lets users pin the app to light or dark, or
+            follow the OS. Writes to `preferences.theme`; the
+            ThemeProvider subscribes and rebinds every themed component
+            on change. */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
+          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
+            APPEARANCE
+          </Text>
+        </View>
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING }}>
+          <SegmentedControl
+            options={[...THEME_OPTIONS]}
+            selected={selectedThemeIndex}
+            onSelect={(i) => updatePreference('theme', THEME_VALUES[i])}
+          />
+        </View>
 
         {/* Legal */}
         <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
