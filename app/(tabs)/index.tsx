@@ -13,6 +13,7 @@ import {
   AnimatedListItem,
   ScreenBackground,
   Badge,
+  BrandMark,
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
@@ -64,7 +65,10 @@ function WatchlistScreen() {
                 paddingHorizontal: HORIZONTAL_PADDING,
               }}
             >
-              <Text variant="headingLg">Home</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                <BrandMark size={24} />
+                <Text variant="title">CardPulse</Text>
+              </View>
               <Pressable
                 // `focus=1` opens Explore directly into the X-style focused
                 // search overlay. `from=home` tells Explore that Cancel

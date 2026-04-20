@@ -28,12 +28,20 @@ Variants: `displayLg/Md/Sm`, `headingLg/Md/Sm`, `bodyLg/Md/Sm`, `labelLg/Md/Sm`,
 - `forwardRef` — works with React Hook Form
 - Vertical stack: label / field / hint or error
 
-### `<Badge variant="..." dot>`
-- Variants: `success`, `warning`, `danger`, `info`, `neutral`
-- Status dot on by default
+### `<Badge variant="..." dot>` — pulse chip
+Renders the brand book chip recipe: `{ramp-400}` at 18% alpha fill, `{ramp-200}` text, 12px radius, SG 500 12/-0.1. Every chip carries categorical meaning — do not invent free-form labels.
+
+- **Tier 1 — price movement:** `gain`, `loss` (use `▲`/`▼` prefix in children)
+- **Tier 2 — valuation verdict:** `undervalued`, `overvalued`
+- **Tier 3 — grading status:** `graded`, `ungraded`
+- **Tier 4 — signals / scarcity:** `live` (auto dot), `trophy` (used sparingly)
+- **Legacy aliases** (back-compat, prefer tier variants): `success`, `warning`, `danger`, `info`, `neutral`
 
 ### `<SegmentedControl options={[]} value onChange>`
 Glass background, active item gets `surface` + `shadows.sm`.
+
+### `<BrandMark size={24} variant="color" | "mono" color>`
+The CardPulse prism. Use only in brand moments (auth screens, home header, splash). Never rotate, stretch, gradient, glow, or place indigo-on-indigo — see brand book page 03.
 
 ### `<Avatar uri name size={40}>`
 Falls back to initials in `primaryContainer`.

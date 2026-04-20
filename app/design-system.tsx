@@ -177,7 +177,8 @@ function DesignSystemScreen() {
           <>
             <SectionBlock title="Brand palette" description="Core identity colors that define CardPulse's visual presence.">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] }}>
-                <ColorSwatch name="primary" color={colors.primary} description="Primary brand. Buttons, links, accents." />
+                <ColorSwatch name="primary" color={colors.primary} description="Indigo — primary brand. Buttons, links, accents." />
+                <ColorSwatch name="indigoLift" color={colors.indigoLift} description="Indigo Lift — logo facet and subtle brand highlights." />
                 <ColorSwatch name="primaryActive" color={colors.primaryActive} description="Pressed/active state of primary." />
                 <ColorSwatch name="success" color={colors.success} description="Positive changes, gains, confirmations." />
                 <ColorSwatch name="warning" color={colors.warning} description="Caution states, alerts." />
@@ -219,7 +220,7 @@ function DesignSystemScreen() {
 
       case 'typography':
         return (
-          <SectionBlock title="Type scale" description="System font: SF Pro on iOS, Roboto on Android. All variants with size and weight.">
+          <SectionBlock title="Type scale" description="Space Grotesk only. Weights locked to 400 / 500 / 700 (brand book). Numerals variant uses tabular figures for price alignment.">
             <Card>
               <View style={{ gap: spacing[3] }}>
                 {TYPE_VARIANTS.map((variant) => {
@@ -373,22 +374,29 @@ function DesignSystemScreen() {
             </SectionBlock>
 
             {/* Badges */}
-            <SectionBlock title="Badge & GradeBadge" description="Status indicators and PSA grade labels.">
+            <SectionBlock title="Pulse chips" description="Categorical indicators following the brand book 03.1 recipe — 400-level fill at 18% alpha, 200-level text, 12px radius. Every chip carries one meaning.">
               <View style={isDesktop ? { flexDirection: 'row', gap: spacing[4] } : { gap: spacing[4] }}>
                 <Card style={{ flex: 1 }}>
                   <View style={{ gap: spacing[3] }}>
-                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Badge variants</Text>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 1 — Price movement</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                      <Badge variant="success">Success</Badge>
-                      <Badge variant="warning">Warning</Badge>
-                      <Badge variant="danger">Danger</Badge>
-                      <Badge variant="info">Info</Badge>
-                      <Badge variant="neutral">Neutral</Badge>
+                      <Badge variant="gain">▲ Gain</Badge>
+                      <Badge variant="loss">▼ Loss</Badge>
                     </View>
-                    <Text variant="labelMd" color={colors.onSurfaceMuted}>With dot</Text>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 2 — Valuation verdict</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                      <Badge variant="success" dot>Active</Badge>
-                      <Badge variant="danger" dot>Offline</Badge>
+                      <Badge variant="undervalued">Undervalued</Badge>
+                      <Badge variant="overvalued">Overvalued</Badge>
+                    </View>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 3 — Grading status</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+                      <Badge variant="graded">PSA 10</Badge>
+                      <Badge variant="ungraded">Ungraded</Badge>
+                    </View>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 4 — Signals and scarcity</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+                      <Badge variant="live">Live</Badge>
+                      <Badge variant="trophy">Trophy</Badge>
                     </View>
                   </View>
                 </Card>
