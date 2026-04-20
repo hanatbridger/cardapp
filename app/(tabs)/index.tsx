@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, FlatList, Pressable, RefreshControl } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
 import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
 import { router } from 'expo-router';
@@ -12,6 +12,7 @@ import {
   EmptyState,
   AnimatedListItem,
   ScreenBackground,
+  Badge,
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
@@ -83,6 +84,26 @@ function WatchlistScreen() {
                 }}
               >
                 <IconSearch size={20} color={colors.onSurfaceVariant} />
+              </Pressable>
+            </View>
+
+            {/* Demo data notice — prices shown are from a seeded dataset
+                until the live eBay pricing service is deployed. Tapping
+                the chip explains this to users and App Store reviewers. */}
+            <View style={{ paddingHorizontal: HORIZONTAL_PADDING }}>
+              <Pressable
+                onPress={() =>
+                  Alert.alert(
+                    'Sample data',
+                    'CardPulse is in early access. Prices, trends, and recent sales shown here come from a curated sample dataset. Live eBay pricing turns on soon — your watchlist and alerts will keep working the whole time.',
+                    [{ text: 'Got it' }],
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel="Sample data notice. Tap for details."
+                hitSlop={8}
+              >
+                <Badge variant="info">Sample data — tap for details</Badge>
               </Pressable>
             </View>
 
