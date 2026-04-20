@@ -18,7 +18,6 @@
       "buildNumber": "1",
       "supportsTablet": true,
       "icon": {
-        "dark": "./assets/icon-dark.png",
         "tinted": "./assets/icon-tinted.png"
       },
       "config": {
