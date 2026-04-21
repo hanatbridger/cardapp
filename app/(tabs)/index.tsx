@@ -10,6 +10,7 @@ import {
   Text,
   TrendingCarousel,
   WatchlistCard,
+  SealedWatchlistCard,
   EmptyState,
   ScreenBackground,
   Badge,
@@ -19,6 +20,7 @@ import {
 import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useWatchlistStore, useUserStore } from '../../src/stores';
+import type { WatchlistItem } from '../../src/stores';
 import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
 
@@ -62,7 +64,11 @@ function WatchlistScreen() {
     <ScreenBackground>
       <FlatList
         data={items}
-        keyExtractor={(item) => `${item.cardId}-${item.grade}`}
+        keyExtractor={(item: WatchlistItem) =>
+          item.kind === 'sealed'
+            ? `sealed-${item.productId}`
+            : `card-${item.cardId}-${item.grade}`
+        }
         ListHeaderComponent={
           <View style={{ gap: spacing[4] }}>
             {/* Header — 56-pt row matches CollapsingHeader on the Explore
@@ -141,61 +147,81 @@ function WatchlistScreen() {
             </View>
 
             {/* Watchlist count — hidden on first launch (empty list shows
-                its own EmptyState below with a Search CTA) */}
-            {items.length > 0 && (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  paddingHorizontal: HORIZONTAL_PADDING,
-                }}
-              >
-                <Text variant="labelLg" color={colors.onSurfaceVariant}>
-                  {items.length === 1 ? '1 card tracked' : `${items.length} cards tracked`}
-                </Text>
-                {!isPremium && (
-                  <Text variant="caption" color={colors.onSurfaceMuted}>
-                    {items.length}/{maxFreeItems}
+                its own EmptyState below with a Search CTA). The label
+                flexes to "items" when the list mixes sealed products with
+                cards, since "cards tracked" would misrepresent the row. */}
+            {items.length > 0 && (() => {
+              const hasSealed = items.some((i) => i.kind === 'sealed');
+              const noun = hasSealed
+                ? items.length === 1 ? 'item' : 'items'
+                : items.length === 1 ? 'card' : 'cards';
+              return (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    paddingHorizontal: HORIZONTAL_PADDING,
+                  }}
+                >
+                  <Text variant="labelLg" color={colors.onSurfaceVariant}>
+                    {items.length} {noun} tracked
                   </Text>
-                )}
-              </View>
-            )}
+                  {!isPremium && (
+                    <Text variant="caption" color={colors.onSurfaceMuted}>
+                      {items.length}/{maxFreeItems}
+                    </Text>
+                  )}
+                </View>
+              );
+            })()}
           </View>
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }: { item: WatchlistItem }) => (
           // No AnimatedListItem wrapper here — on iOS, the Reanimated
           // opacity/translateY transforms on a FlatList row inside a
           // virtualized list were eating touches on the WatchlistCard's
           // TouchableOpacity. The subtle fade-in isn't worth the dead
           // rows. Search keeps the animation — its rows are far shorter.
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[2] }}>
-            <WatchlistCard
-              cardId={item.cardId}
-              cardName={item.cardName}
-              cardImageUrl={item.cardImageUrl}
-              setName={item.setName}
-              setNumber={item.setNumber}
-              grade={item.grade}
-              language={item.language}
-              rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
-              // Fallback shown only briefly while the live query loads, or if it fails.
-              // The real price comes from useCardPrice inside WatchlistCard — same
-              // source as the detail screen, so numbers always agree.
-              fallbackPrice={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
-                cardName: item.cardName,
-                grade: item.grade,
-                currentPrice: item.lastPrice,
-                previousPrice: item.lastPrice,
-                percentChange: item.lastPriceChange,
-                lastSaleDate: '',
-                lastSalePrice: item.lastPrice,
-                averagePrice: item.lastPrice,
-                highPrice: item.lastPrice,
-                lowPrice: item.lastPrice,
-                salesCount: 0,
-              } : undefined)}
-            />
+            {item.kind === 'sealed' ? (
+              <SealedWatchlistCard
+                productId={item.productId}
+                productName={item.productName}
+                productType={item.productType}
+                setName={item.setName}
+                imageUrl={item.imageUrl}
+                fallbackPrice={item.lastPrice}
+                fallbackPriceChange={item.lastPriceChange}
+              />
+            ) : (
+              <WatchlistCard
+                cardId={item.cardId}
+                cardName={item.cardName}
+                cardImageUrl={item.cardImageUrl}
+                setName={item.setName}
+                setNumber={item.setNumber}
+                grade={item.grade}
+                language={item.language}
+                rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
+                // Fallback shown only briefly while the live query loads, or if it fails.
+                // The real price comes from useCardPrice inside WatchlistCard — same
+                // source as the detail screen, so numbers always agree.
+                fallbackPrice={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
+                  cardName: item.cardName,
+                  grade: item.grade,
+                  currentPrice: item.lastPrice,
+                  previousPrice: item.lastPrice,
+                  percentChange: item.lastPriceChange,
+                  lastSaleDate: '',
+                  lastSalePrice: item.lastPrice,
+                  averagePrice: item.lastPrice,
+                  highPrice: item.lastPrice,
+                  lowPrice: item.lastPrice,
+                  salesCount: 0,
+                } : undefined)}
+              />
+            )}
           </View>
         )}
         ListEmptyComponent={

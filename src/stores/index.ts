@@ -1,4 +1,11 @@
-export { useWatchlistStore, type WatchlistItem } from './watchlist-store';
+export {
+  useWatchlistStore,
+  isCardItem,
+  isSealedItem,
+  type WatchlistItem,
+  type CardWatchlistItem,
+  type SealedWatchlistItem,
+} from './watchlist-store';
 export {
   useAlertsStore,
   type PriceAlert,

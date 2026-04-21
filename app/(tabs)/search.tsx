@@ -8,6 +8,7 @@ import {
   Text,
   SearchBar,
   CardSearchResult,
+  SealedSearchResult,
   AIPicks,
   AnimatedListItem,
   SegmentedControl,
@@ -18,12 +19,13 @@ import {
 import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useUserStore } from '../../src/stores';
-import { useCardSearch, useSetSearch, useArtistSearch, useCollapsingHeader } from '../../src/hooks';
+import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useCollapsingHeader } from '../../src/hooks';
 import { MOCK_PRICES, TRENDING_SEARCHES, TRENDING_ARTISTS } from '../../src/mocks';
 import { CARD_SCORES } from '../../src/data/card-scores';
 import { getValuation } from '../../src/services/price-prediction';
 import type { PokemonCard } from '../../src/types/card';
 import type { PokemonSet, ArtistResult } from '../../src/services/pokemon-tcg';
+import type { SealedProduct } from '../../src/types/sealed';
 
 type Mode = 'cards' | 'sets' | 'artists';
 
@@ -74,6 +76,14 @@ function SearchScreen() {
   const cardSearch = useCardSearch(mode === 'cards' ? query : '', {});
   const cardResults = cardSearch.data?.cards ?? [];
 
+  // Sealed-product search — runs in parallel with the card search when the
+  // Cards tab is active. Catalog lives client-side so this is essentially
+  // free; we fold any hits into the Cards results list under a "Sealed
+  // Products" section header so collectors find booster boxes / ETBs by
+  // typing the set name into the same box they search singles with.
+  const sealedSearch = useSealedSearch(mode === 'cards' ? query : '');
+  const sealedResults = sealedSearch.data ?? [];
+
   // Set search (enabled always — shows recent sets on empty query)
   const setSearch = useSetSearch(mode === 'sets' ? query : '');
   const setResults = setSearch.data?.sets ?? [];
@@ -92,6 +102,11 @@ function SearchScreen() {
   const handleCardPress = (card: PokemonCard) => {
     addRecentSearch(card.name);
     router.push(`/card/${card.id}`);
+  };
+
+  const handleSealedPress = (product: SealedProduct) => {
+    addRecentSearch(product.name);
+    router.push(`/sealed/${product.id}`);
   };
 
   const handleSetPress = (set: PokemonSet) => {
@@ -194,7 +209,7 @@ function SearchScreen() {
               onChangeText={setQuery}
               placeholder={
                 mode === 'cards'
-                  ? 'Search all Pokémon cards...'
+                  ? 'Search cards, booster boxes, ETBs...'
                   : mode === 'sets'
                     ? 'Search sets by name...'
                     : 'Search illustrators by name...'
@@ -238,8 +253,10 @@ function SearchScreen() {
           error={cardSearch.isError}
           results={cardResults}
           totalCount={cardSearch.data?.totalCount ?? 0}
+          sealedResults={sealedResults}
           query={query}
           onCardPress={handleCardPress}
+          onSealedPress={handleSealedPress}
           onScroll={scrollHandler}
           topInset={headerHeight + stickyHeight}
         />
@@ -459,13 +476,25 @@ function CardsEmptyState({
   );
 }
 
+/**
+ * Discriminated-union row model for the unified Cards/Sealed feed.
+ * Section-header rows carry the section label + the count so the header
+ * stays in sync with its section without an extra lookup.
+ */
+type SearchFeedItem =
+  | { kind: 'section'; id: string; label: string; count: number }
+  | { kind: 'card'; id: string; card: PokemonCard }
+  | { kind: 'sealed'; id: string; product: SealedProduct };
+
 function CardResults({
   loading,
   error,
   results,
   totalCount,
+  sealedResults,
   query,
   onCardPress,
+  onSealedPress,
   onScroll,
   topInset = 0,
 }: {
@@ -473,8 +502,10 @@ function CardResults({
   error: boolean;
   results: PokemonCard[];
   totalCount: number;
+  sealedResults: SealedProduct[];
   query: string;
   onCardPress: (card: PokemonCard) => void;
+  onSealedPress: (product: SealedProduct) => void;
   onScroll?: any;
   topInset?: number;
 }) {
@@ -491,28 +522,60 @@ function CardResults({
     );
   }
 
+  // Build the unified feed: Cards section first (primary intent), then
+  // Sealed Products below. Either section is omitted when it has no hits
+  // so the UI doesn't render a header over an empty region.
+  const feed: SearchFeedItem[] = [];
+  if (results.length > 0) {
+    feed.push({ kind: 'section', id: 'sec-cards', label: 'Cards', count: totalCount });
+    results.forEach((c) => feed.push({ kind: 'card', id: `card-${c.id}`, card: c }));
+  }
+  if (sealedResults.length > 0) {
+    feed.push({ kind: 'section', id: 'sec-sealed', label: 'Sealed Products', count: sealedResults.length });
+    sealedResults.forEach((p) => feed.push({ kind: 'sealed', id: `sealed-${p.id}`, product: p }));
+  }
+
   return (
     <Animated.FlatList
-      data={results}
-      keyExtractor={(item: PokemonCard) => item.id}
-      renderItem={({ item, index }: { item: PokemonCard; index: number }) => (
-        <AnimatedListItem index={index}>
-          <CardSearchResult card={item} onPress={onCardPress} />
-        </AnimatedListItem>
-      )}
-      ListHeaderComponent={
-        results.length > 0 ? (
-          <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingVertical: spacing[2] }}>
-            <Text variant="caption" color={colors.onSurfaceMuted}>
-              {totalCount} results
-            </Text>
-          </View>
-        ) : null
-      }
+      data={feed}
+      keyExtractor={(item: SearchFeedItem) => item.id}
+      renderItem={({ item, index }: { item: SearchFeedItem; index: number }) => {
+        if (item.kind === 'section') {
+          return (
+            <View
+              style={{
+                paddingHorizontal: HORIZONTAL_PADDING,
+                paddingTop: index === 0 ? spacing[2] : spacing[4],
+                paddingBottom: spacing[1],
+                flexDirection: 'row',
+                alignItems: 'baseline',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text variant="overline" color={colors.onSurfaceVariant}>{item.label.toUpperCase()}</Text>
+              <Text variant="caption" color={colors.onSurfaceMuted}>
+                {item.count} {item.count === 1 ? 'result' : 'results'}
+              </Text>
+            </View>
+          );
+        }
+        if (item.kind === 'card') {
+          return (
+            <AnimatedListItem index={index}>
+              <CardSearchResult card={item.card} onPress={onCardPress} />
+            </AnimatedListItem>
+          );
+        }
+        return (
+          <AnimatedListItem index={index}>
+            <SealedSearchResult product={item.product} onPress={onSealedPress} />
+          </AnimatedListItem>
+        );
+      }}
       ListEmptyComponent={
         <View style={{ padding: spacing[8], alignItems: 'center' }}>
           <Text variant="bodySm" color={colors.onSurfaceMuted}>
-            {error ? 'Search failed — check your connection' : `No cards found${query ? ` for "${query}"` : ''}`}
+            {error ? 'Search failed — check your connection' : `No results found${query ? ` for "${query}"` : ''}`}
           </Text>
         </View>
       }

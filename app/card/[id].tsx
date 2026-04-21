@@ -160,14 +160,14 @@ function CardDetailScreen() {
   );
 
   const isInWatchlist = items.some(
-    (i) => i.cardId === id,
+    (i) => i.kind === 'card' && i.cardId === id,
   );
 
   // Sync price to watchlist — only update if the grade matches what's saved
   useEffect(() => {
     if (price && isInWatchlist && id) {
-      const savedItem = items.find((i) => i.cardId === id);
-      if (savedItem && savedItem.grade === selectedGrade) {
+      const savedItem = items.find((i) => i.kind === 'card' && i.cardId === id);
+      if (savedItem && savedItem.kind === 'card' && savedItem.grade === selectedGrade) {
         updatePrice(id, price.currentPrice, price.percentChange);
       }
     }
@@ -256,14 +256,15 @@ function CardDetailScreen() {
   const handleToggleWatchlist = () => {
     if (isInWatchlist) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const existing = items.find((i) => i.cardId === card.id);
-      if (existing) removeItem(card.id, existing.grade);
+      const existing = items.find((i) => i.kind === 'card' && i.cardId === card.id);
+      if (existing && existing.kind === 'card') removeItem(card.id, existing.grade);
     } else {
       if (!canAddMore()) {
         setWatchlistFullVisible(true);
         return;
       }
       const success = addItem({
+        kind: 'card',
         cardId: card.id,
         cardName: card.name,
         cardImageUrl: card.images.small,

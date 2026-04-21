@@ -4,3 +4,9 @@ export { useCardPrice } from './use-card-price';
 export { usePriceHistory } from './use-price-history';
 export { useAlertChecker } from './use-alert-checker';
 export { useCollapsingHeader } from './use-collapsing-header';
+export {
+  useSealedSearch,
+  useSealedProduct,
+  useSealedPrice,
+  useSealedPriceHistory,
+} from './use-sealed';

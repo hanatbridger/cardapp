@@ -87,7 +87,9 @@ export function useCardPrice(opts: UseCardPriceOptions) {
 
       // 3. Fall back to watchlist stored price — only for Raw (PSA 10 needs real data)
       if (grade === 'UNGRADED' && cardId) {
-        const watchlistItem = watchlistItems.find((i) => i.cardId === cardId && i.grade === 'UNGRADED');
+        const watchlistItem = watchlistItems.find(
+          (i) => i.kind === 'card' && i.cardId === cardId && i.grade === 'UNGRADED',
+        );
         if (watchlistItem?.lastPrice) {
           return buildPrice(cardName, grade, watchlistItem.lastPrice, 'tcgplayer', watchlistItem.lastPrice * 0.95);
         }
