@@ -217,7 +217,12 @@ const TYPE_VARIANTS = [
 
 // ── Main screen ────────────────────────────────────────────
 function DesignSystemScreen() {
-  const { colors } = useTheme();
+  // Pull both colors and live radius from the theme. Radius comes from
+  // `useTheme().radius` (not the static tokens import) so the Radii
+  // preview below re-renders when the TokenEditorPanel slider pushes
+  // an override through the theme store — Colors section has the same
+  // behavior via the `colors` destructure.
+  const { colors, radius: themeRadius } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const isDesktop = screenWidth >= 768;
   const [activeSection, setActiveSection] = useState<NavKey>('colors');
@@ -365,14 +370,16 @@ function DesignSystemScreen() {
 
       case 'radii':
         return (
-          <SectionBlock title="Border radius" description="Consistent corner rounding across the app.">
+          <SectionBlock title="Border radius" description="Consistent corner rounding across the app. Drag the sliders on the right to preview changes live.">
             <Card>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[6] }}>
                 {(['none', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', 'full'] as const).map((key) => (
                   <View key={key} style={{ alignItems: 'center', gap: spacing[2] }}>
-                    <View style={{ width: 64, height: 64, backgroundColor: colors.primary, borderRadius: radius[key] }} />
+                    {/* Reads themeRadius (not tokens.radius) so the
+                        TokenEditorPanel's slider drives the preview. */}
+                    <View style={{ width: 64, height: 64, backgroundColor: colors.primary, borderRadius: themeRadius[key] }} />
                     <Text variant="labelMd">{key}</Text>
-                    <Text variant="caption" color={colors.onSurfaceMuted}>{radius[key]}px</Text>
+                    <Text variant="caption" color={colors.onSurfaceMuted}>{themeRadius[key]}px</Text>
                   </View>
                 ))}
               </View>
@@ -791,7 +798,7 @@ function DesignSystemScreen() {
         >
           {renderContent()}
         </ScrollView>
-        {showEditor && <TokenEditorPanel />}
+        {showEditor && <TokenEditorPanel section={activeSection} />}
       </View>
     </SafeAreaView>
   );

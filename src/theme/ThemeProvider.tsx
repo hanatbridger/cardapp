@@ -21,12 +21,17 @@ export interface GlassTokens {
   backgroundStrong: string;
 }
 
+// Widen the `as const` literal types on radius so the theme consumer
+// sees plain `number` — otherwise slider overrides wouldn't satisfy the
+// literal types (e.g. assigning 18 to a `6` slot).
+type RadiusTokens = { [K in keyof typeof radius]: number };
+
 export interface Theme {
   colors: ColorTokens;
   palette: typeof palette;
   typography: typeof typography;
   spacing: typeof spacing;
-  radius: typeof radius;
+  radius: RadiusTokens;
   shadows: typeof shadows;
   glass: GlassTokens;
   gradientColors: readonly string[];
@@ -56,6 +61,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // doing deep-equality on the override objects.
   const overrideLight = useThemeOverrideStore((s) => s.light);
   const overrideDark = useThemeOverrideStore((s) => s.dark);
+  const overrideRadius = useThemeOverrideStore((s) => s.radius);
   const overrideVersion = useThemeOverrideStore((s) => s.version);
 
   const theme = useMemo<Theme>(
@@ -67,7 +73,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       palette,
       typography,
       spacing,
-      radius,
+      // Radius overrides only take effect for components that read from
+      // `useTheme().radius`. Components importing `radius` directly from
+      // tokens.ts bypass this merge — that's fine for the design-system
+      // preview (which does use useTheme) and for the Copy-as-TS flow.
+      radius: { ...radius, ...overrideRadius },
       shadows,
       glass: isDark ? glass.dark : glass.light,
       gradientColors: isDark ? gradients.dark.colors : gradients.light.colors,
