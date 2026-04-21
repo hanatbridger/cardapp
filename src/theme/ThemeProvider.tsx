@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 import { useUserStore } from '../stores/user-store';
+import { useThemeOverrideStore } from '../stores/theme-override-store';
 import {
   lightColors,
   darkColors,
@@ -47,9 +48,22 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       ? colorScheme === 'dark'
       : themePreference === 'dark';
 
+  // Dev-only color overrides pushed from the design-system editor
+  // (app/design-system.tsx). Empty by default in production — this is
+  // a session-only scratchpad keyed by mode, so a refresh resets to the
+  // `src/theme/tokens.ts` source of truth. We subscribe to `version`
+  // (bumped on every apply/reset) so the memo below recomputes without
+  // doing deep-equality on the override objects.
+  const overrideLight = useThemeOverrideStore((s) => s.light);
+  const overrideDark = useThemeOverrideStore((s) => s.dark);
+  const overrideVersion = useThemeOverrideStore((s) => s.version);
+
   const theme = useMemo<Theme>(
     () => ({
-      colors: isDark ? darkColors : lightColors,
+      colors: {
+        ...(isDark ? darkColors : lightColors),
+        ...(isDark ? overrideDark : overrideLight),
+      },
       palette,
       typography,
       spacing,
@@ -59,7 +73,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       gradientColors: isDark ? gradients.dark.colors : gradients.light.colors,
       isDark,
     }),
-    [isDark],
+    // overrideVersion covers both `overrideLight` and `overrideDark` —
+    // the store bumps it on every mutation, so identity is stable
+    // between applies and new on every apply.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isDark, overrideVersion],
   );
 
   return (

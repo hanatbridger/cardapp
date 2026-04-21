@@ -12,3 +12,7 @@ export {
   type TriggeredAlert,
 } from './alerts-store';
 export { useUserStore } from './user-store';
+export {
+  useThemeOverrideStore,
+  type ColorOverrides,
+} from './theme-override-store';

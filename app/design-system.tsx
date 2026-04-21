@@ -33,6 +33,7 @@ import {
   WatchlistFullModal,
   AnimatedListItem,
   AuthForm,
+  TokenEditorPanel,
   withErrorBoundary,
 } from '../src/components';
 import { MOCK_CARDS } from '../src/mocks';
@@ -771,7 +772,14 @@ function DesignSystemScreen() {
     );
   }
 
-  // ── Desktop layout (sidebar + content) ───────────────────
+  // ── Desktop layout (sidebar + content [+ editor panel]) ──
+  // Token editor only mounts on web and ≥1024px — a 340pt right panel
+  // doesn't fit alongside the 200pt sidebar and content on tablet-width
+  // screens. Gated by __DEV__ so production web builds don't ship the
+  // editor (users can still land on /design-system but see the
+  // read-only view). iOS/Android never render it.
+  const showEditor = __DEV__ && Platform.OS === 'web' && screenWidth >= 1024;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
       <View style={{ flex: 1, flexDirection: 'row' }}>
@@ -779,9 +787,11 @@ function DesignSystemScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: spacing[8], maxWidth: 960 }}
+          style={{ flex: 1 }}
         >
           {renderContent()}
         </ScrollView>
+        {showEditor && <TokenEditorPanel />}
       </View>
     </SafeAreaView>
   );
