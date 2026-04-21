@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
@@ -68,22 +68,28 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     }
   }
 
+  // Use TouchableOpacity rather than Pressable here: on iOS inside a
+  // virtualized FlatList that also has a setInterval-driven sibling
+  // (TrendingCarousel in the ListHeader), Pressable's gesture recognizer
+  // was dropping the up-event roughly every render, making the row feel
+  // unresponsive. TouchableOpacity's RN-native TouchableHandler doesn't
+  // have that failure mode.
   return (
-    <Pressable
+    <TouchableOpacity
+      activeOpacity={0.7}
       onPress={() => router.push(`/card/${cardId}`)}
-      hitSlop={4}
       accessibilityRole="button"
       accessibilityLabel={`Open ${cardName}`}
-      style={({ pressed }) => ({
+      style={{
         flexDirection: 'row',
         padding: spacing[3],
-        backgroundColor: pressed ? colors.surfaceVariant : colors.surface,
+        backgroundColor: colors.surface,
         borderRadius: CARD_BORDER_RADIUS,
         borderWidth: 1,
         borderColor: colors.outline,
         gap: spacing[3],
         alignItems: 'center',
-      })}
+      }}
     >
       <Image
         source={{ uri: cardImageUrl }}
@@ -137,6 +143,6 @@ export const WatchlistCard = React.memo(function WatchlistCard({
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>
         )}
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 });

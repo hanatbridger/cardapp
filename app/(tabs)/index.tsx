@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { View, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
@@ -11,7 +11,6 @@ import {
   TrendingCarousel,
   WatchlistCard,
   EmptyState,
-  AnimatedListItem,
   ScreenBackground,
   Badge,
   BrandMark,
@@ -47,11 +46,17 @@ function WatchlistScreen() {
 
   // Trending rail — raw (UNGRADED) cards only, with % change from the
   // seeded mock dataset. Filtered to cards that have an UNGRADED price
-  // entry so every tile shows a real number.
-  const trendingItems = MOCK_CARDS
-    .map((card) => ({ card, price: getPrice(card.id, 'UNGRADED') }))
-    .filter((item): item is { card: typeof item.card; price: CardPrice } => !!item.price)
-    .slice(0, 8);
+  // entry so every tile shows a real number. Memoized so the reference
+  // is stable across Home re-renders (the WatchlistCard rows below
+  // depend on the FlatList not re-rendering on every keystroke/scroll).
+  const trendingItems = useMemo(
+    () =>
+      MOCK_CARDS
+        .map((card) => ({ card, price: getPrice(card.id, 'UNGRADED') }))
+        .filter((item): item is { card: typeof item.card; price: CardPrice } => !!item.price)
+        .slice(0, 8),
+    [],
+  );
 
   return (
     <ScreenBackground>
@@ -158,8 +163,12 @@ function WatchlistScreen() {
             )}
           </View>
         }
-        renderItem={({ item, index }) => (
-          <AnimatedListItem index={index}>
+        renderItem={({ item }) => (
+          // No AnimatedListItem wrapper here — on iOS, the Reanimated
+          // opacity/translateY transforms on a FlatList row inside a
+          // virtualized list were eating touches on the WatchlistCard's
+          // TouchableOpacity. The subtle fade-in isn't worth the dead
+          // rows. Search keeps the animation — its rows are far shorter.
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[2] }}>
             <WatchlistCard
               cardId={item.cardId}
@@ -188,7 +197,6 @@ function WatchlistScreen() {
               } : undefined)}
             />
           </View>
-          </AnimatedListItem>
         )}
         ListEmptyComponent={
           <EmptyState

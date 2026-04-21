@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { View, FlatList, Pressable } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Text } from './Text';
 import { PriceChange } from './PriceChange';
 import { useTheme } from '../theme/ThemeProvider';
@@ -91,10 +91,18 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
     const initialOffset = singleSetWidth;
     scrollOffset.current = initialOffset;
     flatListRef.current?.scrollToOffset({ offset: initialOffset, animated: false });
+  }, [singleSetWidth]);
 
-    const interval = setInterval(animate, FRAME_INTERVAL);
-    return () => clearInterval(interval);
-  }, [animate, singleSetWidth]);
+  // Only run the 60fps auto-scroll interval while the hosting screen is
+  // focused. Leaving it running in the background (and especially while
+  // the user is on a child route tapping cards) can starve the RN main
+  // thread enough that touch events on siblings get dropped.
+  useFocusEffect(
+    useCallback(() => {
+      const interval = setInterval(animate, FRAME_INTERVAL);
+      return () => clearInterval(interval);
+    }, [animate]),
+  );
 
   const handleTouchStart = () => {
     isPaused.current = true;
