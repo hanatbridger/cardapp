@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { View, TextInput, Pressable, Platform } from 'react-native';
 import { IconSearch, IconX } from '@tabler/icons-react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -11,15 +11,27 @@ interface SearchBarProps {
   placeholder?: string;
   onSubmit?: () => void;
   autoFocus?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
 }
 
-export function SearchBar({
-  value,
-  onChangeText,
-  placeholder = 'Search Pokemon cards...',
-  onSubmit,
-  autoFocus = false,
-}: SearchBarProps) {
+/**
+ * SearchBar forwards its ref to the underlying TextInput so parents can
+ * call `.blur()` / `.focus()` imperatively — needed for the X-style
+ * Cancel button on the Explore tab.
+ */
+export const SearchBar = forwardRef<TextInput, SearchBarProps>(function SearchBar(
+  {
+    value,
+    onChangeText,
+    placeholder = 'Search Pokemon cards...',
+    onSubmit,
+    autoFocus = false,
+    onFocus,
+    onBlur,
+  },
+  ref,
+) {
   const { colors, glass } = useTheme();
 
   return (
@@ -41,11 +53,14 @@ export function SearchBar({
     >
       <IconSearch size={18} color={colors.onSurfaceMuted} />
       <TextInput
+        ref={ref}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.onSurfaceMuted}
         onSubmitEditing={onSubmit}
+        onFocus={onFocus}
+        onBlur={onBlur}
         autoFocus={autoFocus}
         autoCapitalize="none"
         autoCorrect={false}
@@ -64,4 +79,4 @@ export function SearchBar({
       )}
     </View>
   );
-}
+});

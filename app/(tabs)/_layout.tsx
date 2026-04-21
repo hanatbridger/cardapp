@@ -20,9 +20,16 @@ const ACTIVE_PILL_SIZE = 48;
 const ICON_SIZE = 26;
 const BLUR_INTENSITY = 40;
 
-function FloatingTabBar({ state, navigation }: any) {
+function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+
+  // Respect per-screen `tabBarStyle: { display: 'none' }` — used by the
+  // Explore tab when its focused search overlay is open so the overlay
+  // reads as full-screen (same as X's Explore focus mode).
+  const focusedRoute = state.routes[state.index];
+  const focusedOptions = descriptors?.[focusedRoute.key]?.options;
+  if (focusedOptions?.tabBarStyle?.display === 'none') return null;
 
   const rightTabs = ['search', 'notifications', 'profile'];
   const icons: Record<string, typeof IconHome> = {
