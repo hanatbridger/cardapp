@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { queryClient } from '../src/lib/query-client';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { BrandedSplash } from '../src/components/BrandedSplash';
 import { useUserStore } from '../src/stores/user-store';
 import { useAlertChecker } from '../src/hooks/use-alert-checker';
 import {
@@ -119,6 +120,12 @@ export default function RootLayout() {
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
               <Stack.Screen name="design-system" />
             </Stack>
+            {/* Branded splash overlay — the native Expo splash shows the
+                logomark on the dark brand canvas; this extends the same
+                canvas for ~1.1s to add the "CardPulse" wordmark and
+                tagline, then fades into the first screen. Mounted AFTER
+                the Stack so it paints on top. Self-unmounts after fade. */}
+            <BrandedSplash ready={!!(fontsLoaded || fontError)} />
           </ThemeProvider>
         </QueryClientProvider>
       </ErrorBoundary>

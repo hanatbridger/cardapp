@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
@@ -47,18 +47,88 @@ function WatchlistScreen() {
   }, [queryClient]);
 
   // Trending rail — raw (UNGRADED) cards only, with % change from the
-  // seeded mock dataset. Filtered to cards that have an UNGRADED price
-  // entry so every tile shows a real number. Memoized so the reference
-  // is stable across Home re-renders (the WatchlistCard rows below
-  // depend on the FlatList not re-rendering on every keystroke/scroll).
-  const trendingItems = useMemo(
-    () =>
-      MOCK_CARDS
-        .map((card) => ({ card, price: getPrice(card.id, 'UNGRADED') }))
-        .filter((item): item is { card: typeof item.card; price: CardPrice } => !!item.price)
-        .slice(0, 8),
-    [],
-  );
+  // seeded mock dataset. Ranks every card with an UNGRADED price by the
+  // magnitude of its % move, pools the top 24, then picks 8 deterministic
+  // picks seeded by today's UTC date. Same day = same rail (so refresh
+  // doesn't reshuffle while the user scrolls); new day = new rail (so it
+  // tracks what's moving right now). Memoized on `dayKey` so the rail
+  // recomputes exactly once per day without forcing a re-render on
+  // every keystroke or scroll event elsewhere on Home.
+  //
+  // When the live eBay/TCGPlayer pricing service ships, this same shape
+  // ranks live movers — the selection logic stays, only the data source
+  // swaps. That's why we sort by |%change| instead of a static "trending"
+  // flag: it generalizes to live data without reshaping callers.
+  // Tick forward to the next UTC date when it rolls over. Kept as state
+  // (not a memo) so a user who leaves the app open past midnight still
+  // sees a fresh trending rail — otherwise useMemo([]) would freeze the
+  // key at launch-day forever. Invalidate live price queries at the same
+  // boundary so carousel numbers don't trail a day behind their ranking.
+  const [dayKey, setDayKey] = useState(() => {
+    const d = new Date();
+    return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+  });
+
+  useEffect(() => {
+    const scheduleNextTick = () => {
+      const now = new Date();
+      const next = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate() + 1,
+        0, 0, 5, // 5s past midnight UTC to dodge any clock-drift race
+      ));
+      return next.getTime() - now.getTime();
+    };
+    const timer = setTimeout(() => {
+      const d = new Date();
+      setDayKey(`${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`);
+      // Refresh live prices too — the new rail should show live numbers,
+      // not yesterday's cached % moves.
+      queryClient.invalidateQueries({ queryKey: ['prices'] });
+    }, scheduleNextTick());
+    return () => clearTimeout(timer);
+  }, [dayKey, queryClient]);
+
+  const trendingItems = useMemo(() => {
+    // Hash the day key into a 32-bit seed, then drive a deterministic
+    // PRNG (mulberry32). Same seed every render of the same day; fresh
+    // shuffle at midnight UTC. Inlined so this file doesn't grow a
+    // utility import for 10 lines of number-crunching.
+    let h = 2166136261;
+    for (let i = 0; i < dayKey.length; i++) {
+      h ^= dayKey.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    let seed = h >>> 0;
+    const rand = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+
+    const pool = MOCK_CARDS
+      .map((card) => ({ card, price: getPrice(card.id, 'UNGRADED') }))
+      .filter((item): item is { card: typeof item.card; price: CardPrice } => !!item.price)
+      // Biggest absolute movers surface first — a -12% drop is as
+      // newsworthy as a +12% pop. Ties broken by card id so ranking is
+      // stable when prices coincide.
+      .sort((a, b) => {
+        const da = Math.abs(b.price.percentChange) - Math.abs(a.price.percentChange);
+        return da !== 0 ? da : a.card.id.localeCompare(b.card.id);
+      });
+
+    // Take the top ~24 and Fisher-Yates-shuffle them with the day-seeded
+    // PRNG. Then slice 8. This way users see a rotating mix of the day's
+    // hottest movers instead of the same 8 names every day.
+    const top = pool.slice(0, Math.min(24, pool.length));
+    for (let i = top.length - 1; i > 0; i--) {
+      const j = Math.floor(rand() * (i + 1));
+      [top[i], top[j]] = [top[j], top[i]];
+    }
+    return top.slice(0, 8);
+  }, [dayKey]);
 
   return (
     <ScreenBackground>
