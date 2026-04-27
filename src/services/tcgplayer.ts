@@ -28,13 +28,21 @@ import type { CardPrice, PriceHistory } from '../types/card';
  * web preview, and TestFlight builds.
  */
 
-// Vercel-deployed proxy origin. Web hits it relative (same host); native
-// points at the production deployment so TestFlight/Android builds get
-// live data without bundling localhost. Override with EXPO_PUBLIC_API_URL.
-const PROXY_ORIGIN =
-  Platform.OS === 'web'
-    ? ''
-    : (process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app');
+// Vercel-deployed proxy origin. The Vercel function ONLY runs on the
+// deployed origin — it doesn't ship with `expo start`, so localhost dev
+// has to call out to production. Production web hits it relative on the
+// same host. Native always hits the production deployment unless an
+// override URL is set via EXPO_PUBLIC_API_URL.
+const PROXY_ORIGIN = (() => {
+  if (Platform.OS !== 'web') {
+    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+  }
+  // Web in __DEV__ (expo start --web) → call the deployed function
+  // cross-origin. Edge function returns Access-Control-Allow-Origin: *
+  // so the browser allows it. Production web → relative same-origin.
+  if (__DEV__) return 'https://strange-saha-livid.vercel.app';
+  return '';
+})();
 
 // Per-route flags — endpoints ship at different times.
 const LIVE = {

@@ -90,9 +90,14 @@ function CardDetailScreen() {
   // re-tap PSA 10 / Raw on every card.
   const defaultGrade = useUserStore((s) => s.preferences.defaultGrade);
   const updatePreference = useUserStore((s) => s.updatePreference);
-  const [gradeIndex, setGradeIndex] = useState(() =>
-    Math.max(0, GRADE_OPTIONS.indexOf(defaultGrade)),
-  );
+  // PSA 10 is locked at launch — graded prices need the eBay live proxy
+  // which isn't deployed yet. We force the segment to UNGRADED on mount
+  // even if the user previously persisted PSA 10 as their default.
+  const [gradeIndex, setGradeIndex] = useState(() => {
+    const stored = GRADE_OPTIONS.indexOf(defaultGrade);
+    const ungradedIdx = GRADE_OPTIONS.indexOf('UNGRADED');
+    return defaultGrade === 'PSA10' || stored < 0 ? ungradedIdx : stored;
+  });
   const [timeRangeIndex, setTimeRangeIndex] = useState(2);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [watchlistFullVisible, setWatchlistFullVisible] = useState(false);
@@ -375,10 +380,21 @@ function CardDetailScreen() {
             )}
           </View>
 
-          {/* Grade selector */}
+          {/* Grade selector — PSA 10 disabled at launch (see gradeIndex
+              initializer). Tapping the locked segment shows a "coming
+              soon" alert instead of switching tabs. */}
           <SegmentedControl
             options={GRADE_OPTIONS.map((g) => GRADES[g].shortLabel)}
             selected={gradeIndex}
+            disabledIndices={[GRADE_OPTIONS.indexOf('PSA10')]}
+            disabledBadge="Soon"
+            onDisabledPress={() =>
+              Alert.alert(
+                'PSA 10 prices — coming soon',
+                "We're rolling out live TCGPlayer raw prices first. Graded card tracking lights up once our eBay sales pipeline ships — stay tuned.",
+                [{ text: 'Got it' }],
+              )
+            }
             onSelect={(i) => {
               setGradeIndex(i);
               // Persist so the next card the user opens defaults to the
