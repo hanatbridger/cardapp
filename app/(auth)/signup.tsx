@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router, Link } from 'expo-router';
 import { IconChevronLeft } from '@tabler/icons-react-native';
@@ -13,22 +13,20 @@ import { safeGoBack } from '../../src/utils/safeGoBack';
 function SignupScreen() {
   const { colors } = useTheme();
   const signIn = useUserStore((s) => s.signIn);
-  const [loading, setLoading] = useState(false);
 
+  // Email/password is hidden at v1 launch — see AuthForm appleOnly.
+  // Handler kept so re-enabling later is one prop flip + Supabase wiring.
   const handleSignUp = async (values: {
     email: string;
     password: string;
     displayName?: string;
   }) => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
     const username = '@' + values.email.split('@')[0];
     signIn({
       email: values.email,
       username,
       displayName: values.displayName || username.slice(1),
     }, 'email');
-    setLoading(false);
     router.replace('/(tabs)');
   };
 
@@ -93,7 +91,7 @@ function SignupScreen() {
           </View>
 
           {/* Form */}
-          <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} loading={loading} />
+          <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} appleOnly />
 
           {/* Legal */}
           <View style={{ alignItems: 'center', gap: spacing[0.5] }}>

@@ -51,7 +51,7 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "privacy": "https://dist-amber-theta-56.vercel.app/privacy",
+    "privacy": "https://strange-saha-livid.vercel.app/privacy",
     "plugins": [
       "expo-router",
       "expo-apple-authentication",

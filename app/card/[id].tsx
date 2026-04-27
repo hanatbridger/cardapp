@@ -38,50 +38,6 @@ import { useCardDetail, useCardPrice, usePriceHistory } from '../../src/hooks';
 const screenWidth = Dimensions.get('window').width;
 const TIME_RANGES = ['1D', '1W', '1M', '3M'];
 
-/**
- * Mock recent sold listings — will be replaced by real eBay API data.
- * When real data flows:
- *   - Each item has a viewItemURL linking to the specific sold listing (ebay.com/itm/...)
- *   - Search uses full card title + set + language + grade
- *   - Filtered to Completed + Sold items only
- *   - Price comes from the most recent sale
- */
-function generateMockSoldListings(
-  cardName: string,
-  setName: string,
-  cardNumber: string,
-  price: number,
-  language: 'EN' | 'JP' = 'EN',
-) {
-  const now = Date.now();
-  const lang = language === 'JP' ? 'Japanese' : 'English';
-  // Mock individual listing IDs — real API returns actual viewItemURL per listing
-  const mockItemIds = ['306854682927', '305478921034', '304912873456'];
-  return [
-    {
-      title: `${cardName} ${cardNumber} ${setName} ${lang} PSA 10 GEM MINT Pokemon Card`,
-      price: price * (0.95 + Math.random() * 0.1),
-      date: new Date(now - 2 * 3600000).toISOString(),
-      seller: 'pokecollector_99',
-      url: `https://www.ebay.com/itm/${mockItemIds[0]}`,
-    },
-    {
-      title: `${cardName} ${cardNumber} ${setName} ${lang} Near Mint Pokemon TCG`,
-      price: price * (0.88 + Math.random() * 0.1),
-      date: new Date(now - 8 * 3600000).toISOString(),
-      seller: 'tcg_deals',
-      url: `https://www.ebay.com/itm/${mockItemIds[1]}`,
-    },
-    {
-      title: `Pokemon ${cardName} ${cardNumber} ${setName} Special Art Rare ${lang}`,
-      price: price * (0.92 + Math.random() * 0.1),
-      date: new Date(now - 18 * 3600000).toISOString(),
-      seller: 'card_vault_store',
-      url: `https://www.ebay.com/itm/${mockItemIds[2]}`,
-    },
-  ];
-}
-
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
@@ -622,42 +578,63 @@ function CardDetailScreen() {
             </>
           )}
 
-          {/* Recent eBay Sold Listings — same PSA 10 gate as the chart. */}
+          {/* Recent sales CTA — links out to the real eBay sold-listings
+              filter for the current card. We don't have a live sales
+              feed yet so we point users at the canonical source rather
+              than fabricating per-listing data (Apple Guideline 4.1
+              treats placeholder data presented as real as misleading
+              content and grounds for rejection). Hidden on PSA 10
+              along with the rest of the price section. */}
           {selectedGrade !== 'PSA10' && price && (
             <Card>
               <View style={{ gap: spacing[3] }}>
-                <Text variant="labelLg">Recent eBay Sales</Text>
-                {generateMockSoldListings(card.name, card.set.name, card.number, price.currentPrice, card.language).map((sale, i) => {
-                  const timeAgo = Math.round((Date.now() - new Date(sale.date).getTime()) / 3600000);
-                  return (
-                    <Pressable
-                      key={i}
-                      onPress={() => sale.url && Linking.openURL(sale.url)}
-                      style={({ pressed }) => ({
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingVertical: spacing[2],
-                        borderTopWidth: i > 0 ? 1 : 0,
-                        borderTopColor: colors.outlineVariant,
-                        opacity: pressed ? 0.6 : 1,
-                      })}
-                    >
-                      <View style={{ flex: 1, gap: spacing['0.5'] }}>
-                        <Text variant="bodySm" numberOfLines={1}>{sale.title}</Text>
-                        <Text variant="caption" color={colors.onSurfaceMuted}>
-                          {sale.seller} · {timeAgo}h ago
-                        </Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end', gap: spacing['0.5'] }}>
-                        <Text variant="labelLg" color={colors.success}>
-                          {formatPrice(sale.price)}
-                        </Text>
-                        <IconExternalLink size={12} color={colors.onSurfaceMuted} />
-                      </View>
-                    </Pressable>
-                  );
-                })}
+                <Text variant="labelLg">Recent sales</Text>
+                <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ lineHeight: 20 }}>
+                  Live transaction history is rolling out next. In the meantime, browse the latest {card.name} #{card.number} sales on eBay or {card.tcgPlayerUrl ? 'TCGPlayer' : 'TCGPlayer'}.
+                </Text>
+                <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
+                  <Pressable
+                    onPress={() => {
+                      const cardSearch = `${card.name} ${card.set.name} ${card.number}`;
+                      Linking.openURL(
+                        `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch)}&LH_Sold=1&LH_Complete=1&_sop=13`,
+                      );
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing[1] + 2,
+                      paddingHorizontal: spacing[3],
+                      paddingVertical: spacing[2],
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: colors.outline,
+                    }}
+                  >
+                    <IconExternalLink size={14} color={colors.onSurfaceVariant} />
+                    <Text variant="labelSm" color={colors.onSurfaceVariant}>eBay sold listings</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      const url = card.tcgPlayerUrl
+                        ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`;
+                      Linking.openURL(url);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing[1] + 2,
+                      paddingHorizontal: spacing[3],
+                      paddingVertical: spacing[2],
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: colors.outline,
+                    }}
+                  >
+                    <IconExternalLink size={14} color={colors.onSurfaceVariant} />
+                    <Text variant="labelSm" color={colors.onSurfaceVariant}>TCGPlayer page</Text>
+                  </Pressable>
+                </View>
               </View>
             </Card>
           )}

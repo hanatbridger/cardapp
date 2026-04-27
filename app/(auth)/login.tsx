@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router, Link } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
@@ -11,16 +11,13 @@ import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 function LoginScreen() {
   const { colors } = useTheme();
   const signIn = useUserStore((s) => s.signIn);
-  const [loading, setLoading] = useState(false);
 
+  // Email/password is hidden at v1 launch — see AuthForm appleOnly.
+  // The handler is left in place so re-enabling email/password later
+  // is a single AuthForm prop flip + Supabase wiring upstream.
   const handleSignIn = async (values: { email: string; password: string }) => {
-    setLoading(true);
-    // Simulate network call. Real auth wiring lives behind a proper backend
-    // and is intentionally stubbed for the App Store launch MVP.
-    await new Promise((r) => setTimeout(r, 400));
     const username = '@' + values.email.split('@')[0];
     signIn({ email: values.email, username, displayName: username.slice(1) }, 'email');
-    setLoading(false);
     router.replace('/(tabs)');
   };
 
@@ -77,7 +74,7 @@ function LoginScreen() {
           </View>
 
           {/* Form */}
-          <AuthForm mode="signin" onSubmit={handleSignIn} onApple={handleApple} loading={loading} />
+          <AuthForm mode="signin" onSubmit={handleSignIn} onApple={handleApple} appleOnly />
 
           {/* Footer */}
           <View
