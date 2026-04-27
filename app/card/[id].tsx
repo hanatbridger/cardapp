@@ -1,10 +1,10 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { View, ScrollView, Dimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { View, ScrollView, Dimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { IconChevronLeft, IconShare, IconPlus, IconMinus, IconBellRinging, IconBellFilled, IconExternalLink, IconBookmark, IconBookmarkFilled, IconRefresh, IconAlertCircle } from '@tabler/icons-react-native';
+import { IconChevronLeft, IconShare, IconPlus, IconMinus, IconBellRinging, IconBellFilled, IconExternalLink, IconBookmark, IconBookmarkFilled, IconRefresh, IconAlertCircle, IconLock } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import {
   Text,
@@ -97,6 +97,14 @@ function CardDetailScreen() {
   const [timeRangeIndex, setTimeRangeIndex] = useState(2);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [watchlistFullVisible, setWatchlistFullVisible] = useState(false);
+  // Pops a coming-soon overlay every time the user flips TO PSA 10.
+  // Tracked via a ref of the previous grade so the trigger fires on
+  // the transition only, not on initial mount when the user lands on
+  // a PSA 10 default. Using `psaModalSuppressedOnMount` lets us skip
+  // that very-first auto-fire so the popup feels like a response to
+  // an action rather than a screen-load surprise.
+  const [psaModalVisible, setPsaModalVisible] = useState(false);
+  const prevGradeRef = useRef(GRADE_OPTIONS[gradeIndex]);
   const [refreshing, setRefreshing] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
   const { alerts: allAlerts, addAlert } = useAlertsStore();
@@ -115,6 +123,14 @@ function CardDetailScreen() {
     refetch: refetchCard,
   } = useCardDetail(id ?? '');
   const selectedGrade = GRADE_OPTIONS[gradeIndex];
+
+  // Fire the coming-soon popup when the toggle transitions UNGRADED → PSA10.
+  useEffect(() => {
+    if (prevGradeRef.current !== 'PSA10' && selectedGrade === 'PSA10') {
+      setPsaModalVisible(true);
+    }
+    prevGradeRef.current = selectedGrade;
+  }, [selectedGrade]);
 
   // Real eBay prices with mock fallback — includes set name + number for exact matching
   const {
@@ -588,14 +604,23 @@ function CardDetailScreen() {
             </Card>
           )}
 
-          {/* Prediction — AI valuation + market signals */}
-          <AIValuation card={card} marketPrice={price?.currentPrice} />
+          {/* Price-derived sections — AI valuation, fundamentals,
+              market dynamics. All hide on PSA 10 since their numbers
+              would either be missing or, worse, mock data that
+              contradicts the "coming soon" panel above. They come
+              back automatically when PSA 10 launches. */}
+          {selectedGrade !== 'PSA10' && (
+            <>
+              {/* Prediction — AI valuation + market signals */}
+              <AIValuation card={card} marketPrice={price?.currentPrice} />
 
-          {/* Fundamentals — StockTwits-style data table */}
-          <CardFundamentals card={card} marketPrice={price?.currentPrice} />
+              {/* Fundamentals — StockTwits-style data table */}
+              <CardFundamentals card={card} marketPrice={price?.currentPrice} />
 
-          {/* eBay Market Dynamics — demand pressure & supply saturation */}
-          <MarketDynamics cardId={card.id} />
+              {/* eBay Market Dynamics — demand pressure & supply saturation */}
+              <MarketDynamics cardId={card.id} />
+            </>
+          )}
 
           {/* Recent eBay Sold Listings — same PSA 10 gate as the chart. */}
           {selectedGrade !== 'PSA10' && price && (
@@ -676,6 +701,94 @@ function CardDetailScreen() {
           />
         </>
       )}
+
+      {/* PSA 10 coming-soon popup — fires every time the user flips
+          the segmented control to PSA 10. Lives at the screen root
+          (outside the loading-gated branch) so it can pop even on the
+          first render if the user lands on PSA 10 default. Persistent
+          backdrop tap dismisses; "Got it" returns the user to Raw. */}
+      <Modal
+        visible={psaModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPsaModalVisible(false)}
+      >
+        <Pressable
+          onPress={() => setPsaModalVisible(false)}
+          style={{
+            flex: 1,
+            backgroundColor: withAlpha('#000000', 0.65),
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: spacing[6],
+          }}
+        >
+          {/* Inner pressable swallows taps so the modal doesn't dismiss
+              when the user taps the card itself. */}
+          <Pressable
+            onPress={(e) => e.stopPropagation?.()}
+            style={{
+              width: '100%',
+              maxWidth: 360,
+              backgroundColor: colors.surface,
+              borderRadius: radius['2xl'],
+              padding: spacing[6],
+              gap: spacing[4],
+              alignItems: 'center',
+              borderWidth: 1,
+              borderColor: colors.outline,
+            }}
+          >
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: radius.full,
+                backgroundColor: withAlpha(colors.primary, 0.18),
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <IconLock size={28} color={colors.primary} />
+            </View>
+            <View style={{ alignItems: 'center', gap: spacing[2] }}>
+              <Text variant="headingMd" style={{ textAlign: 'center' }}>
+                PSA 10 prices — coming soon
+              </Text>
+              <Text
+                variant="bodySm"
+                color={colors.onSurfaceVariant}
+                style={{ textAlign: 'center', lineHeight: 20 }}
+              >
+                We’re shipping live raw prices from TCGPlayer first. Graded card tracking lights up after our eBay sales pipeline launches — stay tuned.
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', gap: spacing[2], alignSelf: 'stretch' }}>
+              <Button
+                variant="outlined"
+                fullWidth
+                onPress={() => {
+                  // Switch back to Raw and close the modal — the
+                  // most useful next action since PSA 10 is empty.
+                  const ungradedIdx = GRADE_OPTIONS.indexOf('UNGRADED');
+                  setGradeIndex(ungradedIdx);
+                  updatePreference('defaultGrade', 'UNGRADED');
+                  setPsaModalVisible(false);
+                }}
+              >
+                See Raw price
+              </Button>
+              <Button
+                variant="filled"
+                fullWidth
+                onPress={() => setPsaModalVisible(false)}
+              >
+                Got it
+              </Button>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
