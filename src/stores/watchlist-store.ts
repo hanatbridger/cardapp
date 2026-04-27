@@ -56,6 +56,9 @@ export const isSealedItem = (i: WatchlistItem): i is SealedWatchlistItem => i.ki
 // making the screen feel pre-populated. Everything beyond these two is
 // user-added. Keep this list short — the trending rail above already
 // surfaces the rest of the catalogue.
+// Seeded watchlist for first-time users — both UNGRADED so the home
+// tab Watchlist isn't empty on first launch but also doesn't show
+// PSA 10 entries while graded tracking is gated.
 const DEFAULT_WATCHLIST: WatchlistItem[] = [
   {
     kind: 'card',
@@ -64,7 +67,7 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
     cardImageUrl: 'https://images.pokemontcg.io/sv3pt5/199.png',
     setName: '151',
     setNumber: '199',
-    grade: 'PSA10',
+    grade: 'UNGRADED',
     addedAt: '2026-03-15T00:00:00Z',
   },
   {
@@ -74,7 +77,7 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
     cardImageUrl: 'https://images.pokemontcg.io/sv8pt5/161.png',
     setName: 'Prismatic Evolutions',
     setNumber: '161',
-    grade: 'PSA10',
+    grade: 'UNGRADED',
     addedAt: '2026-03-25T00:00:00Z',
   },
 ];
