@@ -1,9 +1,28 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchCardPrice } from '../services/ebay-proxy';
+import { fetchRawCardPrice } from '../services/tcgplayer';
 import { getPrice } from '../mocks/prices';
 import { useWatchlistStore } from '../stores/watchlist-store';
 import type { GradeType } from '../constants/grades';
 import type { CardPrice } from '../types/card';
+
+/**
+ * Pricing source-of-truth, by grade — DO NOT cross the streams:
+ *
+ *   UNGRADED → Pokemon TCG API tcgPlayerPrice (instant, in-card-payload)
+ *              → fetchRawCardPrice (TCGPlayer server proxy, mock fallback)
+ *              → watchlist-stored last price (offline tertiary)
+ *
+ *   PSA10    → fetchCardPrice (eBay sold listings server proxy)
+ *              → PriceCharting (TODO once API key obtained)
+ *              → null (we don't show estimated PSA 10 prices)
+ *
+ * This split exists because TCGPlayer Market Price tracks raw/sealed
+ * marketplace movement well, but graded cards trade through eBay/
+ * PriceCharting where condition + grading authority change the price
+ * floor by 5–10x. Mixing sources within a grade muddies the signal —
+ * users get inconsistent percent-change calculations.
+ */
 
 interface UseCardPriceOptions {
   cardName: string;
@@ -50,49 +69,62 @@ export function useCardPrice(opts: UseCardPriceOptions) {
   return useQuery<CardPrice | null>({
     queryKey: ['prices', cardName, setName, cardNumber, grade, language],
     queryFn: async (): Promise<CardPrice | null> => {
-      // 1. Try mock data first (instant)
-      if (cardId) {
-        const mock = getPrice(cardId, grade);
-        if (mock) return { ...mock, source: grade === 'PSA10' ? 'ebay' as const : 'tcgplayer' as const };
-      }
-
-      // === RAW / UNGRADED ===
+      // === RAW / UNGRADED — TCGPlayer ONLY ===
       if (grade === 'UNGRADED') {
-        // Primary source: TCGPlayer price from Pokemon TCG API
+        // 1. Pokemon TCG API's bundled tcgPlayerPrice (already fetched
+        //    with the card payload — zero round-trips).
         if (tcgPlayerPrice && tcgPlayerPrice > 0) {
           return buildPrice(cardName, grade, tcgPlayerPrice, 'tcgplayer', tcgPlayerMidPrice);
         }
 
-        // Fallback: eBay sold (ungraded)
-        try {
-          const ebayPrice = await fetchCardPrice({ cardName, grade, language, setName, cardNumber });
-          return { ...ebayPrice, source: 'ebay' };
-        } catch {}
-      }
-
-      // === PSA 10 ===
-      if (grade === 'PSA10') {
-        // Primary source: eBay sold listings (PSA 10)
-        try {
-          const ebayPrice = await fetchCardPrice({ cardName, grade, language, setName, cardNumber });
-          return { ...ebayPrice, source: 'ebay' };
-        } catch {}
-
-        // Fallback: PriceCharting (TODO: enable when API key obtained)
-        // const pcPrice = await fetchPriceChartingPrice(cardName, setName);
-        // if (pcPrice?.gradedPrice) return buildPrice(cardName, grade, pcPrice.gradedPrice, 'pricecharting');
-
-        // No estimate — only show PSA 10 prices from real sources (eBay or PriceCharting)
-      }
-
-      // 3. Fall back to watchlist stored price — only for Raw (PSA 10 needs real data)
-      if (grade === 'UNGRADED' && cardId) {
-        const watchlistItem = watchlistItems.find(
-          (i) => i.kind === 'card' && i.cardId === cardId && i.grade === 'UNGRADED',
-        );
-        if (watchlistItem?.lastPrice) {
-          return buildPrice(cardName, grade, watchlistItem.lastPrice, 'tcgplayer', watchlistItem.lastPrice * 0.95);
+        // 2. TCGPlayer server proxy / mock — full sales stats.
+        if (cardId) {
+          try {
+            const tcg = await fetchRawCardPrice(cardId, cardName);
+            if (tcg) return tcg;
+          } catch {
+            // fall through to watchlist tertiary
+          }
         }
+
+        // 3. Last-known price from the user's watchlist — keeps the row
+        //    populated when offline / between sync cycles. Tagged as
+        //    `tcgplayer` because that's where the value originally came
+        //    from when it was stored.
+        if (cardId) {
+          const stored = watchlistItems.find(
+            (i) => i.kind === 'card' && i.cardId === cardId && i.grade === 'UNGRADED',
+          );
+          if (stored?.lastPrice) {
+            return buildPrice(cardName, grade, stored.lastPrice, 'tcgplayer', stored.lastPrice * 0.95);
+          }
+        }
+
+        return null;
+      }
+
+      // === PSA 10 — eBay / PriceCharting ONLY ===
+      if (grade === 'PSA10') {
+        // 1. Mock fallback first (instant) — labelled as eBay since the
+        //    mock seed values are calibrated against eBay sold medians.
+        if (cardId) {
+          const mock = getPrice(cardId, 'PSA10');
+          if (mock) return { ...mock, source: 'ebay' };
+        }
+
+        // 2. Live eBay sold listings via server proxy.
+        try {
+          const ebayPrice = await fetchCardPrice({ cardName, grade, language, setName, cardNumber });
+          return { ...ebayPrice, source: 'ebay' };
+        } catch {}
+
+        // 3. PriceCharting (TODO: enable when API key obtained).
+        // const pc = await fetchPriceChartingPrice(cardName, setName);
+        // if (pc?.gradedPrice) return buildPrice(cardName, grade, pc.gradedPrice, 'pricecharting');
+
+        // No estimate fallback for PSA 10 — graded prices need a real
+        // source or we return null and let the UI show "—".
+        return null;
       }
 
       return null;
