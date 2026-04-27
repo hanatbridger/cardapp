@@ -18,6 +18,7 @@ import {
 } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
 import { configureRevenueCat } from '../src/services/revenue-cat';
+import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
   useFonts,
   SpaceGrotesk_300Light,
@@ -41,11 +42,34 @@ configureRevenueCat();
 defineBackgroundAlertTask();
 configureNotificationHandler();
 
+// Pump Supabase token refresh while the app is foregrounded. Without
+// this RN suspends timers in the background and refresh-on-wake
+// silently fails — see src/services/supabase.ts.
+registerSupabaseAppStateBridge();
+
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const hydrateFromSupabase = useUserStore((s) => s.hydrateFromSupabase);
+
+  // On cold start, reflect the persisted Supabase session into local
+  // state. Then subscribe to auth events so a sign-out triggered from
+  // anywhere (server-side logout, expired refresh, multi-device) flips
+  // the gate. Listener is unsubscribed on unmount — only one
+  // subscription per app lifetime since AuthGate is mounted once.
+  useEffect(() => {
+    hydrateFromSupabase();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        // Mirror Supabase logout into the local boolean. Profile data
+        // stays put — wiping it is the deleteAccount path, not signOut.
+        useUserStore.setState({ isAuthenticated: false });
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [hydrateFromSupabase]);
 
   useEffect(() => {
     // Skip auth/onboarding gates entirely on web (localhost dev preview).

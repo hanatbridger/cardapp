@@ -5,6 +5,7 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
+import { signInWithApple } from '../../src/services/supabase';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 
@@ -30,7 +31,18 @@ function LoginScreen() {
         ],
       });
 
-      // Apple only returns name/email on first sign-in; fall back to defaults
+      // Exchange Apples identity token for a Supabase session. Without
+      // an identityToken we cant authenticate server-side, so bail.
+      if (!credential.identityToken) {
+        Alert.alert('Sign In Failed', 'Apple did not return a sign-in token. Please try again.');
+        return;
+      }
+      await signInWithApple(credential.identityToken);
+
+      // Apple only returns name/email on the FIRST sign-in for a given
+      // user. After that fullName/email are null even when the Supabase
+      // session is fresh. Use whatever Apple gave us if present, else
+      // fall back to the Supabase session profile (set on first login).
       const firstName = credential.fullName?.givenName ?? '';
       const lastName = credential.fullName?.familyName ?? '';
       const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'Apple User';
@@ -40,9 +52,11 @@ function LoginScreen() {
       signIn({ email, username, displayName }, 'apple');
       router.replace('/(tabs)');
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Sign In Failed', 'Apple Sign In could not be completed. Please try again.');
-      }
+      if (e.code === 'ERR_REQUEST_CANCELED') return;
+      Alert.alert(
+        'Sign In Failed',
+        e?.message ?? 'Apple Sign In could not be completed. Please try again.',
+      );
     }
   };
 

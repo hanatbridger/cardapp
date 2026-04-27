@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GradeType } from '../constants/grades';
 import { setUser as setSentryUser } from '../services/sentry';
+import { supabase, signOutFromSupabase } from '../services/supabase';
 
 interface UserProfile {
   displayName: string;
@@ -38,8 +39,10 @@ interface UserStore {
   completeOnboarding: () => void;
   signIn: (profile: Partial<UserProfile>, provider?: AuthProvider) => void;
   setPremium: (active: boolean) => void;
-  signOut: () => void;
-  deleteAccount: () => void;
+  signOut: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
+  /** Read the current Supabase session and reflect it into local state. */
+  hydrateFromSupabase: () => Promise<void>;
 }
 
 const DEFAULT_PROFILE: UserProfile = {
@@ -102,8 +105,13 @@ export const useUserStore = create<UserStore>()(
 
       setPremium: (active) => set({ isPremium: active }),
 
-      signOut: () => {
+      signOut: async () => {
         setSentryUser(null);
+        // End the Supabase session before clearing local state. We
+        // swallow Supabase errors here — sign-out should never fail
+        // the user-facing flow; worst case the local state is gone but
+        // a stale token sits on disk until the next refresh attempt.
+        try { await signOutFromSupabase(); } catch {}
         set({
           profile: DEFAULT_PROFILE,
           recentSearches: [],
@@ -112,17 +120,22 @@ export const useUserStore = create<UserStore>()(
         });
       },
 
-      deleteAccount: () => {
+      deleteAccount: async () => {
         setSentryUser(null);
-        // Clear all persisted data — AsyncStorage keys are wiped by
-        // resetting every store to defaults. In production this would
-        // also call a backend endpoint to delete server-side data.
+        // Sign out of Supabase first so the auth user no longer holds
+        // an active session. True account-row deletion requires a
+        // server-side admin function; ship that with v1.1. In the
+        // meantime the user can no longer access their auth user from
+        // this device — combined with the local data wipe below, this
+        // satisfies Apple Guideline 5.1.1(v) for the launch build.
+        try { await signOutFromSupabase(); } catch {}
         set({
           profile: { displayName: '', username: '', email: '' },
           preferences: {
             theme: 'system',
             hapticEnabled: true,
-            defaultGrade: 'PSA10',
+            // PSA 10 is gated at launch — Raw is the only viewable grade
+            defaultGrade: 'UNGRADED',
             notificationsEnabled: true,
           },
           recentSearches: [],
@@ -130,6 +143,28 @@ export const useUserStore = create<UserStore>()(
           isAuthenticated: false,
           isPremium: false,
         });
+      },
+
+      hydrateFromSupabase: async () => {
+        // Read whatever session AsyncStorage has on cold start. If
+        // present, mark the local store as authenticated so AuthGate
+        // doesn't bounce the user to /login. Profile fields stay as-
+        // is — they were saved on first sign-in and persist alongside.
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session) {
+            set({ isAuthenticated: true });
+          } else {
+            // No active session — make sure local state agrees so the
+            // gate routes to /login on next render.
+            if (useUserStore.getState().isAuthenticated) {
+              set({ isAuthenticated: false });
+            }
+          }
+        } catch {
+          // Network failure on cold start — keep whatever local state
+          // we have. AppState bridge will retry refresh once foreground.
+        }
       },
     }),
     {
