@@ -710,17 +710,22 @@ function CardDetailScreen() {
       <Modal
         visible={psaModalVisible}
         transparent
-        animationType="fade"
+        // RN Modals "slide" animationType slides up from the bottom on
+        // show and back down on dismiss — matches the user-requested
+        // "slide up then slide down" affordance natively without us
+        // having to manage Animated values for the inner card.
+        animationType="slide"
         onRequestClose={() => setPsaModalVisible(false)}
       >
         <Pressable
           onPress={() => setPsaModalVisible(false)}
+          // Bottom-sheet layout — backdrop fills the screen, sheet
+          // anchors to the bottom edge so the slide-up animation reads
+          // as a sheet rising rather than a centered alert appearing.
           style={{
             flex: 1,
-            backgroundColor: withAlpha('#000000', 0.65),
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingHorizontal: spacing[6],
+            backgroundColor: withAlpha('#000000', 0.5),
+            justifyContent: 'flex-end',
           }}
         >
           {/* Inner pressable swallows taps so the modal doesn't dismiss
@@ -729,16 +734,28 @@ function CardDetailScreen() {
             onPress={(e) => e.stopPropagation?.()}
             style={{
               width: '100%',
-              maxWidth: 360,
               backgroundColor: colors.surface,
-              borderRadius: radius['2xl'],
-              padding: spacing[6],
+              borderTopLeftRadius: radius['3xl'],
+              borderTopRightRadius: radius['3xl'],
+              paddingHorizontal: spacing[6],
+              paddingTop: spacing[3],
+              paddingBottom: spacing[8],
               gap: spacing[4],
               alignItems: 'center',
-              borderWidth: 1,
+              borderTopWidth: 1,
               borderColor: colors.outline,
             }}
           >
+            {/* Drag-handle pip — universal "this is a sheet" affordance. */}
+            <View
+              style={{
+                width: 40,
+                height: 4,
+                borderRadius: radius.full,
+                backgroundColor: colors.outlineStrong,
+                marginBottom: spacing[2],
+              }}
+            />
             <View
               style={{
                 width: 64,
