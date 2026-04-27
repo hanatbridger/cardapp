@@ -30,4 +30,5 @@ export { AnimatedListItem } from './AnimatedListItem';
 export { BrandMark } from './BrandMark';
 export { BrandedSplash } from './BrandedSplash';
 export { TokenEditorPanel } from './TokenEditorPanel';
+export { ComingSoonPanel } from './ComingSoonPanel';
 export { CollapsingHeader } from './CollapsingHeader';

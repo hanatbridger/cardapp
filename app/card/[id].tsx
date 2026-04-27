@@ -20,6 +20,7 @@ import {
   WatchlistFullModal,
   CardDetailSkeleton,
   Skeleton,
+  ComingSoonPanel,
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
@@ -90,14 +91,9 @@ function CardDetailScreen() {
   // re-tap PSA 10 / Raw on every card.
   const defaultGrade = useUserStore((s) => s.preferences.defaultGrade);
   const updatePreference = useUserStore((s) => s.updatePreference);
-  // PSA 10 is locked at launch — graded prices need the eBay live proxy
-  // which isn't deployed yet. We force the segment to UNGRADED on mount
-  // even if the user previously persisted PSA 10 as their default.
-  const [gradeIndex, setGradeIndex] = useState(() => {
-    const stored = GRADE_OPTIONS.indexOf(defaultGrade);
-    const ungradedIdx = GRADE_OPTIONS.indexOf('UNGRADED');
-    return defaultGrade === 'PSA10' || stored < 0 ? ungradedIdx : stored;
-  });
+  const [gradeIndex, setGradeIndex] = useState(() =>
+    Math.max(0, GRADE_OPTIONS.indexOf(defaultGrade)),
+  );
   const [timeRangeIndex, setTimeRangeIndex] = useState(2);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [watchlistFullVisible, setWatchlistFullVisible] = useState(false);
@@ -380,21 +376,12 @@ function CardDetailScreen() {
             )}
           </View>
 
-          {/* Grade selector — PSA 10 disabled at launch (see gradeIndex
-              initializer). Tapping the locked segment shows a "coming
-              soon" alert instead of switching tabs. */}
+          {/* Grade selector — both segments tappable. PSA 10 swaps the
+              price section for a "coming soon" panel instead of being
+              locked at the toggle level (see ComingSoonPanel below). */}
           <SegmentedControl
             options={GRADE_OPTIONS.map((g) => GRADES[g].shortLabel)}
             selected={gradeIndex}
-            disabledIndices={[GRADE_OPTIONS.indexOf('PSA10')]}
-            disabledBadge="Soon"
-            onDisabledPress={() =>
-              Alert.alert(
-                'PSA 10 prices — coming soon',
-                "We're rolling out live TCGPlayer raw prices first. Graded card tracking lights up once our eBay sales pipeline ships — stay tuned.",
-                [{ text: 'Got it' }],
-              )
-            }
             onSelect={(i) => {
               setGradeIndex(i);
               // Persist so the next card the user opens defaults to the
@@ -403,8 +390,18 @@ function CardDetailScreen() {
             }}
           />
 
-          {/* Price section + alert */}
-          {priceLoading ? (
+          {/* Price section + alert. PSA 10 is gated until the eBay
+              live proxy ships — show the slide-up coming-soon panel
+              instead of the price card / loading skeleton / empty
+              state. The toggle still works so the user can flip back
+              to Raw with one tap. */}
+          {selectedGrade === 'PSA10' ? (
+            <ComingSoonPanel
+              reanimateKey={selectedGrade}
+              title="PSA 10 prices — coming soon"
+              body="We’re shipping live raw prices first. Graded card tracking lights up after our eBay sales pipeline launches. Tap Raw above to see the live TCGPlayer Market Price."
+            />
+          ) : priceLoading ? (
             <Card elevated>
               <View style={{ gap: spacing[3] }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
@@ -430,13 +427,16 @@ function CardDetailScreen() {
                       variant="caption"
                       color={colors.primary}
                       onPress={() => {
+                        // PSA 10 path is short-circuited above by the
+                        // ComingSoonPanel — selectedGrade is always
+                        // UNGRADED here, so the eBay sold-listings
+                        // URL doesn't need a grade suffix.
                         const cardSearch = `${card.name} ${card.set.name} ${card.number}`;
-                        const gradeSearch = selectedGrade === 'PSA10' ? ' PSA 10' : '';
                         const sourceUrl =
                           price.source === 'tcgplayer'
                             ? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`
                             : price.source === 'ebay'
-                              ? `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch + gradeSearch)}&LH_Sold=1&LH_Complete=1&_sop=13`
+                              ? `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch)}&LH_Sold=1&LH_Complete=1&_sop=13`
                               : price.source === 'pricecharting'
                                 ? `https://www.pricecharting.com/search-products?q=${encodeURIComponent(cardSearch)}&type=prices`
                                 : `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`;
@@ -488,74 +488,41 @@ function CardDetailScreen() {
             </View>
           ) : (
             <Card>
+              {/* Empty state — only reachable on UNGRADED. PSA 10 is
+                  short-circuited above by ComingSoonPanel. */}
               <View style={{ gap: spacing[3] }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
                   <IconAlertCircle size={18} color={colors.onSurfaceMuted} />
-                  <Text variant="labelLg">
-                    {selectedGrade === 'PSA10' ? 'No PSA 10 sales recorded' : 'Price data unavailable'}
-                  </Text>
+                  <Text variant="labelLg">Price data unavailable</Text>
                 </View>
                 <Text variant="caption" color={colors.onSurfaceMuted}>
-                  {selectedGrade === 'PSA10'
-                    ? "We haven't seen recent PSA 10 sales for this card on eBay. Try the raw price, or check eBay directly."
-                    : 'Raw prices come from TCGPlayer Market Price. Try again in a moment, or check TCGPlayer directly for the latest market value.'}
+                  Raw prices come from TCGPlayer Market Price. Try again in a moment, or check TCGPlayer directly for the latest market value.
                 </Text>
                 <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
-                  {selectedGrade === 'PSA10' ? (
-                    <Pressable
-                      onPress={() => {
-                        const i = GRADE_OPTIONS.indexOf('UNGRADED');
-                        setGradeIndex(i);
-                        updatePreference('defaultGrade', 'UNGRADED');
-                      }}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing[1],
-                        paddingHorizontal: spacing[3],
-                        paddingVertical: spacing[2],
-                        borderRadius: radius.md,
-                        backgroundColor: colors.primary,
-                      }}
-                    >
-                      <Text variant="labelSm" color={colors.onPrimary}>
-                        See raw price
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={() => refetchPrice()}
-                      disabled={priceFetching}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: spacing[1],
-                        paddingHorizontal: spacing[3],
-                        paddingVertical: spacing[2],
-                        borderRadius: radius.md,
-                        borderWidth: 1,
-                        borderColor: colors.outline,
-                        opacity: priceFetching ? 0.5 : 1,
-                      }}
-                    >
-                      <IconRefresh size={14} color={colors.primary} />
-                      <Text variant="labelSm" color={colors.primary}>
-                        {priceFetching ? 'Retrying…' : 'Try again'}
-                      </Text>
-                    </Pressable>
-                  )}
+                  <Pressable
+                    onPress={() => refetchPrice()}
+                    disabled={priceFetching}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: spacing[1],
+                      paddingHorizontal: spacing[3],
+                      paddingVertical: spacing[2],
+                      borderRadius: radius.md,
+                      borderWidth: 1,
+                      borderColor: colors.outline,
+                      opacity: priceFetching ? 0.5 : 1,
+                    }}
+                  >
+                    <IconRefresh size={14} color={colors.primary} />
+                    <Text variant="labelSm" color={colors.primary}>
+                      {priceFetching ? 'Retrying…' : 'Try again'}
+                    </Text>
+                  </Pressable>
                   <Pressable
                     onPress={() => {
-                      // Send users to whichever marketplace is the
-                      // source-of-truth for the active grade — eBay
-                      // sold-listings filter for PSA 10, TCGPlayer
-                      // product page (or search) for raw. Mirrors the
-                      // citation link on the populated price view.
-                      const cardSearch = `${card.name} ${card.set.name} ${card.number}`;
-                      const url = selectedGrade === 'PSA10'
-                        ? `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch + ' PSA 10')}&LH_Sold=1&LH_Complete=1&_sop=13`
-                        : (card.tcgPlayerUrl
-                          ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`);
+                      const url = card.tcgPlayerUrl
+                        ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`;
                       Linking.openURL(url);
                     }}
                     style={{
@@ -571,7 +538,7 @@ function CardDetailScreen() {
                   >
                     <IconExternalLink size={14} color={colors.onSurfaceVariant} />
                     <Text variant="labelSm" color={colors.onSurfaceVariant}>
-                      {selectedGrade === 'PSA10' ? 'Check eBay' : 'Check TCGPlayer'}
+                      Check TCGPlayer
                     </Text>
                   </Pressable>
                 </View>
@@ -579,8 +546,11 @@ function CardDetailScreen() {
             </Card>
           )}
 
-          {/* Chart with time range toggle */}
-          {filteredHistory && filteredHistory.length > 2 && price && (
+          {/* Chart with time range toggle. Hidden on PSA 10 — the
+              ComingSoonPanel above already explains the gate, and the
+              chart would render mock graded history while the price
+              card says "coming soon" — inconsistent. */}
+          {selectedGrade !== 'PSA10' && filteredHistory && filteredHistory.length > 2 && price && (
             <Card>
               <View style={{ gap: spacing[3] }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -627,8 +597,8 @@ function CardDetailScreen() {
           {/* eBay Market Dynamics — demand pressure & supply saturation */}
           <MarketDynamics cardId={card.id} />
 
-          {/* Recent eBay Sold Listings */}
-          {price && (
+          {/* Recent eBay Sold Listings — same PSA 10 gate as the chart. */}
+          {selectedGrade !== 'PSA10' && price && (
             <Card>
               <View style={{ gap: spacing[3] }}>
                 <Text variant="labelLg">Recent eBay Sales</Text>

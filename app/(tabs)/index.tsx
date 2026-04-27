@@ -1,5 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, FlatList, Pressable, RefreshControl, Alert } from 'react-native';
+import { View, FlatList, Pressable, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
@@ -13,7 +13,6 @@ import {
   SealedWatchlistCard,
   EmptyState,
   ScreenBackground,
-  Badge,
   BrandMark,
   withErrorBoundary,
 } from '../../src/components';
@@ -32,7 +31,15 @@ const TAB_BAR_CLEARANCE = 64 + 4;
 function WatchlistScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { items, maxFreeItems } = useWatchlistStore();
+  const { items: rawItems, maxFreeItems } = useWatchlistStore();
+  // PSA 10 tracking is gated until the eBay live proxy ships — hide
+  // any previously-saved PSA 10 cards from the list and the count.
+  // The store keeps the data intact, so they reappear automatically
+  // when the gate lifts. Sealed products and Raw cards always show.
+  const items = useMemo(
+    () => rawItems.filter((i) => !(i.kind === 'card' && i.grade === 'PSA10')),
+    [rawItems],
+  );
   const isPremium = useUserStore((s) => s.isPremium);
   const [refreshing, setRefreshing] = useState(false);
   const queryClient = useQueryClient();
@@ -182,26 +189,6 @@ function WatchlistScreen() {
                 }}
               >
                 <IconSearch size={20} color={colors.onSurfaceVariant} />
-              </Pressable>
-            </View>
-
-            {/* Demo data notice — prices shown are from a seeded dataset
-                until the live eBay pricing service is deployed. Tapping
-                the chip explains this to users and App Store reviewers. */}
-            <View style={{ paddingHorizontal: HORIZONTAL_PADDING }}>
-              <Pressable
-                onPress={() =>
-                  Alert.alert(
-                    'Sample data',
-                    'CardPulse is in early access. Prices, trends, and recent sales shown here come from a curated sample dataset. Live eBay pricing turns on soon — your watchlist and alerts will keep working the whole time.',
-                    [{ text: 'Got it' }],
-                  )
-                }
-                accessibilityRole="button"
-                accessibilityLabel="Sample data notice. Tap for details."
-                hitSlop={8}
-              >
-                <Badge variant="info">Sample data — tap for details</Badge>
               </Pressable>
             </View>
 
