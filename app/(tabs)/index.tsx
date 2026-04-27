@@ -22,6 +22,8 @@ import { useWatchlistStore, useUserStore } from '../../src/stores';
 import type { WatchlistItem } from '../../src/stores';
 import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
+import { useTrendingMovers } from '../../src/hooks';
+import type { TrendingTile } from '../../src/services/trending';
 
 // Floating tab bar occupies 64pt + safe-area bottom + offset. Pad the
 // list enough that the last card clears the glass pill — otherwise its
@@ -97,11 +99,17 @@ function WatchlistScreen() {
     return () => clearTimeout(timer);
   }, [dayKey, queryClient]);
 
-  const trendingItems = useMemo(() => {
-    // Hash the day key into a 32-bit seed, then drive a deterministic
-    // PRNG (mulberry32). Same seed every render of the same day; fresh
-    // shuffle at midnight UTC. Inlined so this file doesn't grow a
-    // utility import for 10 lines of number-crunching.
+  // Live trending — proxied from collectrics.com via /api/trending. The
+  // upstream feed publishes one snapshot per day with day-over-day
+  // % change, which is exactly what we want to surface. Cached at the
+  // edge for 6h, so refreshes are cheap.
+  const { data: liveTrending } = useTrendingMovers(12);
+
+  // Fallback rail — date-seeded shuffle of MOCK_CARDS by |% change|. Used
+  // on the very first paint before the trending fetch resolves and as a
+  // safety net if the upstream is down. Same data shape as live so the
+  // carousel doesn't have to branch.
+  const fallbackTrending: TrendingTile[] = useMemo(() => {
     let h = 2166136261;
     for (let i = 0; i < dayKey.length; i++) {
       h ^= dayKey.charCodeAt(i);
@@ -118,24 +126,32 @@ function WatchlistScreen() {
     const pool = MOCK_CARDS
       .map((card) => ({ card, price: getPrice(card.id, 'UNGRADED') }))
       .filter((item): item is { card: typeof item.card; price: CardPrice } => !!item.price)
-      // Biggest absolute movers surface first — a -12% drop is as
-      // newsworthy as a +12% pop. Ties broken by card id so ranking is
-      // stable when prices coincide.
       .sort((a, b) => {
         const da = Math.abs(b.price.percentChange) - Math.abs(a.price.percentChange);
         return da !== 0 ? da : a.card.id.localeCompare(b.card.id);
       });
 
-    // Take the top ~24 and Fisher-Yates-shuffle them with the day-seeded
-    // PRNG. Then slice 8. This way users see a rotating mix of the day's
-    // hottest movers instead of the same 8 names every day.
     const top = pool.slice(0, Math.min(24, pool.length));
     for (let i = top.length - 1; i > 0; i--) {
       const j = Math.floor(rand() * (i + 1));
       [top[i], top[j]] = [top[j], top[i]];
     }
-    return top.slice(0, 8);
+    return top.slice(0, 8).map<TrendingTile>(({ card, price }) => ({
+      productId: card.id,
+      name: card.name,
+      setName: card.set.name,
+      rarity: card.rarity ?? '',
+      imageUrl: card.images.small,
+      rawPrice: price.currentPrice,
+      percentChange: price.percentChange,
+    }));
   }, [dayKey]);
+
+  // Prefer live, fall back to seeded shuffle.
+  const trendingItems: TrendingTile[] =
+    liveTrending?.items && liveTrending.items.length > 0
+      ? liveTrending.items
+      : fallbackTrending;
 
   return (
     <ScreenBackground>

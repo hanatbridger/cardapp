@@ -6,29 +6,29 @@ import { Text } from './Text';
 import { PriceChange } from './PriceChange';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
-import type { PokemonCard } from '../types/card';
-import type { CardPrice } from '../types/card';
-
-interface TrendingItem {
-  card: PokemonCard;
-  price?: CardPrice;
-}
+import type { TrendingTile } from '../services/trending';
 
 interface TrendingCarouselProps {
-  items: TrendingItem[];
+  items: TrendingTile[];
 }
 
-const ITEM_WIDTH = 140;
+const ITEM_WIDTH = 200;
 const ITEM_GAP = 8;
 const SCROLL_SPEED = 0.5; // pixels per frame
 const FRAME_INTERVAL = 16; // ~60fps
 
-function TrendingCard({ card, price }: TrendingItem) {
+function TrendingCard({ name, setName, imageUrl, percentChange }: TrendingTile) {
   const { colors } = useTheme();
 
   return (
     <Pressable
-      onPress={() => router.push(`/card/${card.id}`)}
+      // The trending payload only carries TCGPlayer productIds (not
+      // Pokemon TCG card ids), so a tile tap drops the user into Search
+      // with the card name pre-filled — they pick the canonical record
+      // and we route to the in-app card detail from there.
+      onPress={() =>
+        router.push(`/(tabs)/search?focus=1&from=home&q=${encodeURIComponent(name)}`)
+      }
       style={{
         width: ITEM_WIDTH,
         flexDirection: 'row',
@@ -40,17 +40,18 @@ function TrendingCard({ card, price }: TrendingItem) {
       }}
     >
       <Image
-        source={{ uri: card.images.small }}
+        source={{ uri: imageUrl }}
         style={{ width: 36, height: 50, borderRadius: radius.sm }}
         contentFit="cover"
       />
       <View style={{ flex: 1, gap: spacing['0.5'] }}>
         <Text variant="labelMd" numberOfLines={1}>
-          {card.name}
+          {name}
         </Text>
-        {price && (
-          <PriceChange percent={price.percentChange} size="sm" showIcon={true} />
-        )}
+        <Text variant="caption" color={colors.onSurfaceMuted} numberOfLines={1}>
+          {setName}
+        </Text>
+        <PriceChange percent={percentChange} size="sm" showIcon />
       </View>
     </Pressable>
   );
@@ -115,8 +116,7 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
     }, 3000);
   };
 
-  const handleScroll = (e: any) => {
-    // Sync offset when user manually scrolls
+  const handleScroll = (e: { nativeEvent: { contentOffset: { x: number } } }) => {
     if (isPaused.current) {
       scrollOffset.current = e.nativeEvent.contentOffset.x;
     }
@@ -126,7 +126,7 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
     <FlatList
       ref={flatListRef}
       data={tripleData}
-      keyExtractor={(item, index) => `${item.card.id}-${index}`}
+      keyExtractor={(item, index) => `${item.productId}-${index}`}
       renderItem={({ item }) => <TrendingCard {...item} />}
       horizontal
       showsHorizontalScrollIndicator={false}

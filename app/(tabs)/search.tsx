@@ -31,7 +31,7 @@ type Mode = 'cards' | 'sets' | 'artists';
 
 function SearchScreen() {
   const { colors } = useTheme();
-  const params = useLocalSearchParams<{ focus?: string; from?: string }>();
+  const params = useLocalSearchParams<{ focus?: string; from?: string; q?: string }>();
   const navigation = useNavigation();
   const [mode, setMode] = useState<Mode>('cards');
   const [query, setQuery] = useState('');
@@ -64,12 +64,17 @@ function SearchScreen() {
       if (params.focus === '1') {
         setSearchFocused(true);
         setSearchOrigin(params.from === 'home' ? 'home' : 'tab');
+        // Optional `q` deep-link param — used by the Trending Now tile
+        // tap to pre-fill the search box with the card name. Lets the
+        // user pick the canonical record (Pokemon TCG cardId) since
+        // the trending payload only carries TCGPlayer productIds.
+        if (params.q) setQuery(params.q);
         // Small delay so the input is mounted before we call .focus().
         const t = setTimeout(() => searchInputRef.current?.focus(), 50);
-        router.setParams({ focus: undefined, from: undefined });
+        router.setParams({ focus: undefined, from: undefined, q: undefined });
         return () => clearTimeout(t);
       }
-    }, [params.focus, params.from]),
+    }, [params.focus, params.from, params.q]),
   );
 
   // Card search
