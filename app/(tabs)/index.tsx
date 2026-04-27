@@ -154,8 +154,14 @@ function WatchlistScreen() {
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-                <BrandMark size={24} />
-                <Text variant="title">CardPulse</Text>
+                {/* Logomark sized to track the headingLg cap height
+                    (24/700) so the wordmark + mark optical weight
+                    matches Notifications/Profile/Explore titles. 28pt
+                    keeps the 1.16x mark-to-text ratio that reads as
+                    balanced — same ratio Material 3 uses for app-bar
+                    leading icons. */}
+                <BrandMark size={28} />
+                <Text variant="headingLg">CardPulse</Text>
               </View>
               <Pressable
                 // `focus=1` opens Explore directly into the X-style focused
