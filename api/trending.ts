@@ -25,8 +25,12 @@ interface CollectricsRow {
   'psa-10-price'?: number;
   'dod-change'?: number;
   'dod-change-pct'?: number;
+  'baseline-change'?: number;
+  'baseline-change-pct'?: number;
   'snapshot-date'?: string;
 }
+
+type Mode = 'movers' | 'undervalued' | 'overvalued';
 
 export interface TrendingTile {
   /** TCGPlayer productId, parsed from the image URL. */
@@ -36,13 +40,22 @@ export interface TrendingTile {
   rarity: string;
   imageUrl: string;
   rawPrice: number;
-  /** Already converted to percent (e.g. 4.9, not 0.049). */
+  /** Day-over-day change, already converted to percent (e.g. 4.9). */
   percentChange: number;
+  /**
+   * Current price vs 30-day baseline, in percent. Drives the
+   * undervalued / overvalued ranking — negative means current price is
+   * below the 30d average (potential rebound), positive means it's
+   * above (potential cooldown). Undefined when collectrics doesn't
+   * publish a baseline for the row.
+   */
+  baselineChangePct?: number;
 }
 
 interface TrendingResponse {
   generatedAt: string;
   source: 'collectrics';
+  mode: Mode;
   items: TrendingTile[];
 }
 
@@ -74,10 +87,11 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
 
-  const limit = Math.min(
-    Number(new URL(req.url).searchParams.get('limit') ?? '12'),
-    24,
-  );
+  const url = new URL(req.url);
+  const limit = Math.min(Number(url.searchParams.get('limit') ?? '12'), 24);
+  const modeRaw = (url.searchParams.get('mode') ?? 'movers').toLowerCase();
+  const mode: Mode =
+    modeRaw === 'undervalued' || modeRaw === 'overvalued' ? modeRaw : 'movers';
 
   try {
     const res = await fetch('https://mycollectrics.com/api/card_leaderboard', {
@@ -90,39 +104,64 @@ export default async function handler(req: Request): Promise<Response> {
     const data = await res.json();
     const rows: CollectricsRow[] = Array.isArray(data?.rows) ? data.rows : [];
 
-    const items: TrendingTile[] = rows
+    // Map every row that has the basics into a TrendingTile. Filtering
+    // and sorting per mode happens after the map so we keep the optional
+    // baselineChangePct on every tile (consumers may want both metrics).
+    const tiles: TrendingTile[] = rows
       .filter(
         (r) =>
           typeof r['raw-price'] === 'number' &&
           r['raw-price']! > 0 &&
           typeof r['dod-change-pct'] === 'number',
       )
-      .map((r) => {
+      .map((r): TrendingTile | null => {
         const productId = extractProductId(r['image-url'] ?? '');
-        return productId
-          ? {
-              productId,
-              name: r['product-name'],
-              setName: r['set-name'],
-              rarity: r['rarity-name'] ?? r['rarity-code'] ?? '',
-              imageUrl: r['image-url'],
-              rawPrice: r['raw-price']!,
-              percentChange: r['dod-change-pct']! * 100,
-            }
-          : null;
+        if (!productId) return null;
+        const tile: TrendingTile = {
+          productId,
+          name: r['product-name'],
+          setName: r['set-name'],
+          rarity: r['rarity-name'] ?? r['rarity-code'] ?? '',
+          imageUrl: r['image-url'],
+          rawPrice: r['raw-price']!,
+          percentChange: r['dod-change-pct']! * 100,
+        };
+        if (typeof r['baseline-change-pct'] === 'number') {
+          tile.baselineChangePct = r['baseline-change-pct']! * 100;
+        }
+        return tile;
       })
-      .filter((x): x is TrendingTile => x !== null)
-      // Biggest absolute movers first — a -10% drop is as newsworthy as
-      // a +10% pop. Within ties, alpha by name keeps ordering stable.
-      .sort((a, b) => {
-        const d = Math.abs(b.percentChange) - Math.abs(a.percentChange);
-        return d !== 0 ? d : a.name.localeCompare(b.name);
-      })
-      .slice(0, limit);
+      .filter((x): x is TrendingTile => x !== null);
+
+    let items: TrendingTile[];
+    if (mode === 'undervalued') {
+      // Cards trading below their 30-day baseline — recent dips that
+      // may rebound. Most negative baseline change first.
+      items = tiles
+        .filter((t) => typeof t.baselineChangePct === 'number' && t.baselineChangePct < 0)
+        .sort((a, b) => (a.baselineChangePct! - b.baselineChangePct!))
+        .slice(0, limit);
+    } else if (mode === 'overvalued') {
+      // Cards trading above their 30-day baseline — recent spikes that
+      // may cool down. Most positive baseline change first.
+      items = tiles
+        .filter((t) => typeof t.baselineChangePct === 'number' && t.baselineChangePct > 0)
+        .sort((a, b) => (b.baselineChangePct! - a.baselineChangePct!))
+        .slice(0, limit);
+    } else {
+      // Default: biggest absolute prior-day movers, sign-agnostic.
+      items = tiles
+        .sort((a, b) => {
+          const d = Math.abs(b.percentChange) - Math.abs(a.percentChange);
+          return d !== 0 ? d : a.name.localeCompare(b.name);
+        })
+        .slice(0, limit);
+    }
 
     const body: TrendingResponse = {
       generatedAt: data['generated-at'] ?? '',
       source: 'collectrics',
+      mode,
       items,
     };
     return json(200, body);

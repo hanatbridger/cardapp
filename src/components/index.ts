@@ -17,7 +17,7 @@ export { CardSearchResult } from './CardSearchResult';
 export { SealedSearchResult } from './SealedSearchResult';
 export { NotificationItem } from './NotificationItem';
 export { AIValuation } from './AIValuation';
-export { AIPicks } from './AIPicks';
+export { AIPicks, type AIPickItem } from './AIPicks';
 export { ScreenBackground } from './ScreenBackground';
 export { PriceAlertModal } from './PriceAlertModal';
 export { WatchlistFullModal } from './WatchlistFullModal';

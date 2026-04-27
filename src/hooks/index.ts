@@ -10,4 +10,4 @@ export {
   useSealedPrice,
   useSealedPriceHistory,
 } from './use-sealed';
-export { useTrendingMovers } from './use-trending';
+export { useTrending, useTrendingMovers } from './use-trending';

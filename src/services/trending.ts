@@ -15,6 +15,8 @@ const PROXY_ORIGIN = (() => {
   return '';
 })();
 
+export type TrendingMode = 'movers' | 'undervalued' | 'overvalued';
+
 export interface TrendingTile {
   productId: string;
   name: string;
@@ -22,21 +24,30 @@ export interface TrendingTile {
   rarity: string;
   imageUrl: string;
   rawPrice: number;
-  /** Already in percent (e.g. 4.9, not 0.049). */
+  /** Day-over-day change, already in percent (e.g. 4.9). */
   percentChange: number;
+  /** Current vs 30-day baseline, in percent. Drives undervalued/overvalued. */
+  baselineChangePct?: number;
 }
 
 export interface TrendingPayload {
   generatedAt: string;
   source: 'collectrics';
+  mode: TrendingMode;
   items: TrendingTile[];
 }
 
-export async function fetchTrendingMovers(limit = 12): Promise<TrendingPayload> {
-  const res = await fetch(`${PROXY_ORIGIN}/api/trending?limit=${limit}`);
+export async function fetchTrending(
+  limit = 12,
+  mode: TrendingMode = 'movers',
+): Promise<TrendingPayload> {
+  const res = await fetch(`${PROXY_ORIGIN}/api/trending?limit=${limit}&mode=${mode}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((body as { error?: string }).error ?? `trending ${res.status}`);
   }
   return (await res.json()) as TrendingPayload;
 }
+
+// Back-compat shim — older callers still import this name.
+export const fetchTrendingMovers = (limit = 12) => fetchTrending(limit, 'movers');

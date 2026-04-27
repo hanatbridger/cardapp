@@ -7,7 +7,6 @@ import {
   IconSparkles,
   IconInfinity,
   IconBellRinging,
-  IconBookmarks,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import {
@@ -37,7 +36,16 @@ interface Plan {
   hint?: string;
 }
 
+// Monthly first so users see the lower-commitment option up top —
+// annual sits below as the upsell with the Save 50% badge doing the
+// heavy lifting on conversion.
 const PLANS: Plan[] = [
+  {
+    id: 'monthly',
+    label: 'Monthly',
+    price: '$4.99',
+    period: '/month',
+  },
   {
     id: 'annual',
     label: 'Annual',
@@ -45,12 +53,6 @@ const PLANS: Plan[] = [
     period: '/year',
     badge: 'Save 50%',
     hint: 'Just $2.50/mo',
-  },
-  {
-    id: 'monthly',
-    label: 'Monthly',
-    price: '$4.99',
-    period: '/month',
   },
 ];
 
@@ -66,11 +68,6 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
     body: 'Track every card you care about — no 5-card cap.',
   },
   {
-    icon: IconBookmarks,
-    title: 'Every grade, every card',
-    body: 'Add the same card at multiple grades (Raw, PSA 9, PSA 10) without using up your free slots.',
-  },
-  {
     icon: IconBellRinging,
     title: 'Price alerts',
     body: 'Get pushed the moment any card crosses the price you set — raw or graded.',
@@ -81,7 +78,7 @@ function PaywallScreen() {
   const { colors } = useTheme();
   const setPremium = useUserStore((s) => s.setPremium);
   const isPremium = useUserStore((s) => s.isPremium);
-  const [selected, setSelected] = useState<PlanId>('annual');
+  const [selected, setSelected] = useState<PlanId>('monthly');
   const [purchasing, setPurchasing] = useState(false);
   const [offerings, setOfferings] = useState<any>(null);
 

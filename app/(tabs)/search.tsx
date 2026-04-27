@@ -10,6 +10,7 @@ import {
   CardSearchResult,
   SealedSearchResult,
   AIPicks,
+  type AIPickItem,
   AnimatedListItem,
   SegmentedControl,
   ScreenBackground,
@@ -19,7 +20,7 @@ import {
 import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useUserStore } from '../../src/stores';
-import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useCollapsingHeader } from '../../src/hooks';
+import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useCollapsingHeader, useTrending } from '../../src/hooks';
 import { MOCK_PRICES, TRENDING_SEARCHES, TRENDING_ARTISTS } from '../../src/mocks';
 import { CARD_SCORES } from '../../src/data/card-scores';
 import { getValuation } from '../../src/services/price-prediction';
@@ -102,6 +103,47 @@ function SearchScreen() {
   const hasQuery = query.length >= 2;
   const showCardResults = mode === 'cards' && hasQuery;
   const showSetResults = mode === 'sets';
+
+  // Undervalued / Overvalued picks — proxied from collectrics via
+  // /api/trending. Fed off the same daily card-leaderboard feed as the
+  // Trending Now rail; mode toggles which sort the proxy returns. Only
+  // fetched while the user is on the Cards tab and hasn't typed a query
+  // yet (the picks rail is the empty-state filler — no point wasting a
+  // request when search results are about to take its place).
+  const enablePicks = mode === 'cards' && !hasQuery;
+  const undervalQuery = useTrending(enablePicks ? 'undervalued' : 'movers', 8);
+  const overvalQuery = useTrending(enablePicks ? 'overvalued' : 'movers', 8);
+  const undervaluedPicks: AIPickItem[] = (undervalQuery.data?.items ?? []).map((t) => ({
+    cardId: `tcg-${t.productId}`,
+    cardName: t.name,
+    setName: t.setName,
+    imageUrl: t.imageUrl,
+    marketPrice: t.rawPrice,
+    // Mock predicted price reconstructed from the 30d baseline so the
+    // existing display ("Undervalued by X%") reads correctly.
+    predictedPrice: t.rawPrice * (1 + Math.abs((t.baselineChangePct ?? 0) / 100)),
+    // baselineChangePct is negative for undervalued; display wants
+    // positive gapPercent, so flip the sign.
+    gapPercent: -(t.baselineChangePct ?? 0),
+    label: 'undervalued' as const,
+    // Trending payload only carries TCGPlayer productIds, not Pokemon
+    // TCG card ids — route via in-app search so the user picks the
+    // canonical record.
+    searchQuery: t.name,
+  }));
+  const overvaluedPicks: AIPickItem[] = (overvalQuery.data?.items ?? []).map((t) => ({
+    cardId: `tcg-${t.productId}`,
+    cardName: t.name,
+    setName: t.setName,
+    imageUrl: t.imageUrl,
+    marketPrice: t.rawPrice,
+    predictedPrice: t.rawPrice / (1 + (t.baselineChangePct ?? 0) / 100),
+    // Display wants negative gapPercent for overvalued; baselineChangePct
+    // is positive, so flip.
+    gapPercent: -(t.baselineChangePct ?? 0),
+    label: 'overvalued' as const,
+    searchQuery: t.name,
+  }));
   const showArtistResults = mode === 'artists' && hasQuery;
 
   const handleCardPress = (card: PokemonCard) => {
@@ -251,6 +293,8 @@ function SearchScreen() {
           onTrendingPress={handleTrendingPress}
           onScroll={scrollHandler}
           topInset={headerHeight + stickyHeight}
+          undervaluedPicks={undervaluedPicks}
+          overvaluedPicks={overvaluedPicks}
         />
       ) : showCardResults ? (
         <CardResults
@@ -414,10 +458,14 @@ function CardsEmptyState({
   onTrendingPress,
   onScroll,
   topInset = 0,
+  undervaluedPicks,
+  overvaluedPicks,
 }: {
   onTrendingPress: (term: string) => void;
   onScroll?: any;
   topInset?: number;
+  undervaluedPicks: AIPickItem[];
+  overvaluedPicks: AIPickItem[];
 }) {
   const { colors } = useTheme();
 
@@ -457,26 +505,14 @@ function CardsEmptyState({
         </View>
       </View>
 
-      {(() => {
-        const scored = CARD_SCORES
-          .map((score) => {
-            const mp = MOCK_PRICES[score.cardId]?.currentPrice;
-            if (!mp) return null;
-            const v = getValuation(score, mp);
-            return { ...score, marketPrice: mp, predictedPrice: v.predictedPrice, gapPercent: v.gapPercent, label: v.label };
-          })
-          .filter(Boolean) as any[];
-
-        const undervalued = scored.filter((c: any) => c.label === 'undervalued').sort((a: any, b: any) => b.gapPercent - a.gapPercent);
-        const overvalued = scored.filter((c: any) => c.label === 'overvalued').sort((a: any, b: any) => a.gapPercent - b.gapPercent);
-
-        return (
-          <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[5], gap: spacing[5] }}>
-            <AIPicks title="Undervalued Right Now" items={undervalued} type="undervalued" />
-            <AIPicks title="Potentially Overvalued" items={overvalued} type="overvalued" />
-          </View>
-        );
-      })()}
+      {/* Undervalued / Overvalued picks — daily collectrics feed (see
+          undervalQuery / overvalQuery at the top of the component).
+          Each list silently hides when its data isn't ready, so first
+          paint stays clean instead of showing skeletons. */}
+      <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[5], gap: spacing[5] }}>
+        <AIPicks title="Undervalued Right Now" items={undervaluedPicks} type="undervalued" />
+        <AIPicks title="Potentially Overvalued" items={overvaluedPicks} type="overvalued" />
+      </View>
     </Animated.ScrollView>
   );
 }
