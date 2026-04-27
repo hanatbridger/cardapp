@@ -1,4 +1,4 @@
-import { apiFetch } from './api-client';
+import { Platform } from 'react-native';
 import { getSealedPrice } from '../mocks/sealed';
 import { getPrice, getMockPriceHistory } from '../mocks/prices';
 import type { SealedPrice } from '../types/sealed';
@@ -15,22 +15,34 @@ import type { CardPrice, PriceHistory } from '../types/card';
  *   UNGRADED → TCGPlayer (this file)
  *   PSA10    → eBay sold / PriceCharting (ebay-proxy.ts)
  *
- * TCGPlayer doesn't expose Market Price publicly without a partner API
- * key, so the live endpoints are thin server proxies that fetch the
- * product page and parse the Market Price + low / high / avg blocks.
- * While those routes are being built out we fall back to local mocks
- * (mocks/prices.ts for singles, mocks/sealed.ts for sealed) so the UI
- * behaves identically in dev, web preview, and TestFlight builds.
+ * The live path goes through Vercel serverless functions in `/api/`:
+ *
+ *   /api/tcgplayer/price?id=<pokemonTcgCardId>
+ *     → resolves productId, returns live Market Price
+ *   /api/tcgplayer/history?id=...   (TODO)
+ *   /api/sealed/price?id=...        (TODO)
+ *   /api/sealed/history?id=...      (TODO)
+ *
+ * When a live route isn't deployed yet, the corresponding fetcher
+ * falls back to local mocks so the UI behaves identically in dev,
+ * web preview, and TestFlight builds.
  */
 
-// Flip to `true` once the server proxy routes are live:
-//   /api/tcgplayer/price?id=...   (raw singles)
-//   /api/tcgplayer/history?id=...
-//   /api/sealed/price?id=...
-//   /api/sealed/history?id=...
-// Until then everything resolves from local mocks so the UI behaves
-// identically in dev, web preview, and TestFlight builds.
-const USE_LIVE_TCGPLAYER = false;
+// Vercel-deployed proxy origin. Web hits it relative (same host); native
+// points at the production deployment so TestFlight/Android builds get
+// live data without bundling localhost. Override with EXPO_PUBLIC_API_URL.
+const PROXY_ORIGIN =
+  Platform.OS === 'web'
+    ? ''
+    : (process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app');
+
+// Per-route flags — endpoints ship at different times.
+const LIVE = {
+  rawPrice: true,         // /api/tcgplayer/price       — Edge fn (deployed)
+  rawHistory: false,      // /api/tcgplayer/history     — TODO
+  sealedPrice: false,     // /api/sealed/price          — TODO
+  sealedHistory: false,   // /api/sealed/history        — TODO
+};
 
 interface TcgPlayerPriceResponse {
   productId: string;
@@ -55,49 +67,58 @@ export interface SealedPriceHistoryPoint {
   price: number;
 }
 
+async function getJson<T>(path: string): Promise<T> {
+  const res = await fetch(`${PROXY_ORIGIN}${path}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((body as { error?: string }).error ?? `proxy ${res.status}`);
+  }
+  return (await res.json()) as T;
+}
+
 /**
  * Fetch the current TCGPlayer Market Price for a raw (UNGRADED) single.
  *
- * Caller already has the Pokemon TCG API's `tcgPlayerPrice` (which IS a
- * TCGPlayer Market Price snapshot, just without the rolling-window
- * detail). This is the secondary fetch — used when we need full sales
- * stats (avg/high/low/count, last sale date) that the Pokemon TCG API
- * doesn't surface, and as a fallback when a card isn't in the Pokemon
- * TCG dataset.
- *
- * Returns `null` if the card isn't found in either the live proxy or
- * the mocks — caller decides how to surface that to the user.
+ * Pokemon TCG API embeds `tcgPlayerPrice` on each card payload but the
+ * cache lags 1–7 days for newly-released sets. When the bundled price
+ * is missing, the hook falls through to this fetcher which hits the
+ * Vercel serverless function for live data.
  */
 export async function fetchRawCardPrice(
   cardId: string,
   cardName: string,
   tcgplayerProductId?: string,
 ): Promise<CardPrice | null> {
-  if (USE_LIVE_TCGPLAYER) {
-    const lookup = tcgplayerProductId ?? cardId;
-    const data = await apiFetch<TcgPlayerPriceResponse>(
-      `/api/tcgplayer/price?id=${encodeURIComponent(lookup)}`,
-    );
-    return {
-      cardName,
-      grade: 'UNGRADED',
-      currentPrice: data.currentPrice,
-      previousPrice: data.previousPrice,
-      percentChange: data.percentChange,
-      averagePrice: data.averagePrice,
-      highPrice: data.highPrice,
-      lowPrice: data.lowPrice,
-      salesCount: data.salesCount,
-      lastSaleDate: data.lastSaleDate
-        ? new Date(data.lastSaleDate).toISOString().split('T')[0]
-        : '',
-      lastSalePrice: data.lastSalePrice,
-      source: 'tcgplayer',
-    };
+  if (LIVE.rawPrice) {
+    try {
+      const lookup = tcgplayerProductId ?? cardId;
+      const data = await getJson<TcgPlayerPriceResponse>(
+        `/api/tcgplayer/price?id=${encodeURIComponent(lookup)}`,
+      );
+      return {
+        cardName,
+        grade: 'UNGRADED',
+        currentPrice: data.currentPrice,
+        previousPrice: data.previousPrice,
+        percentChange: data.percentChange,
+        averagePrice: data.averagePrice,
+        highPrice: data.highPrice,
+        lowPrice: data.lowPrice,
+        salesCount: data.salesCount,
+        lastSaleDate: data.lastSaleDate
+          ? new Date(data.lastSaleDate).toISOString().split('T')[0]
+          : '',
+        lastSalePrice: data.lastSalePrice,
+        source: 'tcgplayer',
+      };
+    } catch {
+      // Live proxy didn't have the card (e.g. set not on TCGPlayer yet)
+      // — drop to mocks instead of throwing.
+    }
   }
 
-  // Same 150ms simulated round-trip as fetchSealedPrice so skeletons
-  // get a moment to render in dev.
+  // Same 150ms simulated round-trip as fetchSealedPrice so skeletons get
+  // a moment to render in dev.
   await new Promise((resolve) => setTimeout(resolve, 150));
   const mock = getPrice(cardId, 'UNGRADED');
   return mock ? { ...mock, source: 'tcgplayer' } : null;
@@ -105,16 +126,16 @@ export async function fetchRawCardPrice(
 
 /**
  * Fetch a TCGPlayer Market Price history series for a raw (UNGRADED)
- * single. Live endpoint isn't wired yet — we fall back to the
- * mocked history (mocks/prices.ts → getMockPriceHistory).
+ * single. Live endpoint isn't wired yet — falls back to the mocked
+ * history series so the chart still renders something.
  */
 export async function fetchRawCardPriceHistory(
   cardId: string,
   tcgplayerProductId?: string,
 ): Promise<PriceHistory> {
-  if (USE_LIVE_TCGPLAYER) {
+  if (LIVE.rawHistory) {
     const lookup = tcgplayerProductId ?? cardId;
-    const data = await apiFetch<TcgPlayerHistoryResponse>(
+    const data = await getJson<TcgPlayerHistoryResponse>(
       `/api/tcgplayer/history?id=${encodeURIComponent(lookup)}`,
     );
     return data.history;
@@ -133,9 +154,9 @@ export async function fetchSealedPrice(
   productId: string,
   tcgplayerProductId?: string,
 ): Promise<SealedPrice | null> {
-  if (USE_LIVE_TCGPLAYER) {
+  if (LIVE.sealedPrice) {
     const lookup = tcgplayerProductId ?? productId;
-    const data = await apiFetch<TcgPlayerPriceResponse>(
+    const data = await getJson<TcgPlayerPriceResponse>(
       `/api/sealed/price?id=${encodeURIComponent(lookup)}`,
     );
     return {
@@ -154,32 +175,27 @@ export async function fetchSealedPrice(
     };
   }
 
-  // Simulate a short network round-trip so skeletons actually appear in
-  // dev — same pattern as getPrice() in mocks/prices.ts.
   await new Promise((resolve) => setTimeout(resolve, 150));
   return getSealedPrice(productId) ?? null;
 }
 
 /**
  * Fetch a TCGPlayer Market Price history series for a sealed product.
- * We return an empty array when the live endpoint isn't wired yet — the
+ * Returns an empty array when the live endpoint isn't wired yet — the
  * chart component gracefully renders a "history coming soon" placeholder.
  */
 export async function fetchSealedPriceHistory(
   productId: string,
   tcgplayerProductId?: string,
 ): Promise<SealedPriceHistoryPoint[]> {
-  if (USE_LIVE_TCGPLAYER) {
+  if (LIVE.sealedHistory) {
     const lookup = tcgplayerProductId ?? productId;
-    const data = await apiFetch<TcgPlayerHistoryResponse>(
+    const data = await getJson<TcgPlayerHistoryResponse>(
       `/api/sealed/history?id=${encodeURIComponent(lookup)}`,
     );
     return data.history;
   }
 
-  // No mocked history yet — sealed price charts stay empty until live
-  // data lands. The detail screen switches to a "coming soon" strip when
-  // this array is empty rather than rendering a fake line.
   await new Promise((resolve) => setTimeout(resolve, 100));
   return [];
 }

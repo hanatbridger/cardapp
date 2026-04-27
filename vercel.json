@@ -3,6 +3,10 @@
   "buildCommand": "npx expo export --platform web",
   "framework": null,
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "//": "Catch-all SPA rewrite. The negative lookahead keeps /api/* paths reaching their serverless functions in /api/ instead of falling through to index.html.",
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
+    }
   ]
 }
