@@ -113,18 +113,21 @@ function SearchScreen() {
   const enablePicks = mode === 'cards' && !hasQuery;
   const undervalQuery = useTrending(enablePicks ? 'undervalued' : 'movers', 8);
   const overvalQuery = useTrending(enablePicks ? 'overvalued' : 'movers', 8);
+  // Both lists are split views on today's biggest movers (dod-change-pct).
+  // Undervalued = today's dips, Overvalued = today's spikes. Display
+  // gapPercent maps to the existing AIPicks renderer:
+  //   undervalued: positive number, prefixed "+", green ↑
+  //   overvalued:  negative number, no prefix, red ↓
+  // percentChange is signed (e.g. -7.5 for a -7.5% dip), so we flip
+  // the sign for undervalued so it reads as "undervalued by 7.5%".
   const undervaluedPicks: AIPickItem[] = (undervalQuery.data?.items ?? []).map((t) => ({
     cardId: `tcg-${t.productId}`,
     cardName: t.name,
     setName: t.setName,
     imageUrl: t.imageUrl,
     marketPrice: t.rawPrice,
-    // Mock predicted price reconstructed from the 30d baseline so the
-    // existing display ("Undervalued by X%") reads correctly.
-    predictedPrice: t.rawPrice * (1 + Math.abs((t.baselineChangePct ?? 0) / 100)),
-    // baselineChangePct is negative for undervalued; display wants
-    // positive gapPercent, so flip the sign.
-    gapPercent: -(t.baselineChangePct ?? 0),
+    predictedPrice: t.rawPrice * (1 + Math.abs(t.percentChange / 100)),
+    gapPercent: -t.percentChange, // -(-7.5) = +7.5
     label: 'undervalued' as const,
     // Trending payload only carries TCGPlayer productIds, not Pokemon
     // TCG card ids — route via in-app search so the user picks the
@@ -137,10 +140,8 @@ function SearchScreen() {
     setName: t.setName,
     imageUrl: t.imageUrl,
     marketPrice: t.rawPrice,
-    predictedPrice: t.rawPrice / (1 + (t.baselineChangePct ?? 0) / 100),
-    // Display wants negative gapPercent for overvalued; baselineChangePct
-    // is positive, so flip.
-    gapPercent: -(t.baselineChangePct ?? 0),
+    predictedPrice: t.rawPrice / (1 + t.percentChange / 100),
+    gapPercent: -t.percentChange, // -(+7.5) = -7.5
     label: 'overvalued' as const,
     searchQuery: t.name,
   }));

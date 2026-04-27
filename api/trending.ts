@@ -133,23 +133,25 @@ export default async function handler(req: Request): Promise<Response> {
       })
       .filter((x): x is TrendingTile => x !== null);
 
+    // All three modes ride the same dod-change-pct (biggest movers
+    // today) — modes split the feed by direction:
+    //   movers      → biggest |move|, sign-agnostic
+    //   undervalued → biggest negative dod (today's dips, rebound bets)
+    //   overvalued  → biggest positive dod (today's spikes, cooldown bets)
+    // baseline-change-pct stays on each tile in case consumers want
+    // the 30-day signal separately, but it doesn't drive the rank.
     let items: TrendingTile[];
     if (mode === 'undervalued') {
-      // Cards trading below their 30-day baseline — recent dips that
-      // may rebound. Most negative baseline change first.
       items = tiles
-        .filter((t) => typeof t.baselineChangePct === 'number' && t.baselineChangePct < 0)
-        .sort((a, b) => (a.baselineChangePct! - b.baselineChangePct!))
+        .filter((t) => t.percentChange < 0)
+        .sort((a, b) => a.percentChange - b.percentChange) // most negative first
         .slice(0, limit);
     } else if (mode === 'overvalued') {
-      // Cards trading above their 30-day baseline — recent spikes that
-      // may cool down. Most positive baseline change first.
       items = tiles
-        .filter((t) => typeof t.baselineChangePct === 'number' && t.baselineChangePct > 0)
-        .sort((a, b) => (b.baselineChangePct! - a.baselineChangePct!))
+        .filter((t) => t.percentChange > 0)
+        .sort((a, b) => b.percentChange - a.percentChange) // most positive first
         .slice(0, limit);
     } else {
-      // Default: biggest absolute prior-day movers, sign-agnostic.
       items = tiles
         .sort((a, b) => {
           const d = Math.abs(b.percentChange) - Math.abs(a.percentChange);
