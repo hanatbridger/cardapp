@@ -482,7 +482,7 @@ function CardDetailScreen() {
                 <Text variant="caption" color={colors.onSurfaceMuted}>
                   {selectedGrade === 'PSA10'
                     ? "We haven't seen recent PSA 10 sales for this card on eBay. Try the raw price, or check eBay directly."
-                    : 'Prices come from eBay sold listings. Try again in a moment, or check eBay directly for the latest sales.'}
+                    : 'Raw prices come from TCGPlayer Market Price. Try again in a moment, or check TCGPlayer directly for the latest market value.'}
                 </Text>
                 <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
                   {selectedGrade === 'PSA10' ? (
@@ -530,11 +530,17 @@ function CardDetailScreen() {
                   )}
                   <Pressable
                     onPress={() => {
+                      // Send users to whichever marketplace is the
+                      // source-of-truth for the active grade — eBay
+                      // sold-listings filter for PSA 10, TCGPlayer
+                      // product page (or search) for raw. Mirrors the
+                      // citation link on the populated price view.
                       const cardSearch = `${card.name} ${card.set.name} ${card.number}`;
-                      const gradeSearch = selectedGrade === 'PSA10' ? ' PSA 10' : '';
-                      Linking.openURL(
-                        `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch + gradeSearch)}&LH_Sold=1&LH_Complete=1&_sop=13`,
-                      );
+                      const url = selectedGrade === 'PSA10'
+                        ? `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch + ' PSA 10')}&LH_Sold=1&LH_Complete=1&_sop=13`
+                        : (card.tcgPlayerUrl
+                          ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`);
+                      Linking.openURL(url);
                     }}
                     style={{
                       flexDirection: 'row',
@@ -549,7 +555,7 @@ function CardDetailScreen() {
                   >
                     <IconExternalLink size={14} color={colors.onSurfaceVariant} />
                     <Text variant="labelSm" color={colors.onSurfaceVariant}>
-                      Check eBay
+                      {selectedGrade === 'PSA10' ? 'Check eBay' : 'Check TCGPlayer'}
                     </Text>
                   </Pressable>
                 </View>
