@@ -73,3 +73,51 @@ export async function signInWithApple(identityToken: string, nonce?: string) {
 export async function signOutFromSupabase() {
   await supabase.auth.signOut();
 }
+
+/**
+ * Permanently delete the current user's account.
+ *
+ * Calls the Vercel Edge function /api/account/delete which uses the
+ * Supabase service-role key (kept server-side) to call admin.deleteUser.
+ * The function authenticates the request with the current session's
+ * access token, so this will fail if the user is not signed in.
+ *
+ * Apple Guideline 5.1.1(v) requires this to actually remove the
+ * account, not just sign out. After this resolves successfully, the
+ * caller should clear local state and route the user to onboarding.
+ *
+ * Throws on any failure — caller decides how to surface to the user.
+ */
+const ACCOUNT_API_ORIGIN = (() => {
+  // Mirror src/services/tcgplayer.ts — call the deployed Vercel
+  // origin from native + dev-web; use same-origin in prod-web.
+  if (Platform.OS !== 'web') {
+    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+  }
+  if (__DEV__) return 'https://strange-saha-livid.vercel.app';
+  return '';
+})();
+
+export async function deleteUserAccount(): Promise<void> {
+  const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+  if (sessionErr) throw sessionErr;
+  const accessToken = sessionData.session?.access_token;
+  if (!accessToken) {
+    throw new Error('Not signed in — cannot delete account.');
+  }
+
+  const res = await fetch(`${ACCOUNT_API_ORIGIN}/api/account/delete`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({} as { error?: string }));
+    throw new Error(
+      body?.error ?? `Account deletion failed (HTTP ${res.status})`,
+    );
+  }
+}

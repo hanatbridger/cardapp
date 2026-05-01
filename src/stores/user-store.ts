@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GradeType } from '../constants/grades';
 import { setUser as setSentryUser } from '../services/sentry';
-import { supabase, signOutFromSupabase } from '../services/supabase';
+import { supabase, signOutFromSupabase, deleteUserAccount } from '../services/supabase';
 
 interface UserProfile {
   displayName: string;
@@ -121,13 +121,17 @@ export const useUserStore = create<UserStore>()(
       },
 
       deleteAccount: async () => {
+        // Apple Guideline 5.1.1(v): account deletion must actually
+        // remove the account, not just sign out. Call the server
+        // Edge function which uses service-role to delete the auth
+        // user. If it fails, propagate so the UI can show an error
+        // and let the user retry — do NOT silently degrade to a
+        // local-only wipe (that would leave the auth row alive).
+        await deleteUserAccount();
         setSentryUser(null);
-        // Sign out of Supabase first so the auth user no longer holds
-        // an active session. True account-row deletion requires a
-        // server-side admin function; ship that with v1.1. In the
-        // meantime the user can no longer access their auth user from
-        // this device — combined with the local data wipe below, this
-        // satisfies Apple Guideline 5.1.1(v) for the launch build.
+        // Server delete also invalidates the session; sign out of
+        // the local client to clear AsyncStorage. Errors here are
+        // best-effort — the auth row is already gone.
         try { await signOutFromSupabase(); } catch {}
         set({
           profile: { displayName: '', username: '', email: '' },
