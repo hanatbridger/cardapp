@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "com.getcardpulse.app",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": true,
       "icon": {
         "light": "./assets/icon.png",
