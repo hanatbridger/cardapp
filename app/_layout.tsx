@@ -6,6 +6,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { queryClient } from '../src/lib/query-client';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { BrandedSplash } from '../src/components/BrandedSplash';
 import { useUserStore } from '../src/stores/user-store';
 import { useAlertChecker } from '../src/hooks/use-alert-checker';
 import {
@@ -17,6 +18,15 @@ import {
 } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
 import { configureRevenueCat } from '../src/services/revenue-cat';
+import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
+import {
+  useFonts,
+  SpaceGrotesk_300Light,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from '@expo-google-fonts/space-grotesk';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -32,11 +42,34 @@ configureRevenueCat();
 defineBackgroundAlertTask();
 configureNotificationHandler();
 
+// Pump Supabase token refresh while the app is foregrounded. Without
+// this RN suspends timers in the background and refresh-on-wake
+// silently fails — see src/services/supabase.ts.
+registerSupabaseAppStateBridge();
+
 function AuthGate() {
   const router = useRouter();
   const segments = useSegments();
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
+  const hydrateFromSupabase = useUserStore((s) => s.hydrateFromSupabase);
+
+  // On cold start, reflect the persisted Supabase session into local
+  // state. Then subscribe to auth events so a sign-out triggered from
+  // anywhere (server-side logout, expired refresh, multi-device) flips
+  // the gate. Listener is unsubscribed on unmount — only one
+  // subscription per app lifetime since AuthGate is mounted once.
+  useEffect(() => {
+    hydrateFromSupabase();
+    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        // Mirror Supabase logout into the local boolean. Profile data
+        // stays put — wiping it is the deleteAccount path, not signOut.
+        useUserStore.setState({ isAuthenticated: false });
+      }
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [hydrateFromSupabase]);
 
   useEffect(() => {
     // Skip auth/onboarding gates entirely on web (localhost dev preview).
@@ -70,12 +103,24 @@ function AlertCheckerHost() {
 }
 
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGrotesk_300Light,
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+  });
+
   useEffect(() => {
-    // No custom fonts to load — using system font (SF Pro / Roboto)
-    SplashScreen.hideAsync().catch(() => {});
-    // Register background fetch for price alerts. Idempotent + no-op on web.
-    registerBackgroundAlertTask();
-  }, []);
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync().catch(() => {});
+      registerBackgroundAlertTask();
+    }
+  }, [fontsLoaded, fontError]);
+
+  if (!fontsLoaded && !fontError) {
+    return null;
+  }
 
   return (
     <View style={{ flex: 1 }}>
@@ -99,6 +144,12 @@ export default function RootLayout() {
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
               <Stack.Screen name="design-system" />
             </Stack>
+            {/* Branded splash overlay — the native Expo splash shows the
+                logomark on the dark brand canvas; this extends the same
+                canvas for ~1.1s to add the "CardPulse" wordmark and
+                tagline, then fades into the first screen. Mounted AFTER
+                the Stack so it paints on top. Self-unmounts after fade. */}
+            <BrandedSplash ready={!!(fontsLoaded || fontError)} />
           </ThemeProvider>
         </QueryClientProvider>
       </ErrorBoundary>

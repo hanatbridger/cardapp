@@ -9,7 +9,7 @@ import { spacing, radius } from '../theme/tokens';
 import { formatPrice } from '../utils/format';
 import type { CardScore } from '../services/price-prediction';
 
-interface AIPickItem {
+export interface AIPickItem {
   cardId: string;
   cardName: string;
   setName: string;
@@ -18,6 +18,13 @@ interface AIPickItem {
   predictedPrice: number;
   gapPercent: number;
   label: 'undervalued' | 'overvalued' | 'fair';
+  /**
+   * When set, tile tap drops the user into the search screen with this
+   * query pre-filled instead of routing directly to /card/{cardId}.
+   * Used by collectrics-sourced picks where we have a TCGPlayer
+   * productId but not a Pokemon TCG card id.
+   */
+  searchQuery?: string;
 }
 
 interface AIPicksProps {
@@ -34,7 +41,13 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
 
   return (
     <Pressable
-      onPress={() => router.push(`/card/${item.cardId}`)}
+      onPress={() =>
+        item.searchQuery
+          ? router.push(
+              `/(tabs)/search?focus=1&from=home&q=${encodeURIComponent(item.searchQuery)}`,
+            )
+          : router.push(`/card/${item.cardId}`)
+      }
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',

@@ -1,26 +1,24 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router, Link } from 'expo-router';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, AuthForm, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
+import { signInWithApple } from '../../src/services/supabase';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 
 function LoginScreen() {
   const { colors } = useTheme();
   const signIn = useUserStore((s) => s.signIn);
-  const [loading, setLoading] = useState(false);
 
+  // Email/password is hidden at v1 launch — see AuthForm appleOnly.
+  // The handler is left in place so re-enabling email/password later
+  // is a single AuthForm prop flip + Supabase wiring upstream.
   const handleSignIn = async (values: { email: string; password: string }) => {
-    setLoading(true);
-    // Simulate network call. Real auth wiring lives behind a proper backend
-    // and is intentionally stubbed for the App Store launch MVP.
-    await new Promise((r) => setTimeout(r, 400));
     const username = '@' + values.email.split('@')[0];
     signIn({ email: values.email, username, displayName: username.slice(1) }, 'email');
-    setLoading(false);
     router.replace('/(tabs)');
   };
 
@@ -33,7 +31,18 @@ function LoginScreen() {
         ],
       });
 
-      // Apple only returns name/email on first sign-in; fall back to defaults
+      // Exchange Apples identity token for a Supabase session. Without
+      // an identityToken we cant authenticate server-side, so bail.
+      if (!credential.identityToken) {
+        Alert.alert('Sign In Failed', 'Apple did not return a sign-in token. Please try again.');
+        return;
+      }
+      await signInWithApple(credential.identityToken);
+
+      // Apple only returns name/email on the FIRST sign-in for a given
+      // user. After that fullName/email are null even when the Supabase
+      // session is fresh. Use whatever Apple gave us if present, else
+      // fall back to the Supabase session profile (set on first login).
       const firstName = credential.fullName?.givenName ?? '';
       const lastName = credential.fullName?.familyName ?? '';
       const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'Apple User';
@@ -43,9 +52,11 @@ function LoginScreen() {
       signIn({ email, username, displayName }, 'apple');
       router.replace('/(tabs)');
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Sign In Failed', 'Apple Sign In could not be completed. Please try again.');
-      }
+      if (e.code === 'ERR_REQUEST_CANCELED') return;
+      Alert.alert(
+        'Sign In Failed',
+        e?.message ?? 'Apple Sign In could not be completed. Please try again.',
+      );
     }
   };
 
@@ -66,15 +77,18 @@ function LoginScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {/* Header */}
-          <View style={{ gap: spacing[2] }}>
-            <Text variant="displaySm">Welcome back</Text>
-            <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-              Sign in to keep tracking your collection.
-            </Text>
+          <View style={{ gap: spacing[4] }}>
+            <BrandMark size={56} />
+            <View style={{ gap: spacing[2] }}>
+              <Text variant="displaySm">Welcome back</Text>
+              <Text variant="bodyMd" color={colors.onSurfaceVariant}>
+                Sign in to keep tracking your collection.
+              </Text>
+            </View>
           </View>
 
           {/* Form */}
-          <AuthForm mode="signin" onSubmit={handleSignIn} onApple={handleApple} loading={loading} />
+          <AuthForm mode="signin" onSubmit={handleSignIn} onApple={handleApple} appleOnly />
 
           {/* Footer */}
           <View

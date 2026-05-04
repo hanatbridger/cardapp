@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, ScrollView, Pressable, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { router, Link } from 'expo-router';
 import { IconChevronLeft } from '@tabler/icons-react-native';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, AuthForm, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
+import { signInWithApple } from '../../src/services/supabase';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { safeGoBack } from '../../src/utils/safeGoBack';
@@ -13,22 +14,20 @@ import { safeGoBack } from '../../src/utils/safeGoBack';
 function SignupScreen() {
   const { colors } = useTheme();
   const signIn = useUserStore((s) => s.signIn);
-  const [loading, setLoading] = useState(false);
 
+  // Email/password is hidden at v1 launch — see AuthForm appleOnly.
+  // Handler kept so re-enabling later is one prop flip + Supabase wiring.
   const handleSignUp = async (values: {
     email: string;
     password: string;
     displayName?: string;
   }) => {
-    setLoading(true);
-    await new Promise((r) => setTimeout(r, 400));
     const username = '@' + values.email.split('@')[0];
     signIn({
       email: values.email,
       username,
       displayName: values.displayName || username.slice(1),
     }, 'email');
-    setLoading(false);
     router.replace('/(tabs)');
   };
 
@@ -41,6 +40,12 @@ function SignupScreen() {
         ],
       });
 
+      if (!credential.identityToken) {
+        Alert.alert('Sign Up Failed', 'Apple did not return a sign-in token. Please try again.');
+        return;
+      }
+      await signInWithApple(credential.identityToken);
+
       const firstName = credential.fullName?.givenName ?? '';
       const lastName = credential.fullName?.familyName ?? '';
       const displayName = [firstName, lastName].filter(Boolean).join(' ') || 'Apple User';
@@ -50,9 +55,11 @@ function SignupScreen() {
       signIn({ email, username, displayName }, 'apple');
       router.replace('/(tabs)');
     } catch (e: any) {
-      if (e.code !== 'ERR_REQUEST_CANCELED') {
-        Alert.alert('Sign Up Failed', 'Apple Sign In could not be completed. Please try again.');
-      }
+      if (e.code === 'ERR_REQUEST_CANCELED') return;
+      Alert.alert(
+        'Sign Up Failed',
+        e?.message ?? 'Apple Sign In could not be completed. Please try again.',
+      );
     }
   };
 
@@ -82,15 +89,18 @@ function SignupScreen() {
           </Pressable>
 
           {/* Header */}
-          <View style={{ gap: spacing[2] }}>
-            <Text variant="displaySm">Create your account</Text>
-            <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-              Track prices, build watchlists, and never miss a market move.
-            </Text>
+          <View style={{ gap: spacing[4] }}>
+            <BrandMark size={56} />
+            <View style={{ gap: spacing[2] }}>
+              <Text variant="displaySm">Create your account</Text>
+              <Text variant="bodyMd" color={colors.onSurfaceVariant}>
+                Track prices, build watchlists, and never miss a market move.
+              </Text>
+            </View>
           </View>
 
           {/* Form */}
-          <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} loading={loading} />
+          <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} appleOnly />
 
           {/* Legal */}
           <View style={{ alignItems: 'center', gap: spacing[0.5] }}>

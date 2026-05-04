@@ -28,12 +28,20 @@ Variants: `displayLg/Md/Sm`, `headingLg/Md/Sm`, `bodyLg/Md/Sm`, `labelLg/Md/Sm`,
 - `forwardRef` — works with React Hook Form
 - Vertical stack: label / field / hint or error
 
-### `<Badge variant="..." dot>`
-- Variants: `success`, `warning`, `danger`, `info`, `neutral`
-- Status dot on by default
+### `<Badge variant="..." dot>` — pulse chip
+Renders the brand book chip recipe: `{ramp-400}` at 18% alpha fill, `{ramp-200}` text, 12px radius, SG 500 12/-0.1. Every chip carries categorical meaning — do not invent free-form labels.
+
+- **Tier 1 — price movement:** `gain`, `loss` (use `▲`/`▼` prefix in children)
+- **Tier 2 — valuation verdict:** `undervalued`, `overvalued`
+- **Tier 3 — grading status:** `graded`, `ungraded`
+- **Tier 4 — signals / scarcity:** `live` (auto dot), `trophy` (used sparingly)
+- **Legacy aliases** (back-compat, prefer tier variants): `success`, `warning`, `danger`, `info`, `neutral`
 
 ### `<SegmentedControl options={[]} value onChange>`
 Glass background, active item gets `surface` + `shadows.sm`.
+
+### `<BrandMark size={24} variant="color" | "mono" color>`
+The CardPulse prism. Use only in brand moments (auth screens, home header, splash). Never rotate, stretch, gradient, glow, or place indigo-on-indigo — see brand book page 03.
 
 ### `<Avatar uri name size={40}>`
 Falls back to initials in `primaryContainer`.
@@ -57,16 +65,18 @@ Sizes: `sm`, `md`, `lg`. Auto color from `success`/`danger`. Trending icon prefi
 Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded amber/gray — to be tokenized.
 
 ### `FloatingTabBar` (in `app/(tabs)/_layout.tsx`)
-Custom floating tab bar. Not exported from barrel — defined inline in the tab layout.
+Custom floating tab bar — brand book motif #3. Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
 
-**Layout:** `[○ Home]  [Search · Bell · Profile]`
-- **Left:** Home button — standalone 48×48 circle, `glass.backgroundStrong` bg, `glass.border` 1px border, `radius` 24. Contains a 40×40 inner circle (`radius.xl`) that gets `withAlpha(primary, 0.15)` bg when active.
-- **Right:** Pill container — `flex: 1`, `glass.backgroundStrong` bg, `radius['2xl']` (24), `glass.border` 1px. Contains Search (`IconSearch`), Notifications (`IconBell`), Profile (`IconUser`) with `justifyContent: 'space-around'`. Each icon sits in a 40px pressable with `radius.xl` that gets `withAlpha(primary, 0.15)` bg when active.
-- **Active icon:** `colors.primary`, `strokeWidth: 2`
-- **Inactive icon:** `colors.onSurfaceMuted`, `strokeWidth: 1.5` (Home uses 1.6)
-- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`
+**Layout:** `[● Home]  [Search · Bell · Profile]`
+- **Height:** 64pt bar, 26pt icons.
+- **Liquid-glass surface:** `BlurView` on native (intensity 40, theme-matched tint), `backdrop-filter: blur(24px) saturate(180%)` on web. Tint `rgba(22,27,34,0.40)` dark / `rgba(255,255,255,0.60)` light. Hairline border `rgba(255,255,255,0.10)` dark / `rgba(17,24,39,0.08)` light. Both the home circle and the right pill render the **same** surface so they read as one control.
+- **Home (left):** 64×64 glass circle. Uses the identical 48pt active indicator as the right-group tabs — never a solid-fill state.
+- **Right pill:** `flex: 1`, 64pt tall, `radius.full`. Contains Search / Bell / Profile in evenly-divided cells.
+- **Active indicator (all four tabs):** 48pt pill with `withAlpha(primary, 0.15)` background, icon `colors.primary`, strokeWidth 2.
+- **Inactive icon:** `colors.onSurfaceVariant`, strokeWidth 1.75, transparent bg.
+- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`.
+- **Hit testing:** outer wrapper uses `pointerEvents="box-none"` so the bar only captures taps on its actual Pressables — never on empty space between the circle and the pill.
 - All tabs trigger `Haptics.selectionAsync()` on press.
-- Icon size: 22 for all tabs.
 
 ## Domain components
 

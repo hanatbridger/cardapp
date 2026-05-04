@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { View, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
@@ -13,6 +13,7 @@ import { formatPrice } from '../utils/format';
 import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getValuation } from '../services/price-prediction';
+import { useCardPrice } from '../hooks/use-card-price';
 import type { GradeType } from '../constants/grades';
 import type { CardPrice } from '../types/card';
 
@@ -21,9 +22,13 @@ interface WatchlistCardProps {
   cardName: string;
   cardImageUrl: string;
   setName: string;
+  /** Card number within set — needed to query the right eBay listings */
+  setNumber?: string;
   grade: GradeType;
   rarity?: string;
-  price?: CardPrice;
+  language?: 'EN' | 'JP';
+  /** Fallback price (mock / last-known) shown while live price loads or if it fails */
+  fallbackPrice?: CardPrice;
 }
 
 export const WatchlistCard = React.memo(function WatchlistCard({
@@ -31,11 +36,32 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   cardName,
   cardImageUrl,
   setName,
+  setNumber,
   grade,
   rarity,
-  price,
+  language,
+  fallbackPrice,
 }: WatchlistCardProps) {
   const { colors } = useTheme();
+
+  // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
+  // from every watchlist surface until the eBay live proxy ships.
+  // The home tab also filters them out at the FlatList data prop, but
+  // this guarantees no PSA 10 row leaks through any other caller (or
+  // a stale deploy where the upstream filter wasn't yet live).
+  if (grade === 'PSA10') return null;
+
+  // Fetch live price — shares React Query cache with the detail screen,
+  // so the same card always shows the same number across the app.
+  const { data: livePrice } = useCardPrice({
+    cardName,
+    grade,
+    cardId,
+    setName,
+    cardNumber: setNumber,
+    language,
+  });
+  const price = livePrice ?? fallbackPrice;
 
   // AI valuation
   const score = getCardScore(cardId);
@@ -49,19 +75,28 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     }
   }
 
+  // Use TouchableOpacity rather than Pressable here: on iOS inside a
+  // virtualized FlatList that also has a setInterval-driven sibling
+  // (TrendingCarousel in the ListHeader), Pressable's gesture recognizer
+  // was dropping the up-event roughly every render, making the row feel
+  // unresponsive. TouchableOpacity's RN-native TouchableHandler doesn't
+  // have that failure mode.
   return (
-    <Pressable
+    <TouchableOpacity
+      activeOpacity={0.7}
       onPress={() => router.push(`/card/${cardId}`)}
-      style={({ pressed }) => ({
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${cardName}`}
+      style={{
         flexDirection: 'row',
         padding: spacing[3],
-        backgroundColor: pressed ? colors.surfaceVariant : colors.surface,
+        backgroundColor: colors.surface,
         borderRadius: CARD_BORDER_RADIUS,
         borderWidth: 1,
         borderColor: colors.outline,
         gap: spacing[3],
         alignItems: 'center',
-      })}
+      }}
     >
       <Image
         source={{ uri: cardImageUrl }}
@@ -115,6 +150,6 @@ export const WatchlistCard = React.memo(function WatchlistCard({
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>
         )}
       </View>
-    </Pressable>
+    </TouchableOpacity>
   );
 });

@@ -1,17 +1,36 @@
 import { Tabs } from 'expo-router';
 import { View, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
+import { Haptics } from '../../src/utils/haptics';
 import { IconHome, IconBell, IconUser, IconSearch } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { spacing, radius, shadows } from '../../src/theme/tokens';
+import { spacing, radius } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 
+// Brand book v1.1 motif #3: floating tab bar.
+// Left: standalone 64pt glass circle with Home.
+// Right: flexible 64pt glass pill with Search · Bell · Profile.
+// Both surfaces share the same liquid-glass recipe, and every tab —
+// including Home — uses the same 48pt tonal-indigo active indicator so
+// the four tabs feel like one control. Figma ref: node 60:2.
+const BAR_HEIGHT = 64;
+const HOME_SIZE = BAR_HEIGHT;
+const ACTIVE_PILL_SIZE = 48;
+const ICON_SIZE = 26;
+const BLUR_INTENSITY = 40;
+
 function FloatingTabBar({ state, descriptors, navigation }: any) {
-  const { colors, glass } = useTheme();
+  const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Right group: Search, Notifications, Profile
+  // Respect per-screen `tabBarStyle: { display: 'none' }` — used by the
+  // Explore tab when its focused search overlay is open so the overlay
+  // reads as full-screen (same as X's Explore focus mode).
+  const focusedRoute = state.routes[state.index];
+  const focusedOptions = descriptors?.[focusedRoute.key]?.options;
+  if (focusedOptions?.tabBarStyle?.display === 'none') return null;
+
   const rightTabs = ['search', 'notifications', 'profile'];
   const icons: Record<string, typeof IconHome> = {
     search: IconSearch,
@@ -19,12 +38,58 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
     profile: IconUser,
   };
 
-  // Home is standalone on the left
   const homeRoute = state.routes.find((r: any) => r.name === 'index');
   const homeFocused = homeRoute ? state.index === state.routes.indexOf(homeRoute) : false;
 
+  // Liquid-glass surface — more translucent than before so the canvas
+  // shows through; the higher BlurView intensity does the heavy lifting.
+  const glassTint = isDark ? 'rgba(22, 27, 34, 0.40)' : 'rgba(255, 255, 255, 0.60)';
+  const hairline = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.08)';
+
+  const webGlass =
+    Platform.OS === 'web'
+      ? ({
+          backdropFilter: 'blur(24px) saturate(180%)',
+          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+        } as any)
+      : {};
+
+  const renderGlassSurface = (shapeRadius: number) =>
+    Platform.OS === 'web' ? (
+      <View
+        pointerEvents="none"
+        style={{
+          ...StyleAbsoluteFill,
+          backgroundColor: glassTint,
+          borderWidth: 1,
+          borderColor: hairline,
+          borderRadius: shapeRadius,
+          ...webGlass,
+        }}
+      />
+    ) : (
+      // `pointerEvents="none"` on native — otherwise BlurView (default
+      // `auto`) swallows taps that land in the pill's dead zones (the
+      // 8pt strips above/below the 48pt Pressables and the horizontal
+      // padding around the tab row), and the list rows beneath the bar
+      // never receive them.
+      <BlurView
+        pointerEvents="none"
+        intensity={BLUR_INTENSITY}
+        tint={isDark ? 'dark' : 'light'}
+        style={{
+          ...StyleAbsoluteFill,
+          borderRadius: shapeRadius,
+          borderWidth: 1,
+          borderColor: hairline,
+          overflow: 'hidden',
+        }}
+      />
+    );
+
   return (
     <View
+      pointerEvents="box-none"
       style={{
         position: 'absolute',
         bottom: Math.max(insets.bottom, 8) + 4,
@@ -35,7 +100,9 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         gap: spacing[2],
       }}
     >
-      {/* Home button — standalone circle on the left */}
+      {/* Home — standalone glass circle. Same active treatment as the
+          right-pill tabs: an inner 48pt tonal-indigo pill appears when
+          focused, icon flips to primary. */}
       <Pressable
         onPress={() => {
           if (homeRoute) {
@@ -45,100 +112,110 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         }}
         hitSlop={8}
         accessibilityLabel="Home"
+        accessibilityRole="button"
+        accessibilityState={{ selected: homeFocused }}
         style={{
-          width: 48,
-          height: 48,
-          borderRadius: 24,
-          backgroundColor: glass.backgroundStrong,
-          borderWidth: 1,
-          borderColor: glass.border,
+          width: HOME_SIZE,
+          height: HOME_SIZE,
+          borderRadius: HOME_SIZE / 2,
+          overflow: 'hidden',
           alignItems: 'center',
           justifyContent: 'center',
-          ...(Platform.OS === 'web'
-            ? { backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as any
-            : {}),
         }}
       >
+        {renderGlassSurface(HOME_SIZE / 2)}
         <View
           style={{
-            width: 40,
-            height: 40,
-            borderRadius: radius.xl,
-            backgroundColor: homeFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
+            width: ACTIVE_PILL_SIZE,
+            height: ACTIVE_PILL_SIZE,
+            borderRadius: ACTIVE_PILL_SIZE / 2,
             alignItems: 'center',
             justifyContent: 'center',
+            backgroundColor: homeFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
           }}
         >
           <IconHome
-            size={22}
-            color={homeFocused ? colors.primary : colors.onSurfaceMuted}
-            strokeWidth={homeFocused ? 2 : 1.6}
+            size={ICON_SIZE}
+            color={homeFocused ? colors.primary : colors.onSurfaceVariant}
+            strokeWidth={homeFocused ? 2 : 1.75}
           />
         </View>
       </Pressable>
 
-      {/* Right group — Search, Notifications, Profile */}
+      {/* Right group — Search, Bell, Profile in a glass pill. The wrapper
+          and the inner row are pointerEvents="box-none" so clicks in the
+          dead zones around the 48pt Pressables (top/bottom strips,
+          horizontal padding) pass through to the content beneath instead
+          of being swallowed by the glass. */}
       <View
+        pointerEvents="box-none"
         style={{
           flex: 1,
-          backgroundColor: glass.backgroundStrong,
-          borderRadius: radius['2xl'],
-          borderWidth: 1,
-          borderColor: glass.border,
-          flexDirection: 'row',
-          paddingVertical: spacing[1],
-          paddingHorizontal: spacing[2],
-          justifyContent: 'space-around',
-          alignItems: 'center',
-          ...(Platform.OS === 'web'
-            ? { backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' } as any
-            : {}),
+          height: BAR_HEIGHT,
+          borderRadius: BAR_HEIGHT / 2,
+          overflow: 'hidden',
         }}
       >
-        {rightTabs.map((tabName) => {
-          const route = state.routes.find((r: any) => r.name === tabName);
-          if (!route) return null;
-          const realIndex = state.routes.indexOf(route);
-          const isFocused = state.index === realIndex;
-          const IconComponent = icons[tabName] || IconSearch;
+        {renderGlassSurface(BAR_HEIGHT / 2)}
+        <View
+          pointerEvents="box-none"
+          style={{
+            flex: 1,
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: spacing[2],
+          }}
+        >
+          {rightTabs.map((tabName) => {
+            const route = state.routes.find((r: any) => r.name === tabName);
+            if (!route) return null;
+            const realIndex = state.routes.indexOf(route);
+            const isFocused = state.index === realIndex;
+            const IconComponent = icons[tabName] || IconSearch;
 
-          const onPress = () => {
-            const event = navigation.emit({
-              type: 'tabPress',
-              target: route.key,
-              canPreventDefault: true,
-            });
-            if (!isFocused && !event.defaultPrevented) {
-              Haptics.selectionAsync();
-              navigation.navigate(route.name);
-            }
-          };
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+              if (!isFocused && !event.defaultPrevented) {
+                Haptics.selectionAsync();
+                navigation.navigate(route.name);
+              }
+            };
 
-          return (
-            <Pressable
-              key={route.key}
-              onPress={onPress}
-              style={{
-                flex: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: 40,
-                borderRadius: radius.xl,
-                backgroundColor: isFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
-              }}
-            >
-              <IconComponent
-                size={22}
-                color={isFocused ? colors.primary : colors.onSurfaceMuted}
-                strokeWidth={isFocused ? 2 : 1.5}
-              />
-            </Pressable>
-          );
-        })}
+            return (
+              <Pressable
+                key={route.key}
+                onPress={onPress}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isFocused }}
+                accessibilityLabel={tabName}
+                style={{
+                  flex: 1,
+                  height: ACTIVE_PILL_SIZE,
+                  borderRadius: radius.full,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
+                }}
+              >
+                <IconComponent
+                  size={ICON_SIZE}
+                  color={isFocused ? colors.primary : colors.onSurfaceVariant}
+                  strokeWidth={isFocused ? 2 : 1.75}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
     </View>
   );
 }
+
+const StyleAbsoluteFill = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
 export default function TabLayout() {
   return (

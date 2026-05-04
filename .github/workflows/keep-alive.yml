@@ -1,0 +1,67 @@
+# Keep-alive ping for the v1 launch infrastructure.
+#
+# Supabase Free pauses any project that's been idle for 7 days, and the
+# pause sneaks up — there's no email warning until after it happens.
+# This job hits one request against each piece of public infra every
+# day so the inactivity counter never reaches the threshold.
+#
+# Targets:
+#   • Supabase auth → confirms the project is live + the anon key works
+#   • Vercel /api/trending → keeps the Edge fn warm + verifies collectrics
+#     proxy is responding
+#   • Vercel /api/tcgplayer/price → ditto for the raw-singles proxy
+#
+# Each curl uses --fail so non-2xx responses fail the job and surface
+# in the GitHub Actions UI. If you start seeing failed runs, something
+# upstream broke — investigate before App Store Review hits the same
+# endpoints.
+#
+# To delete this job once you upgrade Supabase to Pro (which removes
+# the auto-pause): delete this file and re-push.
+
+name: Keep production endpoints alive
+
+on:
+  schedule:
+    # Daily at 12:00 UTC (5 AM PT / 8 AM ET). Off-peak so a flaky run
+    # is less likely to coincide with real user traffic.
+    - cron: '0 12 * * *'
+  # Manual trigger for debugging — Actions tab → Run workflow.
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          # Hit the PostgREST root — counts as project activity.
+          # Without the apikey header Supabase returns 401 (still
+          # counts, but we want the 200 path so the curl --fail
+          # doesn't trip on a key mismatch).
+          curl --fail --silent --show-error \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "https://uvycpyoyzubntymvgypy.supabase.co/rest/v1/" \
+            > /dev/null
+          echo "✓ Supabase reachable"
+
+      - name: Ping /api/trending
+        run: |
+          curl --fail --silent --show-error \
+            "https://strange-saha-livid.vercel.app/api/trending?limit=1" \
+            > /dev/null
+          echo "✓ /api/trending live"
+
+      - name: Ping /api/tcgplayer/price
+        run: |
+          # me2pt5-277 = Pikachu ex 277 (Ascended Heroes) — used as
+          # the canary because it's a recent card whose price we
+          # actively rely on the proxy for.
+          curl --fail --silent --show-error \
+            "https://strange-saha-livid.vercel.app/api/tcgplayer/price?id=me2pt5-277" \
+            > /dev/null
+          echo "✓ /api/tcgplayer/price live"

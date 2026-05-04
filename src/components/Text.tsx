@@ -1,7 +1,7 @@
 import React from 'react';
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
-import { typography } from '../theme/tokens';
+import { typography, fontFamilyForWeight } from '../theme/tokens';
 
 type Variant = keyof Omit<typeof typography, 'fontFamily'>;
 
@@ -24,9 +24,9 @@ export function Text({
     <RNText
       style={[
         {
-          // System font: SF Pro on iOS, Roboto on Android
           color: color ?? colors.onSurface,
           ...typeStyle,
+          fontFamily: fontFamilyForWeight(typeStyle.fontWeight),
         },
         style,
       ]}

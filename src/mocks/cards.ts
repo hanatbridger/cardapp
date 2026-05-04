@@ -146,3 +146,27 @@ export const TRENDING_SEARCHES = [
   'Charizard', 'Pikachu', 'Mew', 'Umbreon', 'Gengar',
   'Lugia', 'Rayquaza', 'Mewtwo', 'Eevee', 'Iono',
 ];
+
+/**
+ * Curated trending illustrators — the credits collectors actively search
+ * for when hunting chase cards. Casing matches the exact string the
+ * Pokémon TCG API returns on the `artist` field, so tapping a name
+ * deep-links into getCardsByArtist() without a lookup layer.
+ *
+ * Ordering is roughly by current market momentum in the Scarlet & Violet
+ * era (top of the list = most-searched). Refresh this list if a new
+ * illustrator breaks out — it's a static marketing surface, not an
+ * algorithmic feed.
+ */
+export const TRENDING_ARTISTS = [
+  'YASHIRO Nanaco',
+  'Mitsuhiro Arita',
+  'AKIRA EGAWA',
+  'N-DESIGN Inc.',
+  'PLANETA Mochizuki',
+  'Teeziro',
+  '5ban Graphics',
+  'aky CG Works',
+  'kirisAki',
+  'GOSSAN',
+];

@@ -17,17 +17,22 @@
 
 Access via `colors.*`. Light/dark resolved automatically.
 
+Aligned to **Brand Book v1.1 (April 2026, WCAG AAA)**. When the book and the code disagree, the book wins — update `src/theme/tokens.ts` and every consumer rebinds.
+
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `primary` | `#4B5EFC` | `#6B7CFF` | Primary actions, links, focus |
-| `onPrimary` | `#FFFFFF` | `#FFFFFF` | Text on primary fills |
-| `primaryContainer` | `#EDF0FF` | `#1A2280` | Tonal/soft primary backgrounds |
-| `onPrimaryContainer` | `#1A2280` | `#D4DBFF` | Text on primary container |
-| `secondary` | `#1E97AD` | `#3AB6CC` | Secondary actions |
-| `surface` | `#FFFFFF` | `#161B22` | Card/page background |
-| `surfaceVariant` | `#F8F9FA` | `#1A1F2E` | Subtle surface (sidebar, headers) |
-| `onSurface` | `#212529` | `#F1F3F5` | Primary text |
-| `onSurfaceVariant` | `#6C757D` | `#ADB5BD` | Secondary/muted text |
+| `primary` | `#4B5EFC` | `#6B7CFF` | Indigo — primary brand, buttons, links, focus |
+| `onPrimary` | `#FFFFFF` | `#101559` | Text on primary fills |
+| `indigoLift` | `#A5B0FF` | `#A5B0FF` | Logo facet, subtle brand highlights |
+| `primaryContainer` | `#EDF0FF` | `#101559` | Tonal/soft primary backgrounds |
+| `surface` | `#FFFFFF` | `#0D1117` | Canvas — page background |
+| `surfaceVariant` | `#F9FAFB` | `#161B22` | Surface — card/section background |
+| `surfaceElevated` | `#FFFFFF` | `#1F2937` | Elevated — modal/dropdown |
+| `onSurface` | `#111827` | `#F9FAFB` | Primary text (16:1 AAA on canvas) |
+| `onSurfaceVariant` | `#4B5563` | `#D1D5DB` | Secondary text (10.9:1 AAA) |
+| `onSurfaceMuted` | `#6B7280` | `#9CA3AF` | Tertiary text (7.2:1 AAA) |
+
+**Teal is deprecated.** Brand book v1.1 dropped the `#1E97AD` teal in favor of a single-brand-color system. Do not reintroduce `colors.secondary*`.
 | `outline` | `#E9ECEF` | `#343A40` | Borders, dividers |
 | `outlineVariant` | `#F1F3F5` | `#1A1F2E` | Subtle borders |
 | `success` | `#059669` | `#34D399` | Success, gains |
@@ -43,24 +48,36 @@ Access via `colors.*`. Light/dark resolved automatically.
 
 Use via `<Text variant="bodyMd">` etc. Never inline `fontSize`.
 
-| Variant | Size | Weight | Line | Use |
-|---|---|---|---|---|
-| `displayLg` | 48 | 700 | 53 | Hero headlines |
-| `displayMd` | 36 | 700 | 41 | Page titles |
-| `displaySm` | 30 | 600 | 36 | Section heroes |
-| `headingLg` | 24 | 600 | 31 | Section headings |
-| `headingMd` | 20 | 600 | 27 | Subsection headings |
-| `headingSm` | 16 | 600 | 22 | Card titles |
-| `bodyLg` | 18 | 400 | 29 | Long-form |
-| `bodyMd` | 16 | 400 | 26 | **Default body** |
-| `bodySm` | 14 | 400 | 21 | Compact text |
-| `labelLg` | 14 | 500 | 20 | Buttons, nav |
-| `labelMd` | 12 | 500 | 17 | Badges, tags |
-| `labelSm` | 11 | 500 | 14 | Micro labels |
-| `caption` | 12 | 400 | 17 | Metadata |
-| `overline` | 11 | 600 | 14 | CAPS labels |
+**Font:** Space Grotesk only. Weights locked to **400, 500, 700** per brand book — never use 600. No pairing with any other typeface (no JetBrainsMono, no Inter, no system fallback).
 
-Font family: system default (Inter not bundled — uses platform sans).
+### Brand book v1.1 scales (canonical — use for new screens)
+
+| Variant | Size | Weight | Tracking | Use |
+|---|---|---|---|---|
+| `display` | 56 | 700 | -2.4 | Hero headlines |
+| `headline` | 32 | 700 | -1.2 | Page titles |
+| `title` | 20 | 500 | -0.4 | Section headings, card titles |
+| `body` | 15 | 400 | 0 | Default body |
+| `caption` | 12 | 500 | 0.4 | Metadata, UPPERCASE labels |
+| `numerals` | 24 | 500 | -0.2 | **Prices — tabular-nums applied automatically** |
+
+### Legacy phone-ergonomic ramp (in use across existing screens)
+
+Weights normalized to book-compliant 400/500/700. When updating a screen, prefer the canonical scales above.
+
+| Variant | Size | Weight | Use |
+|---|---|---|---|
+| `displayLg` | 48 | 700 | Large hero |
+| `displayMd` | 36 | 700 | Page titles |
+| `displaySm` | 30 | 700 | Section heroes |
+| `headingLg` | 24 | 700 | Section headings |
+| `headingMd` | 20 | 700 | Subsections |
+| `headingSm` | 16 | 700 | Card titles |
+| `bodyLg/Md/Sm` | 18/16/14 | 400 | Body |
+| `labelLg/Md/Sm` | 14/12/11 | 500 | Buttons, badges |
+| `overline` | 11 | 500 | CAPS labels |
+
+**Prices must use tabular figures.** Either the `numerals` variant (auto) or pass `style={{ fontVariant: ['tabular-nums'] }}` on any other Text.
 
 ## Spacing (`spacing[N]`) — 4px grid
 

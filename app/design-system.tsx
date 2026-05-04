@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { View, ScrollView, Pressable, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { BlurView } from 'expo-blur';
 import {
   IconChevronLeft,
   IconSearch,
   IconHeart,
   IconBell,
+  IconHome,
+  IconUser,
 } from '@tabler/icons-react-native';
 import {
   Text,
@@ -30,6 +33,7 @@ import {
   WatchlistFullModal,
   AnimatedListItem,
   AuthForm,
+  TokenEditorPanel,
   withErrorBoundary,
 } from '../src/components';
 import { MOCK_CARDS } from '../src/mocks';
@@ -103,6 +107,105 @@ function TokenRow({ name, color, usage }: { name: string; color: string; usage: 
   );
 }
 
+// ── Floating tab bar preview ───────────────────────────────
+// Static mirror of app/(tabs)/_layout.tsx FloatingTabBar used in the
+// design-system screen. Must track it — when the real bar changes,
+// update this preview too so the design system stays faithful.
+const TAB_BAR_HEIGHT = 64;
+const TAB_ICON_SIZE = 26;
+
+function TabBarPreview({ activeIndex }: { activeIndex: number }) {
+  const { colors, isDark } = useTheme();
+  const glassTint = isDark ? 'rgba(22, 27, 34, 0.40)' : 'rgba(255, 255, 255, 0.60)';
+  const hairline = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.08)';
+  const ACTIVE_PILL = 48;
+  const tabs = [
+    { key: 'home', Icon: IconHome },
+    { key: 'search', Icon: IconSearch },
+    { key: 'notifications', Icon: IconBell },
+    { key: 'profile', Icon: IconUser },
+  ] as const;
+  const [, ...right] = tabs;
+  const homeActive = activeIndex === 0;
+
+  const Glass = ({ style }: { style?: any }) =>
+    Platform.OS === 'web' ? (
+      <View
+        pointerEvents="none"
+        style={[
+          style,
+          { backgroundColor: glassTint, borderWidth: 1, borderColor: hairline },
+          { backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)' } as any,
+        ]}
+      />
+    ) : (
+      <BlurView
+        pointerEvents="none"
+        intensity={40}
+        tint={isDark ? 'dark' : 'light'}
+        style={[style, { borderWidth: 1, borderColor: hairline, overflow: 'hidden' }]}
+      />
+    );
+
+  const activePill = (isActive: boolean) => ({
+    width: ACTIVE_PILL,
+    height: ACTIVE_PILL,
+    borderRadius: ACTIVE_PILL / 2,
+    alignItems: 'center' as const,
+    justifyContent: 'center' as const,
+    backgroundColor: isActive ? withAlpha(colors.primary, 0.15) : 'transparent',
+  });
+
+  return (
+    <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center' }}>
+      {/* Home — glass circle with the same inner active pill as the right group. */}
+      <View
+        style={{
+          width: TAB_BAR_HEIGHT,
+          height: TAB_BAR_HEIGHT,
+          borderRadius: TAB_BAR_HEIGHT / 2,
+          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Glass
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }}
+        />
+        <View style={activePill(homeActive)}>
+          <IconHome
+            size={TAB_ICON_SIZE}
+            color={homeActive ? colors.primary : colors.onSurfaceVariant}
+            strokeWidth={homeActive ? 2 : 1.75}
+          />
+        </View>
+      </View>
+      {/* Right pill */}
+      <View style={{ flex: 1, height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden' }}>
+        <Glass
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }}
+        />
+        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[2] }}>
+          {right.map((tab, i) => {
+            const isActive = activeIndex === i + 1;
+            return (
+              <View key={tab.key} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                <View style={activePill(isActive)}>
+                  <tab.Icon
+                    size={TAB_ICON_SIZE}
+                    color={isActive ? colors.primary : colors.onSurfaceVariant}
+                    strokeWidth={isActive ? 2 : 1.75}
+                  />
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ── Type scale variants ────────────────────────────────────
 const TYPE_VARIANTS = [
   'displayLg', 'displayMd', 'displaySm',
@@ -114,7 +217,12 @@ const TYPE_VARIANTS = [
 
 // ── Main screen ────────────────────────────────────────────
 function DesignSystemScreen() {
-  const { colors } = useTheme();
+  // Pull both colors and live radius from the theme. Radius comes from
+  // `useTheme().radius` (not the static tokens import) so the Radii
+  // preview below re-renders when the TokenEditorPanel slider pushes
+  // an override through the theme store — Colors section has the same
+  // behavior via the `colors` destructure.
+  const { colors, radius: themeRadius } = useTheme();
   const { width: screenWidth } = useWindowDimensions();
   const isDesktop = screenWidth >= 768;
   const [activeSection, setActiveSection] = useState<NavKey>('colors');
@@ -177,7 +285,8 @@ function DesignSystemScreen() {
           <>
             <SectionBlock title="Brand palette" description="Core identity colors that define CardPulse's visual presence.">
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] }}>
-                <ColorSwatch name="primary" color={colors.primary} description="Primary brand. Buttons, links, accents." />
+                <ColorSwatch name="primary" color={colors.primary} description="Indigo — primary brand. Buttons, links, accents." />
+                <ColorSwatch name="indigoLift" color={colors.indigoLift} description="Indigo Lift — logo facet and subtle brand highlights." />
                 <ColorSwatch name="primaryActive" color={colors.primaryActive} description="Pressed/active state of primary." />
                 <ColorSwatch name="success" color={colors.success} description="Positive changes, gains, confirmations." />
                 <ColorSwatch name="warning" color={colors.warning} description="Caution states, alerts." />
@@ -219,7 +328,7 @@ function DesignSystemScreen() {
 
       case 'typography':
         return (
-          <SectionBlock title="Type scale" description="System font: SF Pro on iOS, Roboto on Android. All variants with size and weight.">
+          <SectionBlock title="Type scale" description="Space Grotesk only. Weights locked to 400 / 500 / 700 (brand book). Numerals variant uses tabular figures for price alignment.">
             <Card>
               <View style={{ gap: spacing[3] }}>
                 {TYPE_VARIANTS.map((variant) => {
@@ -261,14 +370,16 @@ function DesignSystemScreen() {
 
       case 'radii':
         return (
-          <SectionBlock title="Border radius" description="Consistent corner rounding across the app.">
+          <SectionBlock title="Border radius" description="Consistent corner rounding across the app. Drag the sliders on the right to preview changes live.">
             <Card>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[6] }}>
                 {(['none', 'sm', 'md', 'lg', 'xl', '2xl', '3xl', 'full'] as const).map((key) => (
                   <View key={key} style={{ alignItems: 'center', gap: spacing[2] }}>
-                    <View style={{ width: 64, height: 64, backgroundColor: colors.primary, borderRadius: radius[key] }} />
+                    {/* Reads themeRadius (not tokens.radius) so the
+                        TokenEditorPanel's slider drives the preview. */}
+                    <View style={{ width: 64, height: 64, backgroundColor: colors.primary, borderRadius: themeRadius[key] }} />
                     <Text variant="labelMd">{key}</Text>
-                    <Text variant="caption" color={colors.onSurfaceMuted}>{radius[key]}px</Text>
+                    <Text variant="caption" color={colors.onSurfaceMuted}>{themeRadius[key]}px</Text>
                   </View>
                 ))}
               </View>
@@ -373,22 +484,29 @@ function DesignSystemScreen() {
             </SectionBlock>
 
             {/* Badges */}
-            <SectionBlock title="Badge & GradeBadge" description="Status indicators and PSA grade labels.">
+            <SectionBlock title="Pulse chips" description="Categorical indicators following the brand book 03.1 recipe — 400-level fill at 18% alpha, 200-level text, 12px radius. Every chip carries one meaning.">
               <View style={isDesktop ? { flexDirection: 'row', gap: spacing[4] } : { gap: spacing[4] }}>
                 <Card style={{ flex: 1 }}>
                   <View style={{ gap: spacing[3] }}>
-                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Badge variants</Text>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 1 — Price movement</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                      <Badge variant="success">Success</Badge>
-                      <Badge variant="warning">Warning</Badge>
-                      <Badge variant="danger">Danger</Badge>
-                      <Badge variant="info">Info</Badge>
-                      <Badge variant="neutral">Neutral</Badge>
+                      <Badge variant="gain">▲ Gain</Badge>
+                      <Badge variant="loss">▼ Loss</Badge>
                     </View>
-                    <Text variant="labelMd" color={colors.onSurfaceMuted}>With dot</Text>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 2 — Valuation verdict</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                      <Badge variant="success" dot>Active</Badge>
-                      <Badge variant="danger" dot>Offline</Badge>
+                      <Badge variant="undervalued">Undervalued</Badge>
+                      <Badge variant="overvalued">Overvalued</Badge>
+                    </View>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 3 — Grading status</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+                      <Badge variant="graded">PSA 10</Badge>
+                      <Badge variant="ungraded">Ungraded</Badge>
+                    </View>
+                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Tier 4 — Signals and scarcity</Text>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+                      <Badge variant="live">Live</Badge>
+                      <Badge variant="trophy">Trophy</Badge>
                     </View>
                   </View>
                 </Card>
@@ -440,6 +558,22 @@ function DesignSystemScreen() {
             </SectionBlock>
 
             {/* SegmentedControl */}
+            {/* Floating tab bar — UI motif #3 */}
+            <SectionBlock title="Floating tab bar" description="Liquid-glass pill navigation. BlurView on native (pointerEvents none so the glass never swallows taps), backdrop-filter on web. 64pt tall, 26pt icons. Home is a standalone glass circle that shares the same 48pt tonal-indigo active indicator as the right-pill tabs — all four tabs read as one control. The right group is a glass pill with Search · Bell · Profile.">
+              <Card padding={spacing[6]}>
+                <View style={{ gap: spacing[4] }}>
+                  <Text variant="labelMd" color={colors.onSurfaceMuted}>Default state (Home active)</Text>
+                  <View style={{ height: 80, justifyContent: 'center' }}>
+                    <TabBarPreview activeIndex={0} />
+                  </View>
+                  <Text variant="labelMd" color={colors.onSurfaceMuted}>Search active</Text>
+                  <View style={{ height: 80, justifyContent: 'center' }}>
+                    <TabBarPreview activeIndex={1} />
+                  </View>
+                </View>
+              </Card>
+            </SectionBlock>
+
             <SectionBlock title="SegmentedControl" description="Tab-like selector for toggling between options.">
               <View style={{ maxWidth: 320, gap: spacing[3] }}>
                 <SegmentedControl options={['Raw', 'PSA 10']} selected={segmentIndex} onSelect={setSegmentIndex} />
@@ -497,7 +631,7 @@ function DesignSystemScreen() {
                   setName={MOCK_CARDS[0].set.name}
                   grade="PSA10"
                   rarity={MOCK_CARDS[0].rarity}
-                  price={{ cardName: MOCK_CARDS[0].name, grade: 'PSA10', currentPrice: 1560, previousPrice: 1500, percentChange: 4.0, lastSaleDate: '2026-04-10', lastSalePrice: 1555, averagePrice: 1520, highPrice: 1600, lowPrice: 1480, salesCount: 12, source: 'ebay' as const }}
+                  fallbackPrice={{ cardName: MOCK_CARDS[0].name, grade: 'PSA10', currentPrice: 1560, previousPrice: 1500, percentChange: 4.0, lastSaleDate: '2026-04-10', lastSalePrice: 1555, averagePrice: 1520, highPrice: 1600, lowPrice: 1480, salesCount: 12, source: 'ebay' as const }}
                 />
                 <WatchlistCard
                   cardId={MOCK_CARDS[1].id}
@@ -506,7 +640,7 @@ function DesignSystemScreen() {
                   setName={MOCK_CARDS[1].set.name}
                   grade="UNGRADED"
                   rarity={MOCK_CARDS[1].rarity}
-                  price={{ cardName: MOCK_CARDS[1].name, grade: 'UNGRADED', currentPrice: 245, previousPrice: 230, percentChange: 6.52, lastSaleDate: '2026-04-11', lastSalePrice: 248, averagePrice: 235, highPrice: 260, lowPrice: 220, salesCount: 28, source: 'ebay' as const }}
+                  fallbackPrice={{ cardName: MOCK_CARDS[1].name, grade: 'UNGRADED', currentPrice: 245, previousPrice: 230, percentChange: 6.52, lastSaleDate: '2026-04-11', lastSalePrice: 248, averagePrice: 235, highPrice: 260, lowPrice: 220, salesCount: 28, source: 'ebay' as const }}
                 />
               </View>
             </SectionBlock>
@@ -645,7 +779,14 @@ function DesignSystemScreen() {
     );
   }
 
-  // ── Desktop layout (sidebar + content) ───────────────────
+  // ── Desktop layout (sidebar + content [+ editor panel]) ──
+  // Token editor only mounts on web and ≥1024px — a 340pt right panel
+  // doesn't fit alongside the 200pt sidebar and content on tablet-width
+  // screens. Gated by __DEV__ so production web builds don't ship the
+  // editor (users can still land on /design-system but see the
+  // read-only view). iOS/Android never render it.
+  const showEditor = __DEV__ && Platform.OS === 'web' && screenWidth >= 1024;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
       <View style={{ flex: 1, flexDirection: 'row' }}>
@@ -653,9 +794,11 @@ function DesignSystemScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ padding: spacing[8], maxWidth: 960 }}
+          style={{ flex: 1 }}
         >
           {renderContent()}
         </ScrollView>
+        {showEditor && <TokenEditorPanel section={activeSection} />}
       </View>
     </SafeAreaView>
   );

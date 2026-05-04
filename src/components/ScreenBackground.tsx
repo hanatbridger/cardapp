@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform, AppState } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
   withTiming,
+  cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,11 +25,42 @@ export function ScreenBackground({ children, edges = ['top'] }: ScreenBackground
   const progress = useSharedValue(0);
 
   useEffect(() => {
-    progress.value = withRepeat(
-      withTiming(1, { duration: 25000, easing: Easing.linear }),
-      -1,
-      true,
-    );
+    const start = () => {
+      progress.value = withRepeat(
+        withTiming(1, { duration: 25000, easing: Easing.linear }),
+        -1,
+        true,
+      );
+    };
+    const stop = () => {
+      cancelAnimation(progress);
+    };
+
+    start();
+
+    // Pause when the native app backgrounds (iOS/Android) or the web tab hides.
+    // Reanimated keeps driving the timing otherwise, which burns CPU for no benefit.
+    if (Platform.OS === 'web') {
+      const onVisibility = () => {
+        if (typeof document === 'undefined') return;
+        if (document.hidden) stop();
+        else start();
+      };
+      document.addEventListener('visibilitychange', onVisibility);
+      return () => {
+        document.removeEventListener('visibilitychange', onVisibility);
+        stop();
+      };
+    }
+
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') start();
+      else stop();
+    });
+    return () => {
+      sub.remove();
+      stop();
+    };
   }, []);
 
   // Gentle drift — scale larger to hide edges, only translate (no rotation to avoid white corners)
@@ -48,6 +80,7 @@ export function ScreenBackground({ children, edges = ['top'] }: ScreenBackground
   return (
     <View style={{ flex: 1, overflow: 'hidden' }}>
       <AnimatedGradient
+        pointerEvents="none"
         colors={gradientColors as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
