@@ -78,9 +78,11 @@ function json(status: number, body: unknown): Response {
     status,
     headers: {
       'Content-Type': 'application/json',
-      // 6h CDN cache, 1h SWR. Their feed updates once daily so this is
-      // generous; SWR keeps responses snappy while we refresh in bg.
-      'Cache-Control': 'public, s-maxage=21600, stale-while-revalidate=3600',
+      // 30-min CDN cache, 1h SWR. Lower than the upstream's daily
+      // refresh because we layer name-resolution on top — when we
+      // ship resolver tweaks, we want the cache to flush quickly so
+      // users see improved hit rates rather than stale 0/5 responses.
+      'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
       ...CORS,
     },
   });
@@ -141,25 +143,42 @@ async function resolveCardId(
   // Lucene quote anything containing whitespace/special chars; escape
   // double quotes inside the value.
   const q = (val: string) => `"${val.replace(/"/g, '\\"')}"`;
-  const query = `name:${q(cleanName)} set.name:${q(cleanSet)}`;
 
-  // 3s per-lookup budget — we run them in parallel, but a single
-  // hung request shouldn't drag the whole response.
+  // Two-pass query strategy:
+  //   1. Strict — name + set match. Highest precision (right card +
+  //      right set), but fails when collectrics' set name doesn't
+  //      exactly match Pokemon TCG's (promos, new sets, fuzzy renames).
+  //   2. Loose — name only. Lower precision (could pick wrong set),
+  //      but still routes the user to a real card record. Better UX
+  //      than the search detour fallback for cards where set resolution
+  //      misses but the name itself is unique enough.
+  const queries = [
+    `name:${q(cleanName)} set.name:${q(cleanSet)}`,
+    `name:${q(cleanName)}`,
+  ];
+
+  // 3s per-lookup budget covers BOTH passes — if a single pass blows
+  // through it the resolver gives up rather than dragging the whole
+  // response. Pokemon TCG API typical p95 is ~200ms so two sequential
+  // queries fit comfortably under 3s.
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 3000);
 
   try {
-    const res = await fetch(
-      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=1&select=id`,
-      {
-        headers: { 'user-agent': 'CardPulse Trending Resolver' },
-        signal: ctl.signal,
-      },
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const id = data?.data?.[0]?.id;
-    return typeof id === 'string' ? id : null;
+    for (const query of queries) {
+      const res = await fetch(
+        `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=1&select=id`,
+        {
+          headers: { 'user-agent': 'CardPulse Trending Resolver' },
+          signal: ctl.signal,
+        },
+      );
+      if (!res.ok) continue;
+      const data = await res.json();
+      const id = data?.data?.[0]?.id;
+      if (typeof id === 'string') return id;
+    }
+    return null;
   } catch {
     return null;
   } finally {
