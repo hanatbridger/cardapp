@@ -120,8 +120,12 @@ function SearchScreen() {
   //   overvalued:  negative number, no prefix, red ↓
   // percentChange is signed (e.g. -7.5 for a -7.5% dip), so we flip
   // the sign for undervalued so it reads as "undervalued by 7.5%".
+  // Server resolves productId → Pokemon TCG cardId when possible. When
+  // we got a cardId back, drop searchQuery so the AIPicks renderer
+  // routes directly to /card/{cardId}; when resolution missed, keep
+  // searchQuery as the fallback so the tap still lands somewhere.
   const undervaluedPicks: AIPickItem[] = (undervalQuery.data?.items ?? []).map((t) => ({
-    cardId: `tcg-${t.productId}`,
+    cardId: t.cardId ?? `tcg-${t.productId}`,
     cardName: t.name,
     setName: t.setName,
     imageUrl: t.imageUrl,
@@ -129,13 +133,10 @@ function SearchScreen() {
     predictedPrice: t.rawPrice * (1 + Math.abs(t.percentChange / 100)),
     gapPercent: -t.percentChange, // -(-7.5) = +7.5
     label: 'undervalued' as const,
-    // Trending payload only carries TCGPlayer productIds, not Pokemon
-    // TCG card ids — route via in-app search so the user picks the
-    // canonical record.
-    searchQuery: t.name,
+    ...(t.cardId ? {} : { searchQuery: t.name }),
   }));
   const overvaluedPicks: AIPickItem[] = (overvalQuery.data?.items ?? []).map((t) => ({
-    cardId: `tcg-${t.productId}`,
+    cardId: t.cardId ?? `tcg-${t.productId}`,
     cardName: t.name,
     setName: t.setName,
     imageUrl: t.imageUrl,
@@ -143,7 +144,7 @@ function SearchScreen() {
     predictedPrice: t.rawPrice / (1 + t.percentChange / 100),
     gapPercent: -t.percentChange, // -(+7.5) = -7.5
     label: 'overvalued' as const,
-    searchQuery: t.name,
+    ...(t.cardId ? {} : { searchQuery: t.name }),
   }));
   const showArtistResults = mode === 'artists' && hasQuery;
 

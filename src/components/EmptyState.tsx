@@ -32,9 +32,15 @@ export function EmptyState({ icon, title, description, actionLabel, onAction }: 
         </Text>
       )}
       {actionLabel && onAction && (
-        <Button variant="filled" onPress={onAction}>
-          {actionLabel}
-        </Button>
+        // Wrapper view inherits the parent's alignItems: 'center'.
+        // Button itself uses alignSelf: 'flex-start' to size to its
+        // content rather than stretch — wrapping it lets the wrapper
+        // center while the Button still hugs its content.
+        <View>
+          <Button variant="filled" onPress={onAction}>
+            {actionLabel}
+          </Button>
+        </View>
       )}
     </View>
   );

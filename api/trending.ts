@@ -35,6 +35,15 @@ type Mode = 'movers' | 'undervalued' | 'overvalued';
 export interface TrendingTile {
   /** TCGPlayer productId, parsed from the image URL. */
   productId: string;
+  /**
+   * Pokemon TCG card id (e.g. "sv8pt5-156"), resolved server-side
+   * by querying the Pokemon TCG API for a name + set match.
+   * When present, tile taps can route directly to /card/{cardId}.
+   * When absent (resolver miss / rate-limit / new card not yet in
+   * Pokemon TCG database), the client falls back to dropping the
+   * user into search with the name pre-filled.
+   */
+  cardId?: string;
   name: string;
   setName: string;
   rarity: string;
@@ -81,6 +90,67 @@ function extractProductId(url: string): string | null {
   // e.g. https://tcgplayer-cdn.tcgplayer.com/product/676106_in_1000x1000.jpg
   const m = url.match(/\/product\/(\d+)_/);
   return m ? m[1] : null;
+}
+
+/**
+ * Resolve a single tile's TCGPlayer productId to a Pokemon TCG card id
+ * by querying the Pokemon TCG API for a name+set match.
+ *
+ * Why this exists: collectrics gives us TCGPlayer productIds but our
+ * card detail screen routes by Pokemon TCG cardId (a different
+ * identifier). Without this resolver, tile taps have to detour
+ * through the search screen.
+ *
+ * Strategy: query Pokemon TCG API with a Lucene-style name + set
+ * filter. Take the first hit. Pokemon TCG names occasionally diverge
+ * from TCGPlayer names (extra "[V-MAX]" suffixes, etc.) so we strip
+ * common variant tags before querying. On any failure (timeout,
+ * 4xx/5xx, no match), return null — the client falls back to search.
+ *
+ * Pokemon TCG API has no auth requirement for read; rate limit is
+ * 1000 req/hr unauthenticated. Trending tiles are cached at the edge
+ * for 6h, so we only fan out 12-24 lookups twice a day in the worst
+ * case. Comfortable margin.
+ */
+async function resolveCardId(
+  productName: string,
+  setName: string,
+): Promise<string | null> {
+  // Strip common TCGPlayer-only suffixes that Pokemon TCG API doesn't use.
+  // e.g. "Charizard ex (Special Illustration Rare)" -> "Charizard ex"
+  const cleanName = productName
+    .replace(/\s*\([^)]*\)\s*/g, ' ')   // strip (parenthetical)
+    .replace(/\s*-\s*[\w\s/]+$/, '')    // strip trailing " - Suffix"
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // Lucene quote anything containing whitespace/special chars; escape
+  // double quotes inside the value.
+  const q = (val: string) => `"${val.replace(/"/g, '\\"')}"`;
+  const query = `name:${q(cleanName)} set.name:${q(setName)}`;
+
+  // 3s per-lookup budget — we run them in parallel, but a single
+  // hung request shouldn't drag the whole response.
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 3000);
+
+  try {
+    const res = await fetch(
+      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=1&select=id`,
+      {
+        headers: { 'user-agent': 'CardPulse Trending Resolver' },
+        signal: ctl.signal,
+      },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const id = data?.data?.[0]?.id;
+    return typeof id === 'string' ? id : null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -159,6 +229,23 @@ export default async function handler(req: Request): Promise<Response> {
         })
         .slice(0, limit);
     }
+
+    // Resolve productId → Pokemon TCG cardId for the slice we're
+    // about to return (only post-slice — no point spending API quota
+    // resolving cards that don't make the cut). Promise.allSettled
+    // so a single resolver failure can't blow up the response — the
+    // missing tile just lands without a cardId and the client falls
+    // back to the search detour for that one item.
+    const resolved = await Promise.allSettled(
+      items.map((t) => resolveCardId(t.name, t.setName)),
+    );
+    items = items.map((t, i) => {
+      const r = resolved[i];
+      if (r.status === 'fulfilled' && r.value) {
+        return { ...t, cardId: r.value };
+      }
+      return t;
+    });
 
     const body: TrendingResponse = {
       generatedAt: data['generated-at'] ?? '',

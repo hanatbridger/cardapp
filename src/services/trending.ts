@@ -19,6 +19,12 @@ export type TrendingMode = 'movers' | 'undervalued' | 'overvalued';
 
 export interface TrendingTile {
   productId: string;
+  /**
+   * Pokemon TCG card id (e.g. "sv8pt5-156"), resolved server-side.
+   * When present, tile taps route directly to /card/{cardId};
+   * when absent, callers should fall back to the search-by-name flow.
+   */
+  cardId?: string;
   name: string;
   setName: string;
   rarity: string;
