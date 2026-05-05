@@ -116,18 +116,32 @@ async function resolveCardId(
   productName: string,
   setName: string,
 ): Promise<string | null> {
-  // Strip common TCGPlayer-only suffixes that Pokemon TCG API doesn't use.
-  // e.g. "Charizard ex (Special Illustration Rare)" -> "Charizard ex"
+  // Strip TCGPlayer-only patterns that Pokemon TCG API doesn't use.
+  // Empirical examples from collectrics:
+  //   "Tyranitar ex #64"                         -> "Tyranitar ex"
+  //   "Charizard ex (Special Illustration Rare)" -> "Charizard ex"
+  //   "Pikachu ex - Surging Sparks #25"          -> "Pikachu ex"
+  // Pokemon TCG API stores the card number in a separate `number`
+  // field, so the # suffix MUST come off before name matching.
   const cleanName = productName
-    .replace(/\s*\([^)]*\)\s*/g, ' ')   // strip (parenthetical)
-    .replace(/\s*-\s*[\w\s/]+$/, '')    // strip trailing " - Suffix"
+    .replace(/\s*#[\w/]+/g, '')         // "#64", "#25/198", "#SWSH123"
+    .replace(/\s*\([^)]*\)\s*/g, ' ')   // (parenthetical)
+    .replace(/\s*-\s*[^-]+$/, '')       // trailing " - Suffix"
     .replace(/\s+/g, ' ')
+    .trim();
+
+  // Collectrics prefixes every set with "Pokemon " ("Pokemon Paldean
+  // Fates"); Pokemon TCG API uses the bare set name. Strip it. Also
+  // strip the "SV:" prefix that some sets carry on TCGPlayer-side.
+  const cleanSet = setName
+    .replace(/^Pokemon\s+/i, '')
+    .replace(/^SV:\s*/i, '')
     .trim();
 
   // Lucene quote anything containing whitespace/special chars; escape
   // double quotes inside the value.
   const q = (val: string) => `"${val.replace(/"/g, '\\"')}"`;
-  const query = `name:${q(cleanName)} set.name:${q(setName)}`;
+  const query = `name:${q(cleanName)} set.name:${q(cleanSet)}`;
 
   // 3s per-lookup budget — we run them in parallel, but a single
   // hung request shouldn't drag the whole response.
