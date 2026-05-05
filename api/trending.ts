@@ -236,23 +236,42 @@ export default async function handler(req: Request): Promise<Response> {
       })
       .filter((x): x is TrendingTile => x !== null);
 
-    // All three modes ride the same dod-change-pct (biggest movers
-    // today) — modes split the feed by direction:
-    //   movers      → biggest |move|, sign-agnostic
-    //   undervalued → biggest negative dod (today's dips, rebound bets)
-    //   overvalued  → biggest positive dod (today's spikes, cooldown bets)
-    // baseline-change-pct stays on each tile in case consumers want
-    // the 30-day signal separately, but it doesn't drive the rank.
+    // Each mode pulls a different signal out of the same payload:
+    //   movers      → biggest abs(dod-change-pct) — "moved most TODAY"
+    //                 sign-agnostic, sorts up + down moves together.
+    //   undervalued → most-negative baseline-change-pct — "current price
+    //                 farthest BELOW the 30-day average". This is the
+    //                 actual valuation signal, not just today's dip.
+    //   overvalued  → most-positive baseline-change-pct — "current price
+    //                 farthest ABOVE the 30-day average". Cooldown bets.
+    //
+    // Why two different signals: dod-change-pct is movement (volatility),
+    // baseline-change-pct is valuation (mean-reversion). The home ticker
+    // wants "what's hot today" → movement. The Explore picks promise
+    // "valuation insight" → mean-reversion. Mixing them up surfaces
+    // one-day blips as "undervalued," which sharp users notice.
+    //
+    // Tiles without a published baseline-change-pct are excluded from
+    // undervalued/overvalued — collectrics doesn't always publish a
+    // baseline (newly tracked cards, sparse-volume cards), and we'd
+    // rather show fewer rows than mix in items ranked on the wrong
+    // signal. Movers mode keeps every tile since its signal is dod.
     let items: TrendingTile[];
     if (mode === 'undervalued') {
       items = tiles
-        .filter((t) => t.percentChange < 0)
-        .sort((a, b) => a.percentChange - b.percentChange) // most negative first
+        .filter(
+          (t) =>
+            typeof t.baselineChangePct === 'number' && t.baselineChangePct < 0,
+        )
+        .sort((a, b) => a.baselineChangePct! - b.baselineChangePct!) // most negative first
         .slice(0, limit);
     } else if (mode === 'overvalued') {
       items = tiles
-        .filter((t) => t.percentChange > 0)
-        .sort((a, b) => b.percentChange - a.percentChange) // most positive first
+        .filter(
+          (t) =>
+            typeof t.baselineChangePct === 'number' && t.baselineChangePct > 0,
+        )
+        .sort((a, b) => b.baselineChangePct! - a.baselineChangePct!) // most positive first
         .slice(0, limit);
     } else {
       items = tiles

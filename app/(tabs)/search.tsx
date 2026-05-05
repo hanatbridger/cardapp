@@ -124,28 +124,44 @@ function SearchScreen() {
   // we got a cardId back, drop searchQuery so the AIPicks renderer
   // routes directly to /card/{cardId}; when resolution missed, keep
   // searchQuery as the fallback so the tap still lands somewhere.
-  const undervaluedPicks: AIPickItem[] = (undervalQuery.data?.items ?? []).map((t) => ({
-    cardId: t.cardId ?? `tcg-${t.productId}`,
-    cardName: t.name,
-    setName: t.setName,
-    imageUrl: t.imageUrl,
-    marketPrice: t.rawPrice,
-    predictedPrice: t.rawPrice * (1 + Math.abs(t.percentChange / 100)),
-    gapPercent: -t.percentChange, // -(-7.5) = +7.5
-    label: 'undervalued' as const,
-    ...(t.cardId ? {} : { searchQuery: t.name }),
-  }));
-  const overvaluedPicks: AIPickItem[] = (overvalQuery.data?.items ?? []).map((t) => ({
-    cardId: t.cardId ?? `tcg-${t.productId}`,
-    cardName: t.name,
-    setName: t.setName,
-    imageUrl: t.imageUrl,
-    marketPrice: t.rawPrice,
-    predictedPrice: t.rawPrice / (1 + t.percentChange / 100),
-    gapPercent: -t.percentChange, // -(+7.5) = -7.5
-    label: 'overvalued' as const,
-    ...(t.cardId ? {} : { searchQuery: t.name }),
-  }));
+  //
+  // gapPercent + predictedPrice are derived from baseline-change-pct
+  // (current vs 30-day average) — the actual valuation signal, not
+  // dod-change-pct (today's blip). The trending API guarantees
+  // baselineChangePct is defined on every item in undervalued/overvalued
+  // modes (filters out tiles without a baseline), so a defensive
+  // fallback to percentChange covers the type system without ever
+  // firing in practice.
+  const undervaluedPicks: AIPickItem[] = (undervalQuery.data?.items ?? []).map((t) => {
+    const baseline = t.baselineChangePct ?? t.percentChange;
+    return {
+      cardId: t.cardId ?? `tcg-${t.productId}`,
+      cardName: t.name,
+      setName: t.setName,
+      imageUrl: t.imageUrl,
+      marketPrice: t.rawPrice,
+      // 30-day baseline implies upside back to that average.
+      predictedPrice: t.rawPrice * (1 + Math.abs(baseline / 100)),
+      gapPercent: -baseline, // -(-7.5) = +7.5 — positive upside %
+      label: 'undervalued' as const,
+      ...(t.cardId ? {} : { searchQuery: t.name }),
+    };
+  });
+  const overvaluedPicks: AIPickItem[] = (overvalQuery.data?.items ?? []).map((t) => {
+    const baseline = t.baselineChangePct ?? t.percentChange;
+    return {
+      cardId: t.cardId ?? `tcg-${t.productId}`,
+      cardName: t.name,
+      setName: t.setName,
+      imageUrl: t.imageUrl,
+      marketPrice: t.rawPrice,
+      // Reverse the baseline gap to get the implied 30-day average.
+      predictedPrice: t.rawPrice / (1 + baseline / 100),
+      gapPercent: -baseline, // -(+5) = -5 — negative cooldown %
+      label: 'overvalued' as const,
+      ...(t.cardId ? {} : { searchQuery: t.name }),
+    };
+  });
   const showArtistResults = mode === 'artists' && hasQuery;
 
   const handleCardPress = (card: PokemonCard) => {
