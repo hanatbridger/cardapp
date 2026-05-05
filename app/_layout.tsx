@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { View, Platform } from 'react-native';
+import { Platform } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -123,7 +124,12 @@ export default function RootLayout() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    // GestureHandlerRootView wraps the whole tree so react-native-
+    // gesture-handler events (used by ReanimatedSwipeable on the
+    // home watchlist) bubble up correctly. Required at the root —
+    // nesting it deeper means swipe gestures inside route children
+    // don't register.
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <ErrorBoundary onError={(error, info) => captureException(error, { componentStack: info.componentStack })}>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
@@ -153,6 +159,6 @@ export default function RootLayout() {
           </ThemeProvider>
         </QueryClientProvider>
       </ErrorBoundary>
-    </View>
+    </GestureHandlerRootView>
   );
 }

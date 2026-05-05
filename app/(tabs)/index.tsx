@@ -14,6 +14,7 @@ import {
   EmptyState,
   ScreenBackground,
   BrandMark,
+  SwipeToDelete,
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
@@ -33,7 +34,7 @@ const TAB_BAR_CLEARANCE = 64 + 4;
 function WatchlistScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { items: rawItems, maxFreeItems } = useWatchlistStore();
+  const { items: rawItems, maxFreeItems, removeItem } = useWatchlistStore();
   // PSA 10 tracking is gated until the eBay live proxy ships — hide
   // any previously-saved PSA 10 cards from the list and the count.
   // The store keeps the data intact, so they reappear automatically
@@ -262,45 +263,66 @@ function WatchlistScreen() {
           // virtualized list were eating touches on the WatchlistCard's
           // TouchableOpacity. The subtle fade-in isn't worth the dead
           // rows. Search keeps the animation — its rows are far shorter.
+          //
+          // SwipeToDelete wraps each row to expose iOS-Mail-style swipe
+          // removal: drag left → reveal red trash panel → tap to delete.
+          // The pan gesture cooperates with the FlatList's vertical
+          // scroll automatically (gesture-handler defers to native scroll
+          // on the dominant axis).
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[2] }}>
-            {item.kind === 'sealed' ? (
-              <SealedWatchlistCard
-                productId={item.productId}
-                productName={item.productName}
-                productType={item.productType}
-                setName={item.setName}
-                imageUrl={item.imageUrl}
-                fallbackPrice={item.lastPrice}
-                fallbackPriceChange={item.lastPriceChange}
-              />
-            ) : (
-              <WatchlistCard
-                cardId={item.cardId}
-                cardName={item.cardName}
-                cardImageUrl={item.cardImageUrl}
-                setName={item.setName}
-                setNumber={item.setNumber}
-                grade={item.grade}
-                language={item.language}
-                rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
-                // Fallback shown only briefly while the live query loads, or if it fails.
-                // The real price comes from useCardPrice inside WatchlistCard — same
-                // source as the detail screen, so numbers always agree.
-                fallbackPrice={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
-                  cardName: item.cardName,
-                  grade: item.grade,
-                  currentPrice: item.lastPrice,
-                  previousPrice: item.lastPrice,
-                  percentChange: item.lastPriceChange,
-                  lastSaleDate: '',
-                  lastSalePrice: item.lastPrice,
-                  averagePrice: item.lastPrice,
-                  highPrice: item.lastPrice,
-                  lowPrice: item.lastPrice,
-                  salesCount: 0,
-                } : undefined)}
-              />
-            )}
+            <SwipeToDelete
+              onDelete={() => {
+                if (item.kind === 'sealed') {
+                  removeItem(item.productId);
+                } else {
+                  removeItem(item.cardId, item.grade);
+                }
+              }}
+              deleteAccessibilityLabel={
+                item.kind === 'sealed'
+                  ? `Remove ${item.productName} from watchlist`
+                  : `Remove ${item.cardName} from watchlist`
+              }
+            >
+              {item.kind === 'sealed' ? (
+                <SealedWatchlistCard
+                  productId={item.productId}
+                  productName={item.productName}
+                  productType={item.productType}
+                  setName={item.setName}
+                  imageUrl={item.imageUrl}
+                  fallbackPrice={item.lastPrice}
+                  fallbackPriceChange={item.lastPriceChange}
+                />
+              ) : (
+                <WatchlistCard
+                  cardId={item.cardId}
+                  cardName={item.cardName}
+                  cardImageUrl={item.cardImageUrl}
+                  setName={item.setName}
+                  setNumber={item.setNumber}
+                  grade={item.grade}
+                  language={item.language}
+                  rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
+                  // Fallback shown only briefly while the live query loads, or if it fails.
+                  // The real price comes from useCardPrice inside WatchlistCard — same
+                  // source as the detail screen, so numbers always agree.
+                  fallbackPrice={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
+                    cardName: item.cardName,
+                    grade: item.grade,
+                    currentPrice: item.lastPrice,
+                    previousPrice: item.lastPrice,
+                    percentChange: item.lastPriceChange,
+                    lastSaleDate: '',
+                    lastSalePrice: item.lastPrice,
+                    averagePrice: item.lastPrice,
+                    highPrice: item.lastPrice,
+                    lowPrice: item.lastPrice,
+                    salesCount: 0,
+                  } : undefined)}
+                />
+              )}
+            </SwipeToDelete>
           </View>
         )}
         ListEmptyComponent={
