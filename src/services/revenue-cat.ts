@@ -4,9 +4,18 @@
  * Products (configured in RevenueCat dashboard):
  *   - Monthly subscription
  *   - Yearly subscription
- *   - Lifetime in-app purchase
  *
- * Entitlement: "CardPulse Pro"
+ * Entitlement: "premium"
+ *
+ * Why "premium" and not "CardPulse Pro": the entitlement identifier
+ * here MUST match what's configured in the RevenueCat dashboard. The
+ * dashboard's entitlement is named `premium` (with both products
+ * attached), so the code reads from that key. An earlier version of
+ * this file used "CardPulse Pro" and resulted in
+ * `customerInfo.entitlements.active["CardPulse Pro"]` always being
+ * undefined — purchases would succeed at Apple but the app never
+ * flipped premium on, leaving users charged-but-not-unlocked. App
+ * Review caught this on the second submission round.
  */
 
 import { Platform } from 'react-native';
@@ -17,7 +26,7 @@ import Purchases, {
 } from 'react-native-purchases';
 
 const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
-const ENTITLEMENT_ID = 'CardPulse Pro';
+const ENTITLEMENT_ID = 'premium';
 
 let isConfigured = false;
 
@@ -74,7 +83,7 @@ export async function resetUser(): Promise<void> {
 }
 
 /**
- * Check if user has active "CardPulse Pro" entitlement.
+ * Check if user has the active "premium" entitlement.
  */
 export async function checkPremiumStatus(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
