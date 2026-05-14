@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { IconChevronLeft, IconShare, IconPlus, IconMinus, IconBellRinging, IconBellFilled, IconExternalLink, IconBookmark, IconBookmarkFilled, IconRefresh, IconAlertCircle, IconLock } from '@tabler/icons-react-native';
+import { IconChevronLeft, IconShare, IconPlus, IconMinus, IconBellRinging, IconBellFilled, IconExternalLink, IconCirclePlus, IconCircleCheck, IconRefresh, IconAlertCircle, IconLock } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import {
   Text,
@@ -288,10 +288,20 @@ function CardDetailScreen() {
             <IconChevronLeft size={24} color={colors.onSurface} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-            <Pressable onPress={handleToggleWatchlist} hitSlop={8} style={{ padding: spacing[1] }}>
+            <Pressable
+              onPress={handleToggleWatchlist}
+              hitSlop={8}
+              style={{ padding: spacing[1] }}
+              accessibilityRole="button"
+              accessibilityLabel={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+            >
+              {/* IconCirclePlus / IconCircleCheck mirror the iOS Music
+                  "Add to Library" pattern — circle-plus communicates
+                  the add affordance clearly, circle-check confirms the
+                  added state and still reads as "tap to remove". */}
               {isInWatchlist
-                ? <IconBookmarkFilled size={22} color={colors.primary} />
-                : <IconBookmark size={22} color={colors.onSurfaceMuted} />}
+                ? <IconCircleCheck size={24} color={colors.primary} strokeWidth={2} />
+                : <IconCirclePlus size={24} color={colors.onSurface} strokeWidth={2} />}
             </Pressable>
             <Pressable onPress={() => setAlertModalVisible(true)} hitSlop={8} style={{ padding: spacing[1] }}>
               {hasAlert
