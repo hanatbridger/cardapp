@@ -139,6 +139,13 @@ function WatchlistScreen() {
     }
     return top.slice(0, 8).map<TrendingTile>(({ card, price }) => ({
       productId: card.id,
+      // MOCK_CARDS use real Pokemon TCG card ids as `card.id` (e.g.
+      // "sv3pt5-199"), so the fallback can populate cardId directly.
+      // Without this, fallback tiles rendered during the cold-launch
+      // window (before the live /api/trending fetch resolves) would
+      // tap-through to search instead of /card/{id}. Now both the
+      // fallback and live paths route directly to detail.
+      cardId: card.id,
       name: card.name,
       setName: card.set.name,
       rarity: card.rarity ?? '',
