@@ -149,10 +149,6 @@ export default function RootLayout() {
               <Stack.Screen name="privacy" />
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
               <Stack.Screen name="design-system" />
-              {/* Diagnostic routes for the watchlist-tap bug
-                  isolation walkthrough — TestFlight-only, remove
-                  before the next App Store submission. */}
-              <Stack.Screen name="dev" options={{ headerShown: false }} />
             </Stack>
             {/* Branded splash overlay — the native Expo splash shows the
                 logomark on the dark brand canvas; this extends the same

@@ -179,28 +179,6 @@ function SettingsScreen() {
             </Card>
           </View>
 
-          {/* Diagnostic — TestFlight-only, remove before next App Store submission.
-              Entry point for the watchlist-tap bug isolation walkthrough. */}
-          <View style={{ gap: spacing[2] }}>
-            <Text variant="labelLg" color={colors.onSurfaceVariant}>DIAGNOSTIC</Text>
-            <Card>
-              <Pressable
-                onPress={() => router.push('/dev' as any)}
-                style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
-                accessibilityRole="link"
-                accessibilityLabel="Open diagnostic screens"
-              >
-                <View style={{ flex: 1 }}>
-                  <Text variant="bodyMd">Watchlist tap walkthrough</Text>
-                  <Text variant="caption" color={colors.onSurfaceMuted}>
-                    Step through 5 isolation screens to find which layer eats taps on cold launch.
-                  </Text>
-                </View>
-                <IconChevronRight size={18} color={colors.onSurfaceMuted} />
-              </Pressable>
-            </Card>
-          </View>
-
           {/* Legal */}
           <View style={{ gap: spacing[2] }}>
             <Text variant="labelLg" color={colors.onSurfaceVariant}>LEGAL</Text>
