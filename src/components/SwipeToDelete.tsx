@@ -130,6 +130,14 @@ export function SwipeToDelete({
       // width, which made the row feel loose. With it off the swipe
       // resists past full reveal — same as iOS Mail.
       overshootRight={false}
+      // Pan must travel at least 20px horizontally before it
+      // activates as a swipe. Default is 10, which on iOS is
+      // aggressive enough that a slight finger drift during a tap
+      // can promote the touch to a pan and steal it from the inner
+      // RectButton. 20 gives the tap clear priority while still
+      // feeling responsive once the user actually intends to swipe.
+      dragOffsetFromRightEdge={20}
+      dragOffsetFromLeftEdge={20}
       renderRightActions={(progress) => (
         <DeleteAction
           progress={progress}

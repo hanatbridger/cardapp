@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, TouchableOpacity } from 'react-native';
+import { View } from 'react-native';
+import { RectButton } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
@@ -75,15 +76,19 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     }
   }
 
-  // Use TouchableOpacity rather than Pressable here: on iOS inside a
-  // virtualized FlatList that also has a setInterval-driven sibling
-  // (TrendingCarousel in the ListHeader), Pressable's gesture recognizer
-  // was dropping the up-event roughly every render, making the row feel
-  // unresponsive. TouchableOpacity's RN-native TouchableHandler doesn't
-  // have that failure mode.
+  // Use gesture-handler's RectButton, not RN's TouchableOpacity.
+  // Reason: this row is wrapped by ReanimatedSwipeable (in app/(tabs)/
+  // index.tsx via SwipeToDelete), which uses gesture-handler's Tap +
+  // Pan gestures. RN's Touchable system and gesture-handler's gesture
+  // system don't coordinate — on cold launch, gesture-handler's
+  // internal Tap can capture the touch before TouchableOpacity sees
+  // it, silently swallowing the press. RectButton lives in the same
+  // gesture system as the swipe and yields properly to it. This was
+  // the root cause that previous symptom-level fixes (removing fade-
+  // in wrapper, swapping Pressable for TouchableOpacity, migrating
+  // TrendingCarousel to UI-thread Reanimated) never addressed.
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
+    <RectButton
       onPress={() => router.push(`/card/${cardId}`)}
       accessibilityRole="button"
       accessibilityLabel={`Open ${cardName}`}
@@ -150,6 +155,6 @@ export const WatchlistCard = React.memo(function WatchlistCard({
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>
         )}
       </View>
-    </TouchableOpacity>
+    </RectButton>
   );
 });
