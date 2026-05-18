@@ -102,10 +102,18 @@ export async function searchCards(
   // If we have nothing, return an empty result set.
   if (parts.length === 0) return { cards: [], totalCount: 0 };
 
+  // Set detail screens render every card in the set under the "All"
+  // filter, so when we're scoped to a single setId we ask the
+  // Pokemon TCG API for up to 250 cards in one shot (their max
+  // pageSize). Default 20 leaks through to set view as "only 20
+  // cards visible" — keep 20 for everything else (text search,
+  // rarity-only filters) so result lists stay snappy.
+  const effectivePageSize = filters.setId ? 250 : pageSize;
+
   const params = new URLSearchParams({
     q: parts.join(' '),
     page: String(page),
-    pageSize: String(pageSize),
+    pageSize: String(effectivePageSize),
     orderBy: filters.setId ? 'number' : '-set.releaseDate',
   });
 
