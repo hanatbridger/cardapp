@@ -79,12 +79,17 @@ export function ScreenBackground({ children, edges = ['top'] }: ScreenBackground
 
   return (
     <View style={{ flex: 1, overflow: 'hidden' }}>
+      {/* pointerEvents lives in style (not as a prop) — the legacy prop
+          syntax is deprecated and unreliable on React Native's New
+          Architecture / Fabric renderer. Without this, the
+          absolutely-positioned gradient layer silently captures every
+          touch on the screen on iOS Fabric builds, making the home
+          screen un-tappable. */}
       <AnimatedGradient
-        pointerEvents="none"
         colors={gradientColors as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={animatedStyle}
+        style={[animatedStyle, { pointerEvents: 'none' }]}
       />
       <SafeAreaView style={{ flex: 1 }} edges={edges}>
         {children}

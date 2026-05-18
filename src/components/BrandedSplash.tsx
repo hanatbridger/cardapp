@@ -39,13 +39,19 @@ export function BrandedSplash({ ready }: { ready: boolean }) {
   if (!visible) return null;
 
   return (
+    // pointerEvents lives in style (not as a prop) so it works on
+    // React Native Fabric / New Architecture. Without this in style,
+    // the fading splash overlay (which is mounted for ~1.4s on cold
+    // launch and absolutely positioned to fill the screen) silently
+    // captured every touch on the underlying app surface — leaving
+    // the home screen un-tappable for the first second after launch.
     <Animated.View
-      pointerEvents="none"
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
       style={[
         StyleSheet.absoluteFillObject,
         {
+          pointerEvents: 'none',
           // Match expo splash backgroundColor exactly (#0D1117) so the
           // crossfade has no seam. Hardcoded here — this is a brand
           // surface pinned by the native splash config, not themeable.

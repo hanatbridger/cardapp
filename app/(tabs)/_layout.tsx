@@ -54,27 +54,27 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         } as any)
       : {};
 
+  // pointerEvents lives in style (not as a prop) so it works on
+  // React Native Fabric / New Architecture. Without this, the BlurView
+  // / glass tint layers default to `auto` and swallow every tap that
+  // lands in the pill's dead zones — including taps on rows of the
+  // home FlatList that visually sit ABOVE the bar but extend slightly
+  // behind it due to how scroll content overshoots the bar.
   const renderGlassSurface = (shapeRadius: number) =>
     Platform.OS === 'web' ? (
       <View
-        pointerEvents="none"
         style={{
           ...StyleAbsoluteFill,
           backgroundColor: glassTint,
           borderWidth: 1,
           borderColor: hairline,
           borderRadius: shapeRadius,
+          pointerEvents: 'none',
           ...webGlass,
         }}
       />
     ) : (
-      // `pointerEvents="none"` on native — otherwise BlurView (default
-      // `auto`) swallows taps that land in the pill's dead zones (the
-      // 8pt strips above/below the 48pt Pressables and the horizontal
-      // padding around the tab row), and the list rows beneath the bar
-      // never receive them.
       <BlurView
-        pointerEvents="none"
         intensity={BLUR_INTENSITY}
         tint={isDark ? 'dark' : 'light'}
         style={{
@@ -83,13 +83,18 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
           borderWidth: 1,
           borderColor: hairline,
           overflow: 'hidden',
+          pointerEvents: 'none',
         }}
       />
     );
 
   return (
+    // box-none lives in style for Fabric compatibility. As a prop it's
+    // unreliable on New Architecture; the wrapper would default to
+    // `auto` and capture every tap that lands in its absolute-
+    // positioned bounding box — including the home FlatList's content
+    // that flows beneath the floating bar.
     <View
-      pointerEvents="box-none"
       style={{
         position: 'absolute',
         bottom: Math.max(insets.bottom, 8) + 4,
@@ -98,6 +103,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         flexDirection: 'row',
         alignItems: 'center',
         gap: spacing[2],
+        pointerEvents: 'box-none',
       }}
     >
       {/* Home — standalone glass circle. Same active treatment as the
@@ -148,22 +154,22 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
           horizontal padding) pass through to the content beneath instead
           of being swallowed by the glass. */}
       <View
-        pointerEvents="box-none"
         style={{
           flex: 1,
           height: BAR_HEIGHT,
           borderRadius: BAR_HEIGHT / 2,
           overflow: 'hidden',
+          pointerEvents: 'box-none',
         }}
       >
         {renderGlassSurface(BAR_HEIGHT / 2)}
         <View
-          pointerEvents="box-none"
           style={{
             flex: 1,
             flexDirection: 'row',
             alignItems: 'center',
             paddingHorizontal: spacing[2],
+            pointerEvents: 'box-none',
           }}
         >
           {rightTabs.map((tabName) => {
