@@ -4,5 +4,11 @@
   "framework": null,
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/snapshot-prices",
+      "schedule": "0 14 * * *"
+    }
   ]
 }

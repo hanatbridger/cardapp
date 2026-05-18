@@ -47,7 +47,7 @@ const PROXY_ORIGIN = (() => {
 // Per-route flags — endpoints ship at different times.
 const LIVE = {
   rawPrice: true,         // /api/tcgplayer/price       — Edge fn (deployed)
-  rawHistory: false,      // /api/tcgplayer/history     — TODO
+  rawHistory: true,       // /api/tcgplayer/history     — Supabase-backed (v1.0.3+)
   sealedPrice: false,     // /api/sealed/price          — TODO
   sealedHistory: false,   // /api/sealed/history        — TODO
 };
@@ -134,17 +134,29 @@ export async function fetchRawCardPrice(
 
 /**
  * Fetch a TCGPlayer Market Price history series for a raw (UNGRADED)
- * single. Live endpoint isn't wired yet — falls back to the mocked
- * history series so the chart still renders something.
+ * single.
+ *
+ * Live path (LIVE.rawHistory): queries our Supabase-backed
+ * /api/tcgplayer/history?id={pokemonTcgCardId}. The endpoint maps
+ * cardId→productId server-side (via stored snapshots or Pokemon TCG
+ * API lookup) so callers only need the cardId. May return [] while
+ * the snapshot DB is still accumulating data for this card — the
+ * card detail screen renders a "Building history" placeholder in
+ * that case rather than misleading mock data.
+ *
+ * If a tcgplayerProductId is known to the caller, prefer that
+ * (`?productId=`) path — bypasses the cardId→productId lookup.
  */
 export async function fetchRawCardPriceHistory(
   cardId: string,
   tcgplayerProductId?: string,
 ): Promise<PriceHistory> {
   if (LIVE.rawHistory) {
-    const lookup = tcgplayerProductId ?? cardId;
+    const param = tcgplayerProductId
+      ? `productId=${encodeURIComponent(tcgplayerProductId)}`
+      : `id=${encodeURIComponent(cardId)}`;
     const data = await getJson<TcgPlayerHistoryResponse>(
-      `/api/tcgplayer/history?id=${encodeURIComponent(lookup)}`,
+      `/api/tcgplayer/history?${param}`,
     );
     return data.history;
   }

@@ -528,6 +528,27 @@ function CardDetailScreen() {
             </Card>
           )}
 
+          {/* "Building history" placeholder — shown when raw history is
+              still bootstrapping (fewer than 3 snapshots accumulated for
+              this card). Hidden on PSA 10 since the ComingSoonPanel
+              above already explains that gate. */}
+          {selectedGrade !== 'PSA10' && price && (!history || history.length < 3) && (
+            <Card>
+              <View style={{ gap: spacing[2], alignItems: 'center', paddingVertical: spacing[4] }}>
+                <Text variant="labelLg">Price history is building</Text>
+                <Text
+                  variant="caption"
+                  color={colors.onSurfaceVariant}
+                  style={{ textAlign: 'center', maxWidth: 280 }}
+                >
+                  {history && history.length > 0
+                    ? `We have ${history.length} ${history.length === 1 ? 'day' : 'days'} of price data so far. The chart unlocks at 3 days and fills in over the next 90.`
+                    : 'We snapshot card prices once a day. Charts will start showing real history within a few days of this card entering the daily tracker.'}
+                </Text>
+              </View>
+            </Card>
+          )}
+
           {/* Chart with time range toggle. Hidden on PSA 10 — the
               ComingSoonPanel above already explains the gate, and the
               chart would render mock graded history while the price
