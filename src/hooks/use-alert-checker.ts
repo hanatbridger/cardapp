@@ -29,19 +29,31 @@ export function useAlertChecker() {
   enabledRef.current = notificationsEnabled;
 
   useEffect(() => {
-    const runCheck = () => {
+    // findAlertsToTrigger is async (it fetches live prices per
+    // alert) — wrap in a self-invoking function so callers don't
+    // care. Errors are swallowed: an alert that can't be evaluated
+    // this cycle just waits for the next one rather than crashing
+    // the timer.
+    const runCheck = async () => {
       if (!enabledRef.current) return;
-      const toFire = findAlertsToTrigger(alertsRef.current);
-      for (const evaluation of toFire) {
-        const entry = recordTriggered(evaluation.alert, evaluation.currentPrice);
-        const { title, body } = formatAlertMessage(
-          evaluation.alert,
-          evaluation.currentPrice,
-        );
-        presentLocalNotification(title, body, {
-          cardId: entry.cardId,
-          triggeredAlertId: entry.id,
-        });
+      try {
+        const toFire = await findAlertsToTrigger(alertsRef.current);
+        for (const evaluation of toFire) {
+          const entry = recordTriggered(
+            evaluation.alert,
+            evaluation.currentPrice,
+          );
+          const { title, body } = formatAlertMessage(
+            evaluation.alert,
+            evaluation.currentPrice,
+          );
+          presentLocalNotification(title, body, {
+            cardId: entry.cardId,
+            triggeredAlertId: entry.id,
+          });
+        }
+      } catch {
+        // Live-price fetch failed for every alert; skip this cycle.
       }
     };
 

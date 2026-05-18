@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import {
   IconCrown, IconShield, IconFileText, IconHelpCircle, IconLogout,
   IconChevronRight, IconDeviceMobile, IconStar,
@@ -263,7 +264,14 @@ function ProfileScreen() {
           <SettingsRow
             icon={<IconDeviceMobile size={18} color={colors.onSurfaceVariant} />}
             label="App Version"
-            value="1.0.0"
+            // Read from expo-constants instead of hardcoding. Falls back to
+            // the bundled app.json version, and ultimately to a literal so
+            // the row is never blank if both are unavailable on web.
+            value={
+              Constants.expoConfig?.version ??
+              (Constants.manifest as { version?: string } | null)?.version ??
+              '1.0'
+            }
           />
           <SettingsDivider />
           <SettingsRow

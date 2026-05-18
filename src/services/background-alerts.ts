@@ -24,7 +24,11 @@ export function defineBackgroundAlertTask() {
       await useAlertsStore.persist.rehydrate();
       const { alerts, recordTriggered } = useAlertsStore.getState();
 
-      const toFire = findAlertsToTrigger(alerts);
+      // findAlertsToTrigger now fetches live prices in parallel —
+      // awaitable, but still capped by the per-fetch timeout in
+      // fetchRawCardPrice so the whole background task stays under
+      // the OS's 30s budget even with a full Premium-tier watchlist.
+      const toFire = await findAlertsToTrigger(alerts);
       if (toFire.length === 0) {
         return BackgroundFetch.BackgroundFetchResult.NoData;
       }

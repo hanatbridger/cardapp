@@ -73,8 +73,14 @@ function AuthGate() {
   }, [hydrateFromSupabase]);
 
   useEffect(() => {
-    // Skip auth/onboarding gates entirely on web (localhost dev preview).
-    // Native builds still enforce the full flow for App Store review.
+    // Skip auth/onboarding gates entirely on web. The web build is
+    // public at strange-saha-livid.vercel.app and serves the legal
+    // routes /privacy, /terms, and /help that App Store review +
+    // real users need to reach without signing in. Pre-launch the
+    // dev profile leaked because DEFAULT_PROFILE was hardcoded with
+    // the dev's identity — that's now blank in user-store, so the
+    // un-authed web view shows empty fields rather than someone
+    // else's name + email. OAuth-for-web is a future enhancement.
     if (Platform.OS === 'web') return;
 
     const root = segments[0];

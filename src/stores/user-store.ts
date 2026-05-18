@@ -45,10 +45,17 @@ interface UserStore {
   hydrateFromSupabase: () => Promise<void>;
 }
 
+// Blank initial state — populated by signIn() once the user
+// authenticates (Apple Sign In on iOS, or whatever else ships in
+// future). Earlier this defaulted to the dev's personal info, which
+// was fine on iOS because the auth gate replaced it before any
+// render, but the web build skips the auth gate for dev preview
+// purposes and leaked the dev's name + email to anyone visiting
+// strange-saha-livid.vercel.app.
 const DEFAULT_PROFILE: UserProfile = {
-  displayName: 'Han Wong',
-  username: '@hanwong',
-  email: 'han@bridgercreative.com',
+  displayName: '',
+  username: '',
+  email: '',
 };
 
 export const useUserStore = create<UserStore>()(
