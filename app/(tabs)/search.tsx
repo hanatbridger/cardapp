@@ -217,7 +217,14 @@ function SearchScreen() {
     <ScreenBackground>
       <CollapsingHeader
         hideBack
-        title="Explore"
+        // Headline swaps to "Search" when the user arrived via the
+        // Home top-right search icon (searchOrigin === 'home') and
+        // the input is focused. Reads as the action the screen is
+        // currently performing rather than the tab name. Direct
+        // visits to the Explore tab (searchOrigin === 'tab') keep
+        // the "Explore" label even when the input is focused, so
+        // the tab identity stays stable when used in-place.
+        title={searchFocused && searchOrigin === 'home' ? 'Search' : 'Explore'}
         animatedStyle={headerAnimatedStyle}
         // Headline matches Home and Notifications (variant="headingLg").
         titleVariant="headingLg"
