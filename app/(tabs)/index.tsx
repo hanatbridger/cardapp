@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { View, FlatList, Pressable, RefreshControl } from 'react-native';
+import { View, FlatList, RefreshControl } from 'react-native';
+import { RectButton } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
@@ -193,13 +194,16 @@ function WatchlistScreen() {
                 <BrandMark size={28} />
                 <Text variant="headingLg">CardPulse</Text>
               </View>
-              <Pressable
-                // `focus=1` opens Explore directly into the X-style focused
-                // search overlay. `from=home` tells Explore that Cancel
-                // should pop back to Home rather than leaving the user on
-                // the Explore tab. See app/(tabs)/search.tsx.
+              {/* RectButton (gesture-handler), not RN Pressable. Same
+                  reasoning as WatchlistCard.tsx: on Fabric (new arch),
+                  RN's Touchable system has intermittent press-recognition
+                  issues we still don't fully understand, while gesture-
+                  handler's RectButton fires reliably. We confirmed
+                  RectButton fires onPress in the v1.0.5 diagnostic — so
+                  use it consistently across all tap targets that have
+                  been flaky. */}
+              <RectButton
                 onPress={() => router.push('/(tabs)/search?focus=1&from=home')}
-                hitSlop={8}
                 accessibilityLabel="Search"
                 accessibilityRole="button"
                 style={{
@@ -212,7 +216,7 @@ function WatchlistScreen() {
                 }}
               >
                 <IconSearch size={20} color={colors.onSurfaceVariant} />
-              </Pressable>
+              </RectButton>
             </View>
 
             {/* Trending — raw card movers */}

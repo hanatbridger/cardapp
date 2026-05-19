@@ -132,6 +132,18 @@ async function resolveCardId(
     .replace(/\s+/g, ' ')
     .trim();
 
+  // Extract the printed card number from the product name. Collectrics
+  // names embed "#NNN" — same source we stripped above. Pokemon TCG API
+  // exposes `number` as a queryable Lucene field, so we can use it to
+  // disambiguate between multiple printings of the same character
+  // (e.g. "Terapagos ex #170" — the SIR variant — vs "#128" — the
+  // standard print). For numbered cards like "#25/198" we keep just
+  // the card number ("25"), discarding the set-size after the slash.
+  const numberMatch = productName.match(/#([\w]+(?:\/[\w]+)?)/);
+  const cardNumber = numberMatch
+    ? numberMatch[1].split('/')[0].trim()
+    : null;
+
   // Collectrics prefixes every set with "Pokemon " ("Pokemon Paldean
   // Fates"); Pokemon TCG API uses the bare set name. Strip it. Also
   // strip the "SV:" prefix that some sets carry on TCGPlayer-side.
@@ -144,18 +156,23 @@ async function resolveCardId(
   // double quotes inside the value.
   const q = (val: string) => `"${val.replace(/"/g, '\\"')}"`;
 
-  // Two-pass query strategy:
+  // Three-pass query strategy — precision-descending.
   //   1. Strict — name + set match. Highest precision (right card +
   //      right set), but fails when collectrics' set name doesn't
   //      exactly match Pokemon TCG's (promos, new sets, fuzzy renames).
-  //   2. Loose — name only. Lower precision (could pick wrong set),
-  //      but still routes the user to a real card record. Better UX
-  //      than the search detour fallback for cards where set resolution
-  //      misses but the name itself is unique enough.
-  const queries = [
+  //   2. Number-scoped — name + card number. When set normalization
+  //      misses but we have the printed number, this still uniquely
+  //      identifies the right printing (e.g. Terapagos ex "#170"
+  //      lands on the SIR, not the standard print at "#128").
+  //   3. Loose — name only. Lower precision (could pick wrong set
+  //      AND wrong number), used as a last resort.
+  const queries: string[] = [
     `name:${q(cleanName)} set.name:${q(cleanSet)}`,
-    `name:${q(cleanName)}`,
   ];
+  if (cardNumber) {
+    queries.push(`name:${q(cleanName)} number:${q(cardNumber)}`);
+  }
+  queries.push(`name:${q(cleanName)}`);
 
   // 3s per-lookup budget covers BOTH passes — if a single pass blows
   // through it the resolver gives up rather than dragging the whole
