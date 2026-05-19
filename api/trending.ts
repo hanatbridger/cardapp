@@ -156,22 +156,28 @@ async function resolveCardId(
   // double quotes inside the value.
   const q = (val: string) => `"${val.replace(/"/g, '\\"')}"`;
 
-  // Three-pass query strategy — precision-descending.
-  //   1. Strict — name + set match. Highest precision (right card +
-  //      right set), but fails when collectrics' set name doesn't
-  //      exactly match Pokemon TCG's (promos, new sets, fuzzy renames).
-  //   2. Number-scoped — name + card number. When set normalization
-  //      misses but we have the printed number, this still uniquely
-  //      identifies the right printing (e.g. Terapagos ex "#170"
-  //      lands on the SIR, not the standard print at "#128").
-  //   3. Loose — name only. Lower precision (could pick wrong set
-  //      AND wrong number), used as a last resort.
-  const queries: string[] = [
-    `name:${q(cleanName)} set.name:${q(cleanSet)}`,
-  ];
+  // Four-pass query strategy — precision-descending. Order matters
+  // because we return on the FIRST pass that matches anything; lower
+  // precision queries can over-match (e.g. "name + set" alone returns
+  // multiple printings of the same character when a set has Standard
+  // + SIR + RR variants — Pokemon TCG API picks the lowest number,
+  // not the one collectrics tagged with "#170").
+  //
+  //   1. name + set + number  — uniquely identifies the printing
+  //   2. name + number        — set normalization missed but # is
+  //                              still unique enough across all sets
+  //                              with that character
+  //   3. name + set           — for collectrics rows without a # in
+  //                              the product name (rare)
+  //   4. name only            — last-resort fallback
+  const queries: string[] = [];
   if (cardNumber) {
+    queries.push(
+      `name:${q(cleanName)} set.name:${q(cleanSet)} number:${q(cardNumber)}`,
+    );
     queries.push(`name:${q(cleanName)} number:${q(cardNumber)}`);
   }
+  queries.push(`name:${q(cleanName)} set.name:${q(cleanSet)}`);
   queries.push(`name:${q(cleanName)}`);
 
   // 3s per-lookup budget covers BOTH passes — if a single pass blows
