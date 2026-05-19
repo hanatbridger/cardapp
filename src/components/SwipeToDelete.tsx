@@ -1,6 +1,5 @@
 import React, { useRef } from 'react';
-import { Pressable, Platform, View } from 'react-native';
-import { useDebugEvents } from '../dev/debug-events';
+import { Pressable, Platform } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -108,7 +107,6 @@ export function SwipeToDelete({
   deleteAccessibilityLabel = 'Remove from watchlist',
 }: SwipeToDeleteProps) {
   const swipeableRef = useRef<SwipeableMethods>(null);
-  const logDebug = useDebugEvents((s) => s.log);
 
   const handleDelete = () => {
     // Warning haptic on destructive confirmation — matches iOS
@@ -147,28 +145,8 @@ export function SwipeToDelete({
           accessibilityLabel={deleteAccessibilityLabel}
         />
       )}
-      onSwipeableWillOpen={() =>
-        logDebug({ source: 'SwipeToDelete', type: 'onSwipeableWillOpen' })
-      }
-      onSwipeableOpen={() =>
-        logDebug({ source: 'SwipeToDelete', type: 'onSwipeableOpen' })
-      }
     >
-      {/* Diagnostic-only outer touch wrapper — records the very first
-          touch event entering the row, even if gesture-handler later
-          claims (and possibly swallows) it. If we see this fire but
-          no RectButton.active=true follows, the swipe gesture is
-          eating taps. */}
-      <View
-        onTouchStart={() =>
-          logDebug({ source: 'SwipeToDelete', type: 'outerView.onTouchStart' })
-        }
-        onTouchEnd={() =>
-          logDebug({ source: 'SwipeToDelete', type: 'outerView.onTouchEnd' })
-        }
-      >
-        {children}
-      </View>
+      {children}
     </ReanimatedSwipeable>
   );
 }

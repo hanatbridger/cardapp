@@ -3,7 +3,6 @@ import { View } from 'react-native';
 import { RectButton } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useDebugEvents } from '../dev/debug-events';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { GradeBadge } from './GradeBadge';
@@ -77,13 +76,6 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     }
   }
 
-  // Diagnostic-only: log touch lifecycle on the row's RectButton.
-  // Lets the v1.0.4 build's TouchDebugHUD show whether the user's
-  // tap reached the button at all (`active=true`), whether it fired
-  // an onPress, or whether something between the OS and this row
-  // ate the touch entirely. Cheap no-op in v1.0.5 once we remove.
-  const logDebug = useDebugEvents((s) => s.log);
-
   // Use gesture-handler's RectButton, not RN's TouchableOpacity.
   // Reason: this row is wrapped by ReanimatedSwipeable (in app/(tabs)/
   // index.tsx via SwipeToDelete), which uses gesture-handler's Tap +
@@ -97,17 +89,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   // TrendingCarousel to UI-thread Reanimated) never addressed.
   return (
     <RectButton
-      onPress={() => {
-        logDebug({ source: 'WatchlistCard', type: 'RectButton.onPress', detail: cardId });
-        router.push(`/card/${cardId}`);
-      }}
-      onActiveStateChange={(active) => {
-        logDebug({
-          source: 'WatchlistCard',
-          type: `RectButton.active=${active}`,
-          detail: cardId,
-        });
-      }}
+      onPress={() => router.push(`/card/${cardId}`)}
       accessibilityRole="button"
       accessibilityLabel={`Open ${cardName}`}
       style={{
