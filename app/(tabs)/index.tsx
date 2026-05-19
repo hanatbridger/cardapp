@@ -25,6 +25,10 @@ import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
 import { useTrendingMovers } from '../../src/hooks';
 import type { TrendingTile } from '../../src/services/trending';
+// Diagnostic-only — TouchDebugHUD ships in v1.0.4 to capture the
+// touch-event sequence for the watchlist-tap-on-cold-launch bug,
+// then gets removed in v1.0.5 once we know what's eating the tap.
+import { TouchDebugHUD } from '../../src/dev/TouchDebugHUD';
 
 // Floating tab bar occupies 64pt + safe-area bottom + offset. Pad the
 // list enough that the last card clears the glass pill — otherwise its
@@ -354,6 +358,8 @@ function WatchlistScreen() {
           />
         }
       />
+      {/* v1.0.4 diagnostic only — remove in v1.0.5 */}
+      <TouchDebugHUD />
     </ScreenBackground>
   );
 }
