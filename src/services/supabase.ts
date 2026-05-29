@@ -31,10 +31,13 @@ export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON
     storage: AsyncStorage,
     autoRefreshToken: true,
     persistSession: true,
-    // RN doesn't have a URL bar — the OAuth deep-link flow we use
-    // (ASWebAuthenticationSession) doesn't surface query params via
-    // location.hash, so let Supabase skip the URL-detection probe.
-    detectSessionInUrl: false,
+    // On web, the Google OAuth redirect returns to our origin with the
+    // session in the URL hash — Supabase must parse it, so enable
+    // detection there. On native there's no URL bar: Apple Sign In and
+    // native Google Sign-In both hand us an ID token directly via
+    // signInWithIdToken, so URL detection is irrelevant and we leave it
+    // off to skip the probe.
+    detectSessionInUrl: Platform.OS === 'web',
   },
 });
 

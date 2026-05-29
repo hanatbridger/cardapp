@@ -6,6 +6,11 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
 import { signInWithApple } from '../../src/services/supabase';
+import {
+  signInWithGoogleNative,
+  signInWithGoogleWeb,
+  GOOGLE_SIGN_IN_CANCELLED,
+} from '../../src/services/google-auth';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 
@@ -20,6 +25,28 @@ function LoginScreen() {
     const username = '@' + values.email.split('@')[0];
     signIn({ email: values.email, username, displayName: username.slice(1) }, 'email');
     router.replace('/(tabs)');
+  };
+
+  const handleGoogle = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        // Redirects away to Google's consent page; the session is
+        // picked up on return by onAuthStateChange in _layout.tsx,
+        // which also populates the store. No navigation here — the
+        // page reloads at the app origin post-redirect.
+        await signInWithGoogleWeb();
+        return;
+      }
+      const profile = await signInWithGoogleNative();
+      signIn(profile, 'google');
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      if (e?.message === GOOGLE_SIGN_IN_CANCELLED) return;
+      Alert.alert(
+        'Sign In Failed',
+        e?.message ?? 'Google Sign In could not be completed. Please try again.',
+      );
+    }
   };
 
   const handleApple = async () => {
@@ -88,7 +115,7 @@ function LoginScreen() {
           </View>
 
           {/* Form */}
-          <AuthForm mode="signin" onSubmit={handleSignIn} onApple={handleApple} appleOnly />
+          <AuthForm mode="signin" onSubmit={handleSignIn} onApple={handleApple} onGoogle={handleGoogle} appleOnly />
 
           {/* Footer */}
           <View

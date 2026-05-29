@@ -19,6 +19,7 @@ import {
 } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
 import { configureRevenueCat } from '../src/services/revenue-cat';
+import { configureGoogleSignin } from '../src/services/google-auth';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
   useFonts,
@@ -36,6 +37,9 @@ initSentry();
 
 // Initialize RevenueCat for in-app purchases.
 configureRevenueCat();
+
+// Configure the native Google Sign-In SDK (no-op on web).
+configureGoogleSignin();
 
 // Define the background task at module-eval time so the OS can dispatch
 // into it when the app is woken up. Configure the foreground notification
@@ -62,11 +66,33 @@ function AuthGate() {
   // subscription per app lifetime since AuthGate is mounted once.
   useEffect(() => {
     hydrateFromSupabase();
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         // Mirror Supabase logout into the local boolean. Profile data
         // stays put — wiping it is the deleteAccount path, not signOut.
         useUserStore.setState({ isAuthenticated: false });
+        return;
+      }
+      // SIGNED_IN with a session: the only path that reaches here
+      // WITHOUT the local store already being updated is the web
+      // Google OAuth redirect — control left the app for Google's
+      // consent page, so the in-app signIn() (which login.tsx calls
+      // for native flows) never ran. Populate the store from the
+      // session's user metadata so AuthGate lets them through and
+      // the profile screen shows their Google identity. Native flows
+      // already set isAuthenticated before this fires, so the guard
+      // avoids clobbering a richer profile with the same data.
+      if (event === 'SIGNED_IN' && !useUserStore.getState().isAuthenticated) {
+        const u = session.user;
+        const meta = (u.user_metadata ?? {}) as {
+          full_name?: string;
+          name?: string;
+          email?: string;
+        };
+        const email = u.email ?? meta.email ?? 'google-user@gmail.com';
+        const displayName = meta.full_name ?? meta.name ?? email.split('@')[0];
+        const username = '@' + email.split('@')[0];
+        useUserStore.getState().signIn({ email, username, displayName }, 'google');
       }
     });
     return () => sub.subscription.unsubscribe();

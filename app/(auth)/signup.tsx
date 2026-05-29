@@ -7,6 +7,11 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text, AuthForm, ScreenBackground, BrandMark, withErrorBoundary } from '../../src/components';
 import { useUserStore } from '../../src/stores/user-store';
 import { signInWithApple } from '../../src/services/supabase';
+import {
+  signInWithGoogleNative,
+  signInWithGoogleWeb,
+  GOOGLE_SIGN_IN_CANCELLED,
+} from '../../src/services/google-auth';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { safeGoBack } from '../../src/utils/safeGoBack';
@@ -29,6 +34,24 @@ function SignupScreen() {
       displayName: values.displayName || username.slice(1),
     }, 'email');
     router.replace('/(tabs)');
+  };
+
+  const handleGoogle = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        await signInWithGoogleWeb();
+        return;
+      }
+      const profile = await signInWithGoogleNative();
+      signIn(profile, 'google');
+      router.replace('/(tabs)');
+    } catch (e: any) {
+      if (e?.message === GOOGLE_SIGN_IN_CANCELLED) return;
+      Alert.alert(
+        'Sign Up Failed',
+        e?.message ?? 'Google Sign In could not be completed. Please try again.',
+      );
+    }
   };
 
   const handleApple = async () => {
@@ -100,7 +123,7 @@ function SignupScreen() {
           </View>
 
           {/* Form */}
-          <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} appleOnly />
+          <AuthForm mode="signup" onSubmit={handleSignUp} onApple={handleApple} onGoogle={handleGoogle} appleOnly />
 
           {/* Legal */}
           <View style={{ alignItems: 'center', gap: spacing[0.5] }}>

@@ -35,7 +35,9 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
@@ -61,7 +63,13 @@
           "color": "#4B5EFC"
         }
       ],
-      "@sentry/react-native"
+      "@sentry/react-native",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.839078311479-8mejfveaj4ne2fc89tlnm5c7pnq8qslq"
+        }
+      ]
     ],
     "extra": {
       "router": {},

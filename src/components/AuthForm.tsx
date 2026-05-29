@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Pressable, Platform } from 'react-native';
-import { IconBrandApple, IconMail, IconLock, IconUser } from '@tabler/icons-react-native';
+import { IconBrandApple, IconBrandGoogle, IconMail, IconLock, IconUser } from '@tabler/icons-react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { Input } from './Input';
@@ -13,13 +13,16 @@ interface AuthFormProps {
   mode: AuthMode;
   onSubmit: (values: { email: string; password: string; displayName?: string }) => void;
   onApple: () => void;
+  /** Google sign-in handler. When provided, a "Continue with Google"
+   *  button renders below the Apple button. */
+  onGoogle?: () => void;
   loading?: boolean;
   /**
    * When true, hide the email/password form entirely and surface only
-   * the Sign In with Apple button. Used for the v1 launch where we
-   * haven't wired a real backend yet — shipping a stubbed email/
-   * password flow risks an App Review rejection for placeholder
-   * content. Re-enable when Supabase auth is wired.
+   * the social sign-in buttons (Apple + Google). Used for the v1
+   * launch where email/password isn't wired — shipping a stubbed
+   * email/password flow risks an App Review rejection for placeholder
+   * content.
    */
   appleOnly?: boolean;
 }
@@ -32,12 +35,46 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * required by App Store guidelines when offering other social login,
  * but also a nice fast path even with email/password.
  */
-export function AuthForm({ mode, onSubmit, onApple, loading, appleOnly }: AuthFormProps) {
+export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly }: AuthFormProps) {
   const { colors, isDark } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string; displayName?: string }>({});
+
+  const verb = mode === 'signin' ? 'Sign in' : 'Sign up';
+
+  // Google button — white surface, neutral border, brand "G". Google's
+  // brand guidelines want their multicolor "G" asset; IconBrandGoogle
+  // is a monochrome stand-in that reads clearly and is acceptable for
+  // launch. Swap for the official asset in a polish pass if Google
+  // flags it (they rarely do for a neutral-styled button).
+  const GoogleButton = onGoogle ? (
+    <Pressable
+      onPress={onGoogle}
+      style={({ pressed }) => ({
+        height: 48,
+        borderRadius: radius.lg,
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: '#DADCE0',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing[2],
+        opacity: pressed ? 0.85 : 1,
+      })}
+      accessibilityRole="button"
+      accessibilityLabel={`${verb} with Google`}
+    >
+      <IconBrandGoogle size={20} color="#4285F4" strokeWidth={2.5} />
+      <Text variant="labelLg" color="#1F1F1F">
+        {Platform.OS === 'ios' || Platform.OS === 'web'
+          ? `${verb} with Google`
+          : 'Continue with Google'}
+      </Text>
+    </Pressable>
+  ) : null;
 
   const submit = () => {
     const next: typeof errors = {};
@@ -65,7 +102,7 @@ export function AuthForm({ mode, onSubmit, onApple, loading, appleOnly }: AuthFo
   // when Supabase auth is wired and email/password becomes real.
   if (appleOnly) {
     return (
-      <View style={{ gap: spacing[4] }}>
+      <View style={{ gap: spacing[3] }}>
         <Pressable
           onPress={onApple}
           style={({ pressed }) => ({
@@ -79,21 +116,22 @@ export function AuthForm({ mode, onSubmit, onApple, loading, appleOnly }: AuthFo
             opacity: pressed ? 0.85 : 1,
           })}
           accessibilityRole="button"
-          accessibilityLabel={`${mode === 'signin' ? 'Sign in' : 'Sign up'} with Apple`}
+          accessibilityLabel={`${verb} with Apple`}
         >
           <IconBrandApple size={20} color={appleFg} />
           <Text variant="labelLg" color={appleFg}>
             {Platform.OS === 'ios' || Platform.OS === 'web'
-              ? `${mode === 'signin' ? 'Sign in' : 'Sign up'} with Apple`
+              ? `${verb} with Apple`
               : `Continue with Apple`}
           </Text>
         </Pressable>
+        {GoogleButton}
         <Text
           variant="caption"
           color={colors.onSurfaceMuted}
-          style={{ textAlign: 'center', lineHeight: 16 }}
+          style={{ textAlign: 'center', lineHeight: 16, marginTop: spacing[1] }}
         >
-          More sign-in options arriving soon. Your watchlist saves locally on this device in the meantime.
+          Your watchlist saves locally on this device.
         </Text>
       </View>
     );
@@ -164,14 +202,19 @@ export function AuthForm({ mode, onSubmit, onApple, loading, appleOnly }: AuthFo
           gap: spacing[2],
           opacity: pressed ? 0.85 : 1,
         })}
+        accessibilityRole="button"
+        accessibilityLabel={`${verb} with Apple`}
       >
         <IconBrandApple size={20} color={appleFg} />
         <Text variant="labelLg" color={appleFg}>
           {Platform.OS === 'ios' || Platform.OS === 'web'
-            ? `${mode === 'signin' ? 'Sign in' : 'Sign up'} with Apple`
+            ? `${verb} with Apple`
             : `Continue with Apple`}
         </Text>
       </Pressable>
+
+      {/* Google Sign In */}
+      {GoogleButton}
     </View>
   );
 }
