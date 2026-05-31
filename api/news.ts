@@ -26,16 +26,33 @@ interface NewsSource {
   key: string;
   /** Display label for the source badge. */
   label: string;
-  /** Domain used in the Google News `site:` query. */
-  site: string;
+  /** Full Google News query for this source. */
+  query: string;
+  /**
+   * Max items kept from this source before the global merge. Keeps a
+   * prolific general-cards publisher (Beckett) from drowning out the
+   * Pokémon-specific source (PokeBeach), which is the priority feed.
+   */
+  cap: number;
 }
 
+// PokeBeach is Pokémon-only, so a bare site: query is already on-topic
+// and it's the lead source (highest cap). The others (PSA, Beckett,
+// TAG) cover all trading cards / sports, so we AND in "pokemon" to
+// drop basketball/baseball/soccer noise, and cap their volume so they
+// supplement rather than flood the feed.
 const SOURCES: NewsSource[] = [
-  { key: 'pokebeach', label: 'PokeBeach', site: 'pokebeach.com' },
-  { key: 'psa', label: 'PSA', site: 'psacard.com' },
-  { key: 'beckett', label: 'Beckett', site: 'beckett.com' },
-  { key: 'tag', label: 'TAG', site: 'taggrading.com' },
+  { key: 'pokebeach', label: 'PokeBeach', query: 'site:pokebeach.com', cap: 40 },
+  { key: 'psa', label: 'PSA', query: 'site:psacard.com pokemon', cap: 12 },
+  { key: 'beckett', label: 'Beckett', query: 'site:beckett.com pokemon', cap: 12 },
+  { key: 'tag', label: 'TAG', query: 'site:taggrading.com pokemon', cap: 8 },
 ];
+
+// Titles that are clearly site furniture, not news — Google News
+// indexes nav/FAQ/cart pages on some domains (notably TAG). Drop any
+// headline that matches.
+const JUNK_TITLE_RE =
+  /^(your shopping cart|shopping cart|how do i|what (is|can)|frequently asked|contact|customer service|sign in|log in|create account|home page|search results)\b/i;
 
 export interface NewsArticle {
   title: string;
@@ -91,7 +108,7 @@ function pick(block: string, tag: string): string {
 }
 
 async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
-  const q = encodeURIComponent(`site:${source.site}`);
+  const q = encodeURIComponent(source.query);
   const url = `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
 
   const ctl = new AbortController();
@@ -118,6 +135,10 @@ async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
       // since we render the source as its own badge.
       title = title.replace(/\s+-\s+[^-]+$/, '').trim();
 
+      // Drop site furniture / non-news (TAG nav + FAQ pages, etc.)
+      // and absurdly short titles that are almost always nav.
+      if (title.length < 12 || JUNK_TITLE_RE.test(title)) continue;
+
       // pubDate is RFC-822 ("Wed, 28 May 2026 12:00:00 GMT"). Convert
       // to ISO; leave '' if unparseable so the client can hide the date.
       let publishedAt = '';
@@ -134,7 +155,14 @@ async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
         sourceLabel: source.label,
       });
     }
-    return out;
+    // Newest-first within the source, then cap so a prolific publisher
+    // can't dominate the merged feed.
+    out.sort((a, b) => {
+      const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;
+      const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;
+      return tb - ta;
+    });
+    return out.slice(0, source.cap);
   } catch {
     return [];
   } finally {
