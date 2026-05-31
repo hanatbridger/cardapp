@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Platform, Linking } from 'react-native';
+import { Image } from 'expo-image';
 import { RectButton } from 'react-native-gesture-handler';
-import { IconExternalLink } from '@tabler/icons-react-native';
+import { IconNews, IconExternalLink } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -10,14 +11,16 @@ import { formatRelativeTime } from '../utils/format';
 import type { NewsArticle } from '../services/news';
 
 /**
- * A single news headline row. Tapping opens the article in the
- * system browser (Google News redirect → original source).
+ * A single news headline row with a cover thumbnail. Tapping opens the
+ * article directly in the system browser (real source URL — no
+ * redirect interstitial).
  *
  * RectButton (gesture-handler), not RN Pressable: consistent with the
- * tap-reliability fixes elsewhere — plain Pressable has intermittent
- * press-recognition issues on Fabric / the new architecture, while
- * gesture-handler's touchables fire reliably.
+ * tap-reliability fixes — plain Pressable has intermittent press
+ * issues on Fabric, gesture-handler's touchables fire reliably.
  */
+const THUMB = 84;
+
 export const NewsCard = React.memo(function NewsCard({ article }: { article: NewsArticle }) {
   const { colors } = useTheme();
 
@@ -40,33 +43,51 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
       style={{
         flexDirection: 'row',
         gap: spacing[3],
-        padding: spacing[4],
+        padding: spacing[3],
         backgroundColor: colors.surface,
         borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: colors.outline,
-        alignItems: 'flex-start',
+        alignItems: 'center',
       }}
     >
-      <View style={{ flex: 1, gap: spacing[2] }}>
-        {/* Source badge + time */}
+      {/* Cover thumbnail — real article image, or a branded fallback
+          tile when the feed didn't supply one. */}
+      {article.imageUrl ? (
+        <Image
+          source={{ uri: article.imageUrl }}
+          style={{ width: THUMB, height: THUMB, borderRadius: radius.md }}
+          contentFit="cover"
+          transition={150}
+        />
+      ) : (
+        <View
+          style={{
+            width: THUMB,
+            height: THUMB,
+            borderRadius: radius.md,
+            backgroundColor: withAlpha(colors.primary, 0.12),
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <IconNews size={28} color={colors.primary} strokeWidth={1.75} />
+        </View>
+      )}
+
+      <View style={{ flex: 1, gap: spacing[1] }}>
+        {/* Source + time */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-          <View
-            style={{
-              backgroundColor: withAlpha(colors.primary, 0.12),
-              borderRadius: radius.sm,
-              paddingHorizontal: spacing[2],
-              paddingVertical: spacing['0.5'],
-            }}
-          >
-            <Text variant="labelSm" color={colors.primary}>
-              {article.sourceLabel}
-            </Text>
-          </View>
+          <Text variant="labelSm" color={colors.primary}>
+            {article.sourceLabel}
+          </Text>
           {relative ? (
-            <Text variant="caption" color={colors.onSurfaceMuted}>
-              {relative}
-            </Text>
+            <>
+              <Text variant="caption" color={colors.onSurfaceMuted}>·</Text>
+              <Text variant="caption" color={colors.onSurfaceMuted}>
+                {relative}
+              </Text>
+            </>
           ) : null}
         </View>
 
@@ -76,11 +97,7 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
         </Text>
       </View>
 
-      <IconExternalLink
-        size={18}
-        color={colors.onSurfaceMuted}
-        style={{ marginTop: spacing[1] }}
-      />
+      <IconExternalLink size={16} color={colors.onSurfaceMuted} />
     </RectButton>
   );
 });

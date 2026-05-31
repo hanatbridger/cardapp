@@ -1,63 +1,73 @@
-// Vercel serverless function (Edge runtime) — card-news aggregator.
+// Vercel serverless function (Edge runtime) — Pokemon card-news feed.
 //
-// Why Google News RSS instead of each source's own feed: the sources
-// the app cares about are mostly un-fetchable server-side —
-//   • pokebeach.com/feed  → Cloudflare 403 (bot challenge)
-//   • psacard.com feeds   → 403
-//   • taggrading.com      → no usable feed
-//   • beckett.com/news    → direct RSS works, but only ~10 items
-// Google News exposes an RSS search endpoint that is NOT bot-blocked
-// and supports the `site:` operator, so we scope one query per source
-// and get ~100 recent, dated, source-attributed items each — including
-// the Cloudflare-walled PokeBeach. Each item links to a Google News
-// redirect URL that forwards to the original article.
+// Sourcing: the collector/grading outlets originally requested
+// (PokeBeach, PSA, TAG) are un-fetchable server-side — PokeBeach and
+// PSA sit behind Cloudflare, PokeBeach's WordPress API is auth-locked,
+// TAG publishes no real news, and Google News RSS (the only thing that
+// reached them) carries no images and only flaky JS-redirect links.
 //
-// We fan out one request per source, parse the RSS with regex (the
-// Edge runtime has no DOMParser), normalize into a flat Article shape,
-// dedupe by title, sort newest-first, and cap the response.
+// So we source from Pokemon/TCG news outlets that expose proper RSS
+// with real article images AND direct, working links:
+//   • ComicBook "Pokemon TCG" tag — card/grading-specific, our lead
+//   • ComicBook "Pokemon" tag     — broader, filtered to card content
+//   • Dexerto Pokemon             — broader, filtered to card content
+// Each item carries a real cover image and a direct article URL.
 //
-// Cached at the edge for 1h — news doesn't need minute-freshness and
-// this keeps us well under any rate ceiling.
+// We fan out per feed, parse RSS with regex (Edge runtime has no
+// DOMParser), extract a cover image (media:content / media:thumbnail /
+// enclosure / first <img> in content), keyword-filter the broad feeds
+// down to card/TCG content, dedupe, sort newest-first, cap. Edge-cached
+// 1h — the feeds update through the day; an hour keeps it fresh.
 
 export const config = { runtime: 'edge' };
 
 interface NewsSource {
-  /** Stable key the client can filter/badge on. */
   key: string;
-  /** Display label for the source badge. */
   label: string;
-  /** Full Google News query for this source. */
-  query: string;
-  /**
-   * Max items kept from this source before the global merge. Keeps a
-   * prolific general-cards publisher (Beckett) from drowning out the
-   * Pokémon-specific source (PokeBeach), which is the priority feed.
-   */
+  url: string;
+  /** Cap kept from this feed before the global merge. */
   cap: number;
+  /**
+   * When true, keep only items whose title looks card/TCG-related.
+   * Lead feed is already card-scoped so it skips this; broad Pokemon
+   * feeds use it to drop video-game / Pokemon GO / anime noise.
+   */
+  cardOnly: boolean;
 }
 
-// PokeBeach is Pokémon-only, so a bare site: query is already on-topic
-// and it's the lead source (highest cap). The others (PSA, Beckett,
-// TAG) cover all trading cards / sports, so we AND in "pokemon" to
-// drop basketball/baseball/soccer noise, and cap their volume so they
-// supplement rather than flood the feed.
 const SOURCES: NewsSource[] = [
-  { key: 'pokebeach', label: 'PokeBeach', query: 'site:pokebeach.com', cap: 40 },
-  { key: 'psa', label: 'PSA', query: 'site:psacard.com pokemon', cap: 12 },
-  { key: 'beckett', label: 'Beckett', query: 'site:beckett.com pokemon', cap: 12 },
-  { key: 'tag', label: 'TAG', query: 'site:taggrading.com pokemon', cap: 8 },
+  {
+    key: 'comicbook-tcg',
+    label: 'ComicBook',
+    url: 'https://comicbook.com/tag/pokemon-tcg/feed/',
+    cap: 30,
+    cardOnly: false,
+  },
+  {
+    key: 'comicbook-pokemon',
+    label: 'ComicBook',
+    url: 'https://comicbook.com/tag/pokemon/feed/',
+    cap: 15,
+    cardOnly: true,
+  },
+  {
+    key: 'dexerto',
+    label: 'Dexerto',
+    url: 'https://www.dexerto.com/pokemon/feed/',
+    cap: 15,
+    cardOnly: true,
+  },
 ];
 
-// Titles that are clearly site furniture, not news — Google News
-// indexes nav/FAQ/cart pages on some domains (notably TAG). Drop any
-// headline that matches.
-const JUNK_TITLE_RE =
-  /^(your shopping cart|shopping cart|how do i|what (is|can)|frequently asked|contact|customer service|sign in|log in|create account|home page|search results)\b/i;
+// Title/keyword test for the broad feeds — keep card/TCG/grading items,
+// drop pure video-game / GO / anime stories.
+const CARD_RE =
+  /\b(tcg|card|cards|graded?|grading|psa|cgc|beckett|booster|sealed|slab|set|elite trainer|etb|1st edition|first edition|illustration rare|chase card|pull|pokemon center|scarlet|violet|prismatic|mega evolution|surging sparks|stellar crown)\b/i;
 
 export interface NewsArticle {
   title: string;
   url: string;
-  /** ISO timestamp, or '' when the feed omitted a date. */
+  imageUrl: string;
   publishedAt: string;
   sourceKey: string;
   sourceLabel: string;
@@ -84,7 +94,6 @@ function json(status: number, body: unknown): Response {
   });
 }
 
-// Minimal XML entity decode for the fields we surface (titles mostly).
 function decodeEntities(s: string): string {
   return s
     .replace(/&lt;/g, '<')
@@ -92,12 +101,11 @@ function decodeEntities(s: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
-    .replace(/&amp;/g, '&')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, '&');
 }
 
 function pick(block: string, tag: string): string {
-  // Handles both <tag>..</tag> and <tag ...>..</tag>, plus CDATA.
   const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, 'i');
   const m = block.match(re);
   if (!m) return '';
@@ -107,41 +115,49 @@ function pick(block: string, tag: string): string {
   return decodeEntities(v).trim();
 }
 
-async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
-  const q = encodeURIComponent(source.query);
-  const url = `https://news.google.com/rss/search?q=${q}&hl=en-US&gl=US&ceid=US:en`;
+// Pull a cover image from the various places WordPress feeds stash it.
+function extractImage(block: string): string {
+  const patterns = [
+    /<media:content[^>]+url=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
+    /<media:thumbnail[^>]+url=["']([^"']+)["']/i,
+    /<enclosure[^>]+url=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
+    // First <img> inside content:encoded / description (often CDATA or
+    // entity-encoded, so match both raw and decoded forms).
+    /<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
+    /&lt;img[^&]+src=&quot;([^&]+\.(?:jpg|jpeg|png|webp)[^&]*)&quot;/i,
+  ];
+  for (const re of patterns) {
+    const m = block.match(re);
+    if (m) return decodeEntities(m[1]);
+  }
+  return '';
+}
 
+async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 6000);
+  const timer = setTimeout(() => ctl.abort(), 6500);
   try {
-    const res = await fetch(url, {
-      headers: { 'user-agent': 'Mozilla/5.0 (CardPulse News Aggregator)' },
+    const res = await fetch(source.url, {
+      headers: {
+        'user-agent': 'Mozilla/5.0 (compatible; CardPulseBot/1.0; +https://getcardpulse.app)',
+        accept: 'application/rss+xml, application/xml, text/xml',
+      },
       signal: ctl.signal,
     });
     if (!res.ok) return [];
     const xml = await res.text();
 
-    // Split into <item> blocks and parse each.
-    const items = xml.split(/<item>/i).slice(1);
+    const blocks = xml.split(/<item>/i).slice(1);
     const out: NewsArticle[] = [];
-    for (const raw of items) {
+    for (const raw of blocks) {
       const block = raw.split(/<\/item>/i)[0];
-      let title = pick(block, 'title');
+      const title = pick(block, 'title');
       const link = pick(block, 'link');
-      const pubDate = pick(block, 'pubDate');
-      if (!title || !link) continue;
+      if (!title || !link || !/^https?:\/\//.test(link)) continue;
+      if (source.cardOnly && !CARD_RE.test(title)) continue;
 
-      // Google News titles end with " - SourceName"; strip the suffix
-      // since we render the source as its own badge.
-      title = title.replace(/\s+-\s+[^-]+$/, '').trim();
-
-      // Drop site furniture / non-news (TAG nav + FAQ pages, etc.)
-      // and absurdly short titles that are almost always nav.
-      if (title.length < 12 || JUNK_TITLE_RE.test(title)) continue;
-
-      // pubDate is RFC-822 ("Wed, 28 May 2026 12:00:00 GMT"). Convert
-      // to ISO; leave '' if unparseable so the client can hide the date.
       let publishedAt = '';
+      const pubDate = pick(block, 'pubDate');
       if (pubDate) {
         const t = Date.parse(pubDate);
         if (!Number.isNaN(t)) publishedAt = new Date(t).toISOString();
@@ -150,13 +166,12 @@ async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
       out.push({
         title,
         url: link,
+        imageUrl: extractImage(block),
         publishedAt,
         sourceKey: source.key,
         sourceLabel: source.label,
       });
     }
-    // Newest-first within the source, then cap so a prolific publisher
-    // can't dominate the merged feed.
     out.sort((a, b) => {
       const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;
       const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;
@@ -175,17 +190,15 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
 
   const url = new URL(req.url);
-  const limit = Math.min(Number(url.searchParams.get('limit') ?? '60'), 120);
+  const limit = Math.min(Number(url.searchParams.get('limit') ?? '50'), 100);
 
-  // Fan out one query per source. allSettled so one slow/blocked
-  // source can't sink the whole response.
   const settled = await Promise.allSettled(SOURCES.map(fetchSource));
   const all: NewsArticle[] = settled.flatMap((s) =>
     s.status === 'fulfilled' ? s.value : [],
   );
 
-  // Dedupe by normalized title (the same story sometimes surfaces under
-  // multiple source domains via syndication).
+  // Dedupe by normalized title (the same story runs under both
+  // ComicBook tags) — keep the first, which is the higher-priority feed.
   const seen = new Set<string>();
   const deduped: NewsArticle[] = [];
   for (const a of all) {
@@ -195,7 +208,6 @@ export default async function handler(req: Request): Promise<Response> {
     deduped.push(a);
   }
 
-  // Newest first. Undated items sink to the bottom.
   deduped.sort((a, b) => {
     const ta = a.publishedAt ? Date.parse(a.publishedAt) : 0;
     const tb = b.publishedAt ? Date.parse(b.publishedAt) : 0;

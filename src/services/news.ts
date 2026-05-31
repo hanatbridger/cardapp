@@ -19,6 +19,8 @@ const PROXY_ORIGIN = (() => {
 export interface NewsArticle {
   title: string;
   url: string;
+  /** Cover image URL, or '' when the source feed had none. */
+  imageUrl: string;
   /** ISO timestamp, or '' when the source omitted a date. */
   publishedAt: string;
   sourceKey: string;
