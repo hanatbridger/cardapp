@@ -9,6 +9,7 @@ import {
   IconHeart,
   IconBell,
   IconHome,
+  IconNews,
   IconUser,
 } from '@tabler/icons-react-native';
 import {
@@ -122,6 +123,7 @@ function TabBarPreview({ activeIndex }: { activeIndex: number }) {
   const tabs = [
     { key: 'home', Icon: IconHome },
     { key: 'search', Icon: IconSearch },
+    { key: 'news', Icon: IconNews },
     { key: 'notifications', Icon: IconBell },
     { key: 'profile', Icon: IconUser },
   ] as const;

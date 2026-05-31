@@ -3,7 +3,7 @@ import { View, Pressable, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Haptics } from '../../src/utils/haptics';
-import { IconHome, IconBell, IconUser, IconSearch } from '@tabler/icons-react-native';
+import { IconHome, IconBell, IconUser, IconSearch, IconNews } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { spacing, radius } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
@@ -31,9 +31,12 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const focusedOptions = descriptors?.[focusedRoute.key]?.options;
   if (focusedOptions?.tabBarStyle?.display === 'none') return null;
 
-  const rightTabs = ['search', 'notifications', 'profile'];
+  // News sits between Search and Notifications. Four cells now share
+  // the right glass pill, each still flex:1 so they divide evenly.
+  const rightTabs = ['search', 'news', 'notifications', 'profile'];
   const icons: Record<string, typeof IconHome> = {
     search: IconSearch,
+    news: IconNews,
     notifications: IconBell,
     profile: IconUser,
   };
@@ -231,6 +234,7 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="search" />
+      <Tabs.Screen name="news" />
       <Tabs.Screen name="profile" />
       <Tabs.Screen name="notifications" />
     </Tabs>

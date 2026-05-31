@@ -33,3 +33,4 @@ export { TokenEditorPanel } from './TokenEditorPanel';
 export { ComingSoonPanel } from './ComingSoonPanel';
 export { CollapsingHeader } from './CollapsingHeader';
 export { SwipeToDelete } from './SwipeToDelete';
+export { NewsCard } from './NewsCard';
