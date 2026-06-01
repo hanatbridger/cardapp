@@ -21,6 +21,8 @@ export interface NewsArticle {
   url: string;
   /** Cover image URL, or '' when the source feed had none. */
   imageUrl: string;
+  /** Plain-text excerpt, or '' for headline-only sources. */
+  summary: string;
   /** ISO timestamp, or '' when the source omitted a date. */
   publishedAt: string;
   sourceKey: string;

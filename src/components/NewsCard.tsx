@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Platform, Linking } from 'react-native';
+import { View } from 'react-native';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { RectButton } from 'react-native-gesture-handler';
-import { IconNews, IconExternalLink } from '@tabler/icons-react-native';
+import { IconNews, IconChevronRight } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -11,9 +12,9 @@ import { formatRelativeTime } from '../utils/format';
 import type { NewsArticle } from '../services/news';
 
 /**
- * A single news headline row with a cover thumbnail. Tapping opens the
- * article directly in the system browser (real source URL — no
- * redirect interstitial).
+ * A single news headline row with a cover thumbnail. Tapping opens an
+ * in-app article detail screen (summary + read-full-article link-out),
+ * not the browser directly.
  *
  * RectButton (gesture-handler), not RN Pressable: consistent with the
  * tap-reliability fixes — plain Pressable has intermittent press
@@ -24,12 +25,21 @@ const THUMB = 84;
 export const NewsCard = React.memo(function NewsCard({ article }: { article: NewsArticle }) {
   const { colors } = useTheme();
 
-  const open = () => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined') window.open(article.url, '_blank');
-      return;
-    }
-    Linking.openURL(article.url).catch(() => {});
+  const openDetail = () => {
+    // Pass the article fields as route params so the detail screen is
+    // self-contained — survives web refresh / deep-link without
+    // depending on the list query still being cached.
+    router.push({
+      pathname: '/article',
+      params: {
+        title: article.title,
+        url: article.url,
+        image: article.imageUrl,
+        summary: article.summary,
+        source: article.sourceLabel,
+        date: article.publishedAt,
+      },
+    });
   };
 
   const when = article.publishedAt ? Date.parse(article.publishedAt) : NaN;
@@ -37,9 +47,9 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
 
   return (
     <RectButton
-      onPress={open}
-      accessibilityRole="link"
-      accessibilityLabel={`${article.title}. From ${article.sourceLabel}. Opens in browser.`}
+      onPress={openDetail}
+      accessibilityRole="button"
+      accessibilityLabel={`${article.title}. From ${article.sourceLabel}.`}
       style={{
         flexDirection: 'row',
         gap: spacing[3],
@@ -97,7 +107,7 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
         </Text>
       </View>
 
-      <IconExternalLink size={16} color={colors.onSurfaceMuted} />
+      <IconChevronRight size={16} color={colors.onSurfaceMuted} />
     </RectButton>
   );
 });

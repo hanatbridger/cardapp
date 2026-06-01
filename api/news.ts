@@ -1,37 +1,35 @@
 // Vercel serverless function (Edge runtime) — Pokemon card-news feed.
 //
-// Sourcing: the collector/grading outlets originally requested
-// (PokeBeach, PSA, TAG) are un-fetchable server-side — PokeBeach and
-// PSA sit behind Cloudflare, PokeBeach's WordPress API is auth-locked,
-// TAG publishes no real news, and Google News RSS (the only thing that
-// reached them) carries no images and only flaky JS-redirect links.
+// Two source types merged into one feed:
 //
-// So we source from Pokemon/TCG news outlets that expose proper RSS
-// with real article images AND direct, working links:
-//   • ComicBook "Pokemon TCG" tag — card/grading-specific, our lead
-//   • ComicBook "Pokemon" tag     — broader, filtered to card content
-//   • Dexerto Pokemon             — broader, filtered to card content
-// Each item carries a real cover image and a direct article URL.
+//   type 'wp'  — Pokemon/TCG news outlets with proper RSS: real cover
+//                images, real summaries, direct article links.
+//                  • ComicBook "Pokemon TCG" tag (card/grading lead)
+//                  • ComicBook "Pokemon" tag (filtered to cards)
+//                  • Dexerto Pokemon (filtered to cards)
 //
-// We fan out per feed, parse RSS with regex (Edge runtime has no
-// DOMParser), extract a cover image (media:content / media:thumbnail /
-// enclosure / first <img> in content), keyword-filter the broad feeds
-// down to card/TCG content, dedupe, sort newest-first, cap. Edge-cached
-// 1h — the feeds update through the day; an hour keeps it fresh.
+//   type 'gnews' — PokeBeach, reached via Google News RSS because its
+//                  own feed is Cloudflare-walled. Headline-only: no
+//                  cover image (client shows a branded tile) and no
+//                  summary; the link is a Google News URL that
+//                  resolves to the PokeBeach article in a browser.
+//                  Included because PokeBeach is the most TCG-relevant
+//                  source even though its data is thinner.
+//
+// Regex RSS parse (Edge runtime has no DOMParser). Per source we
+// extract title, link, image, summary, date; keyword-filter the broad
+// feeds; dedupe; sort newest-first; cap. Edge-cached 1h.
 
 export const config = { runtime: 'edge' };
+
+type SourceType = 'wp' | 'gnews';
 
 interface NewsSource {
   key: string;
   label: string;
   url: string;
-  /** Cap kept from this feed before the global merge. */
+  type: SourceType;
   cap: number;
-  /**
-   * When true, keep only items whose title looks card/TCG-related.
-   * Lead feed is already card-scoped so it skips this; broad Pokemon
-   * feeds use it to drop video-game / Pokemon GO / anime noise.
-   */
   cardOnly: boolean;
 }
 
@@ -40,27 +38,36 @@ const SOURCES: NewsSource[] = [
     key: 'comicbook-tcg',
     label: 'ComicBook',
     url: 'https://comicbook.com/tag/pokemon-tcg/feed/',
-    cap: 30,
+    type: 'wp',
+    cap: 24,
     cardOnly: false,
   },
   {
     key: 'comicbook-pokemon',
     label: 'ComicBook',
     url: 'https://comicbook.com/tag/pokemon/feed/',
-    cap: 15,
+    type: 'wp',
+    cap: 12,
     cardOnly: true,
   },
   {
     key: 'dexerto',
     label: 'Dexerto',
     url: 'https://www.dexerto.com/pokemon/feed/',
-    cap: 15,
+    type: 'wp',
+    cap: 12,
     cardOnly: true,
+  },
+  {
+    key: 'pokebeach',
+    label: 'PokeBeach',
+    url: 'https://news.google.com/rss/search?q=site:pokebeach.com&hl=en-US&gl=US&ceid=US:en',
+    type: 'gnews',
+    cap: 14,
+    cardOnly: false,
   },
 ];
 
-// Title/keyword test for the broad feeds — keep card/TCG/grading items,
-// drop pure video-game / GO / anime stories.
 const CARD_RE =
   /\b(tcg|card|cards|graded?|grading|psa|cgc|beckett|booster|sealed|slab|set|elite trainer|etb|1st edition|first edition|illustration rare|chase card|pull|pokemon center|scarlet|violet|prismatic|mega evolution|surging sparks|stellar crown)\b/i;
 
@@ -68,6 +75,8 @@ export interface NewsArticle {
   title: string;
   url: string;
   imageUrl: string;
+  /** Plain-text excerpt, or '' for headline-only sources. */
+  summary: string;
   publishedAt: string;
   sourceKey: string;
   sourceLabel: string;
@@ -115,14 +124,11 @@ function pick(block: string, tag: string): string {
   return decodeEntities(v).trim();
 }
 
-// Pull a cover image from the various places WordPress feeds stash it.
 function extractImage(block: string): string {
   const patterns = [
     /<media:content[^>]+url=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
     /<media:thumbnail[^>]+url=["']([^"']+)["']/i,
     /<enclosure[^>]+url=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
-    // First <img> inside content:encoded / description (often CDATA or
-    // entity-encoded, so match both raw and decoded forms).
     /<img[^>]+src=["']([^"']+\.(?:jpg|jpeg|png|webp)[^"']*)["']/i,
     /&lt;img[^&]+src=&quot;([^&]+\.(?:jpg|jpeg|png|webp)[^&]*)&quot;/i,
   ];
@@ -131,6 +137,21 @@ function extractImage(block: string): string {
     if (m) return decodeEntities(m[1]);
   }
   return '';
+}
+
+// Plain-text summary from an RSS description / content:encoded blob.
+function extractSummary(block: string): string {
+  const rawDesc = pick(block, 'description') || pick(block, 'content:encoded');
+  if (!rawDesc) return '';
+  // Drop tags, collapse whitespace, trim to a clean sentence-ish length.
+  const text = decodeEntities(rawDesc.replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Google News descriptions are just the anchor text (== the title) —
+  // not a real summary, so suppress those.
+  if (!text || /^https?:\/\//.test(text)) return '';
+  if (text.length <= 300) return text;
+  return text.slice(0, 297).replace(/\s+\S*$/, '') + '…';
 }
 
 async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
@@ -151,10 +172,16 @@ async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
     const out: NewsArticle[] = [];
     for (const raw of blocks) {
       const block = raw.split(/<\/item>/i)[0];
-      const title = pick(block, 'title');
+      let title = pick(block, 'title');
       const link = pick(block, 'link');
       if (!title || !link || !/^https?:\/\//.test(link)) continue;
+
+      // Google News appends " - Source" to titles; strip it.
+      if (source.type === 'gnews') {
+        title = title.replace(/\s+-\s+[^-]+$/, '').trim();
+      }
       if (source.cardOnly && !CARD_RE.test(title)) continue;
+      if (title.length < 12) continue;
 
       let publishedAt = '';
       const pubDate = pick(block, 'pubDate');
@@ -166,7 +193,8 @@ async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
       out.push({
         title,
         url: link,
-        imageUrl: extractImage(block),
+        imageUrl: source.type === 'wp' ? extractImage(block) : '',
+        summary: source.type === 'wp' ? extractSummary(block) : '',
         publishedAt,
         sourceKey: source.key,
         sourceLabel: source.label,
@@ -197,8 +225,6 @@ export default async function handler(req: Request): Promise<Response> {
     s.status === 'fulfilled' ? s.value : [],
   );
 
-  // Dedupe by normalized title (the same story runs under both
-  // ComicBook tags) — keep the first, which is the higher-priority feed.
   const seen = new Set<string>();
   const deduped: NewsArticle[] = [];
   for (const a of all) {
