@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, FlatList, RefreshControl } from 'react-native';
-import { RectButton } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
@@ -15,6 +14,7 @@ import {
   EmptyState,
   ScreenBackground,
   BrandMark,
+  Touchable,
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
@@ -194,15 +194,10 @@ function WatchlistScreen() {
                 <BrandMark size={28} />
                 <Text variant="headingLg">CardPulse</Text>
               </View>
-              {/* RectButton (gesture-handler), not RN Pressable. Same
-                  reasoning as WatchlistCard.tsx: on Fabric (new arch),
-                  RN's Touchable system has intermittent press-recognition
-                  issues we still don't fully understand, while gesture-
-                  handler's RectButton fires reliably. We confirmed
-                  RectButton fires onPress in the v1.0.5 diagnostic — so
-                  use it consistently across all tap targets that have
-                  been flaky. */}
-              <RectButton
+              {/* Touchable = RectButton on native (Fabric-reliable),
+                  Pressable on web (real onClick). See
+                  components/Touchable.tsx. */}
+              <Touchable
                 onPress={() => router.push('/(tabs)/search?focus=1&from=home')}
                 accessibilityLabel="Search"
                 accessibilityRole="button"
@@ -216,7 +211,7 @@ function WatchlistScreen() {
                 }}
               >
                 <IconSearch size={20} color={colors.onSurfaceVariant} />
-              </RectButton>
+              </Touchable>
             </View>
 
             {/* Trending — raw card movers */}

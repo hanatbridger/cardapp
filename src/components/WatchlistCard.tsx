@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { RectButton } from 'react-native-gesture-handler';
+import { Touchable } from './Touchable';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
@@ -76,7 +76,9 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     }
   }
 
-  // Use gesture-handler's RectButton, not RN's TouchableOpacity.
+  // Touchable = RectButton on native, Pressable on web (see
+  // components/Touchable.tsx). Native needs gesture-handler here, not
+  // RN's TouchableOpacity / Pressable.
   // Reason: this row is wrapped by ReanimatedSwipeable (in app/(tabs)/
   // index.tsx via SwipeToDelete), which uses gesture-handler's Tap +
   // Pan gestures. RN's Touchable system and gesture-handler's gesture
@@ -88,7 +90,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   // in wrapper, swapping Pressable for TouchableOpacity, migrating
   // TrendingCarousel to UI-thread Reanimated) never addressed.
   return (
-    <RectButton
+    <Touchable
       onPress={() => router.push(`/card/${cardId}`)}
       accessibilityRole="button"
       accessibilityLabel={`Open ${cardName}`}
@@ -155,6 +157,6 @@ export const WatchlistCard = React.memo(function WatchlistCard({
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>
         )}
       </View>
-    </RectButton>
+    </Touchable>
   );
 });

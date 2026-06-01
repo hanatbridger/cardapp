@@ -1,6 +1,6 @@
 import React from 'react';
 import { View } from 'react-native';
-import { RectButton } from 'react-native-gesture-handler';
+import { Touchable } from './Touchable';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { Text } from './Text';
@@ -48,12 +48,10 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
   const currentPrice = livePrice?.currentPrice ?? fallbackPrice;
   const percentChange = livePrice?.percentChange ?? fallbackPriceChange;
 
-  // RectButton over TouchableOpacity — see WatchlistCard.tsx for the
-  // full reasoning. Short version: coordinates with parent
-  // ReanimatedSwipeable's gesture-handler Tap+Pan so taps don't get
-  // silently swallowed on cold launch.
+  // Touchable = RectButton on native, Pressable on web (see
+  // components/Touchable.tsx) — reliable taps on both.
   return (
-    <RectButton
+    <Touchable
       onPress={() => router.push(`/sealed/${productId}`)}
       accessibilityRole="button"
       accessibilityLabel={`Open ${productName}`}
@@ -113,6 +111,6 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>
         )}
       </View>
-    </RectButton>
+    </Touchable>
   );
 });

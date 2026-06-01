@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Platform, Pressable } from 'react-native';
+import { View, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
-import { RectButton } from 'react-native-gesture-handler';
 import { IconNews, IconExternalLink } from '@tabler/icons-react-native';
+import { Touchable } from './Touchable';
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -46,15 +46,6 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
 
   const when = article.publishedAt ? Date.parse(article.publishedAt) : NaN;
   const relative = Number.isNaN(when) ? '' : formatRelativeTime(when);
-
-  // Web vs native touchable: gesture-handler's RectButton is the right
-  // call on iOS Fabric (RN Pressable drops presses there), but on
-  // react-native-web RectButton doesn't reliably fire onClick — and
-  // even when it does, window.open from its handler loses the trusted
-  // user-gesture context and gets popup-blocked. Plain Pressable maps
-  // to a native onClick on web, so the press fires AND window.open is
-  // allowed. Use the right one per platform.
-  const Touchable: any = Platform.OS === 'web' ? Pressable : RectButton;
 
   const cardStyle = {
     flexDirection: 'row' as const,
