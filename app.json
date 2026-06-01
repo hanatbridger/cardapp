@@ -72,7 +72,7 @@
       [
         "@react-native-google-signin/google-signin",
         {
-          "iosUrlScheme": "com.googleusercontent.apps.839078311479-8mejfveaj4ne2fc89tlnm5c7pnq8qslq"
+          "iosUrlScheme": "com.googleusercontent.apps.864170396383-4da514g9biulc0374haev0khj9iing07"
         }
       ],
       "expo-web-browser"
