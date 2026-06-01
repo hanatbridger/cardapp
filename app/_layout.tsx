@@ -177,7 +177,6 @@ export default function RootLayout() {
               <Stack.Screen name="edit-profile" />
               <Stack.Screen name="change-password" />
               <Stack.Screen name="help" />
-              <Stack.Screen name="article" />
               <Stack.Screen name="terms" />
               <Stack.Screen name="privacy" />
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />

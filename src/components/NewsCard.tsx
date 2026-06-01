@@ -1,9 +1,9 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { RectButton } from 'react-native-gesture-handler';
-import { IconNews, IconChevronRight } from '@tabler/icons-react-native';
+import { IconNews, IconExternalLink } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -12,9 +12,14 @@ import { formatRelativeTime } from '../utils/format';
 import type { NewsArticle } from '../services/news';
 
 /**
- * A single news headline row with a cover thumbnail. Tapping opens an
- * in-app article detail screen (summary + read-full-article link-out),
- * not the browser directly.
+ * A single news headline row with a cover thumbnail. Tapping opens the
+ * real article in an in-app browser (SFSafariViewController on iOS /
+ * Custom Tabs on Android via expo-web-browser) so the user reads the
+ * full article without leaving the app. On web it opens a new tab.
+ *
+ * The in-app browser runs full WebKit, so even the PokeBeach links
+ * (Google News redirect URLs) resolve to the real article — the JS
+ * redirect completes inside the browser.
  *
  * RectButton (gesture-handler), not RN Pressable: consistent with the
  * tap-reliability fixes — plain Pressable has intermittent press
@@ -25,21 +30,18 @@ const THUMB = 84;
 export const NewsCard = React.memo(function NewsCard({ article }: { article: NewsArticle }) {
   const { colors } = useTheme();
 
-  const openDetail = () => {
-    // Pass the article fields as route params so the detail screen is
-    // self-contained — survives web refresh / deep-link without
-    // depending on the list query still being cached.
-    router.push({
-      pathname: '/article',
-      params: {
-        title: article.title,
-        url: article.url,
-        image: article.imageUrl,
-        summary: article.summary,
-        source: article.sourceLabel,
-        date: article.publishedAt,
-      },
-    });
+  const open = () => {
+    if (!article.url) return;
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined') window.open(article.url, '_blank');
+      return;
+    }
+    // In-app browser, themed to match the app chrome.
+    WebBrowser.openBrowserAsync(article.url, {
+      toolbarColor: colors.surface,
+      controlsColor: colors.primary,
+      enableBarCollapsing: true,
+    }).catch(() => {});
   };
 
   const when = article.publishedAt ? Date.parse(article.publishedAt) : NaN;
@@ -47,9 +49,9 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
 
   return (
     <RectButton
-      onPress={openDetail}
-      accessibilityRole="button"
-      accessibilityLabel={`${article.title}. From ${article.sourceLabel}.`}
+      onPress={open}
+      accessibilityRole="link"
+      accessibilityLabel={`${article.title}. From ${article.sourceLabel}. Opens in browser.`}
       style={{
         flexDirection: 'row',
         gap: spacing[3],
@@ -107,7 +109,7 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
         </Text>
       </View>
 
-      <IconChevronRight size={16} color={colors.onSurfaceMuted} />
+      <IconExternalLink size={16} color={colors.onSurfaceMuted} />
     </RectButton>
   );
 });
