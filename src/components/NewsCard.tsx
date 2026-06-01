@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Platform } from 'react-native';
+import { View, Platform, Pressable } from 'react-native';
 import { Image } from 'expo-image';
 import * as WebBrowser from 'expo-web-browser';
 import { RectButton } from 'react-native-gesture-handler';
@@ -47,21 +47,32 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
   const when = article.publishedAt ? Date.parse(article.publishedAt) : NaN;
   const relative = Number.isNaN(when) ? '' : formatRelativeTime(when);
 
+  // Web vs native touchable: gesture-handler's RectButton is the right
+  // call on iOS Fabric (RN Pressable drops presses there), but on
+  // react-native-web RectButton doesn't reliably fire onClick — and
+  // even when it does, window.open from its handler loses the trusted
+  // user-gesture context and gets popup-blocked. Plain Pressable maps
+  // to a native onClick on web, so the press fires AND window.open is
+  // allowed. Use the right one per platform.
+  const Touchable: any = Platform.OS === 'web' ? Pressable : RectButton;
+
+  const cardStyle = {
+    flexDirection: 'row' as const,
+    gap: spacing[3],
+    padding: spacing[3],
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    alignItems: 'center' as const,
+  };
+
   return (
-    <RectButton
+    <Touchable
       onPress={open}
       accessibilityRole="link"
       accessibilityLabel={`${article.title}. From ${article.sourceLabel}. Opens in browser.`}
-      style={{
-        flexDirection: 'row',
-        gap: spacing[3],
-        padding: spacing[3],
-        backgroundColor: colors.surface,
-        borderRadius: radius.lg,
-        borderWidth: 1,
-        borderColor: colors.outline,
-        alignItems: 'center',
-      }}
+      style={cardStyle}
     >
       {/* Cover thumbnail — real article image, or a branded fallback
           tile when the feed didn't supply one. */}
@@ -110,6 +121,6 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
       </View>
 
       <IconExternalLink size={16} color={colors.onSurfaceMuted} />
-    </RectButton>
+    </Touchable>
   );
 });
