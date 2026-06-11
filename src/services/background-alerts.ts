@@ -5,6 +5,7 @@ import { useAlertsStore } from '../stores/alerts-store';
 import { useUserStore } from '../stores/user-store';
 import { findAlertsToTrigger, formatAlertMessage } from './alert-checker';
 import { presentLocalNotification } from './notifications';
+import { maybeNotifyDailyNews } from './news-notify';
 
 export const PRICE_ALERT_TASK = 'cardpulse-price-alert-check';
 
@@ -40,10 +41,8 @@ export function defineBackgroundAlertTask() {
       // fetchRawCardPrice so the whole background task stays under
       // the OS's 30s budget even with a full Premium-tier watchlist.
       const toFire = await findAlertsToTrigger(alerts);
-      if (toFire.length === 0) {
-        return BackgroundFetch.BackgroundFetchResult.NoData;
-      }
 
+      let firedAny = false;
       for (const evaluation of toFire) {
         const entry = recordTriggered(evaluation.alert, evaluation.currentPrice);
         // null = already recorded by a concurrent (e.g. foreground) check.
@@ -56,9 +55,18 @@ export function defineBackgroundAlertTask() {
           cardId: entry.cardId,
           triggeredAlertId: entry.id,
         });
+        firedAny = true;
       }
 
-      return BackgroundFetch.BackgroundFetchResult.NewData;
+      // Daily news push — at most one per calendar day, only on a new top
+      // story. Self-gates, so it's safe to run on every wake. Runs even
+      // when no alerts fired (we no longer early-return on an empty
+      // alert set), so the news ping doesn't depend on having alerts.
+      const newsNotified = await maybeNotifyDailyNews();
+
+      return firedAny || newsNotified
+        ? BackgroundFetch.BackgroundFetchResult.NewData
+        : BackgroundFetch.BackgroundFetchResult.NoData;
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[background-alerts] task failed', e);

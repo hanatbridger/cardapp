@@ -10,6 +10,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { BrandedSplash } from '../src/components/BrandedSplash';
 import { useUserStore } from '../src/stores/user-store';
 import { useAlertChecker } from '../src/hooks/use-alert-checker';
+import { useNewsNotifier } from '../src/hooks/use-news-notifier';
 import {
   configureNotificationHandler,
 } from '../src/services/notifications';
@@ -146,6 +147,7 @@ function AuthGate() {
 
 function AlertCheckerHost() {
   useAlertChecker();
+  useNewsNotifier();
   return null;
 }
 
