@@ -18,7 +18,11 @@ import {
   registerBackgroundAlertTask,
 } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
-import { configureRevenueCat, registerPremiumSync } from '../src/services/revenue-cat';
+import {
+  configureRevenueCat,
+  registerPremiumSync,
+  registerRevenueCatIdentitySync,
+} from '../src/services/revenue-cat';
 import { configureGoogleSignin } from '../src/services/google-auth';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
@@ -35,11 +39,17 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
 // Initialize Sentry as early as possible — before any rendering.
 initSentry();
 
-// Initialize RevenueCat, then reconcile the local premium flag with
-// RevenueCat's entitlement state (launch check + live listener). Must
-// run after configure resolves — the SDK throws if queried before.
+// Initialize RevenueCat, then bind RC identity to the auth user and
+// reconcile the local premium flag with RevenueCat's entitlement state
+// (launch check + live listener). Must run after configure resolves —
+// the SDK throws if queried before. Identity sync is registered before
+// the premium reconcile so logIn's CustomerInfo update lands against the
+// correct RC user.
 configureRevenueCat()
-  .then(() => registerPremiumSync())
+  .then(() => {
+    registerRevenueCatIdentitySync();
+    registerPremiumSync();
+  })
   .catch(() => {});
 
 // Configure the native Google Sign-In SDK (no-op on web).

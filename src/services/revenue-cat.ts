@@ -27,6 +27,9 @@ import Purchases, {
 // Direct import (not via stores/index) keeps the edge one-way:
 // revenue-cat → user-store. user-store does not import this module.
 import { useUserStore } from '../stores/user-store';
+// revenue-cat → supabase is also one-way (supabase does not import this
+// module), so no cycle. Used to bind RC identity to the auth user.
+import { supabase } from './supabase';
 
 const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 const ENTITLEMENT_ID = 'premium';
@@ -149,6 +152,43 @@ export async function resetUser(): Promise<void> {
   } catch (e) {
     // ignore — user may not have been identified
   }
+}
+
+/**
+ * Bind RevenueCat's app-user identity to the signed-in Supabase user.
+ * Call once at startup, after configureRevenueCat() resolves.
+ *
+ * Why this matters: configure() runs RevenueCat as a single persistent
+ * ANONYMOUS app-user. identifyUser()/resetUser() existed but were never
+ * called, so (1) purchases were never tied to the real account, and (2)
+ * on a shared device the same anonymous user — and thus the previous
+ * account's entitlement — carried across sign-out/sign-in, letting the
+ * premium listener grant a different account premium it never paid for.
+ *
+ * Driving identity off supabase.auth.onAuthStateChange captures EVERY
+ * sign-in path (Apple, native Google, web Google, email) and sign-out in
+ * one place, plus INITIAL_SESSION on cold start. logIn/logOut each emit a
+ * CustomerInfo update, so the premium listener re-reconciles against the
+ * now-correct RC user automatically.
+ */
+let rcIdentityRegistered = false;
+
+export function registerRevenueCatIdentitySync(): void {
+  if (Platform.OS === 'web' || !isConfigured || rcIdentityRegistered) return;
+  rcIdentityRegistered = true;
+
+  supabase.auth.onAuthStateChange((event, session) => {
+    const userId = session?.user?.id;
+    if (userId) {
+      // SIGNED_IN, INITIAL_SESSION (with session), TOKEN_REFRESHED, etc.
+      // logIn is idempotent for an already-identified user.
+      identifyUser(userId);
+    } else if (event === 'SIGNED_OUT') {
+      // Drop to a fresh anonymous user so the next account can't inherit
+      // this one's entitlement on a shared device.
+      resetUser();
+    }
+  });
 }
 
 // NOTE: a checkPremiumStatus() helper used to live here. It was

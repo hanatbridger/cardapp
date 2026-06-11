@@ -106,9 +106,23 @@ function PaywallScreen() {
     setPurchasing(true);
     try {
       if (Platform.OS === 'web') {
-        // Web fallback — simulate for dev/preview
-        await new Promise((r) => setTimeout(r, 600));
-        setPremium(true);
+        // There is no web checkout — RevenueCat/IAP is native-only. The
+        // deployed web build (__DEV__ === false) must NOT grant premium:
+        // it's public and skips the auth gate, so simulating a purchase
+        // would let any anonymous visitor unlock premium for free. Keep
+        // the simulate-grant for local dev/preview only; in production
+        // web, point the user to the app where premium is actually sold.
+        if (__DEV__) {
+          await new Promise((r) => setTimeout(r, 600));
+          setPremium(true);
+        } else {
+          setPurchasing(false);
+          Alert.alert(
+            'Get Premium in the app',
+            'CardPulse Premium is purchased in the iOS app. Download CardPulse and subscribe there — your premium unlocks across your devices.',
+          );
+          return;
+        }
       } else {
         const success = await purchasePackage(pkg);
         if (success) setPremium(true);
