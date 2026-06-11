@@ -3,6 +3,10 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GradeType } from '../constants/grades';
 import type { SealedType } from '../types/sealed';
+// Direct import (not via stores/index) to keep the dependency edge
+// one-way: watchlist-store → user-store. user-store does not import
+// this module, so there is no cycle.
+import { useUserStore } from './user-store';
 
 /**
  * Watchlist items are a discriminated union — the same list now holds
@@ -84,7 +88,6 @@ const DEFAULT_WATCHLIST: WatchlistItem[] = [
 
 interface WatchlistStore {
   items: WatchlistItem[];
-  isPremium: boolean;
   maxFreeItems: number;
   /**
    * Add a card or sealed item. For cards, (cardId, grade) is the unique
@@ -108,14 +111,12 @@ interface WatchlistStore {
    */
   updatePrice: (id: string, price: number, priceChange: number) => void;
   canAddMore: () => boolean;
-  setPremium: (value: boolean) => void;
 }
 
 export const useWatchlistStore = create<WatchlistStore>()(
   persist(
     (set, get) => ({
       items: DEFAULT_WATCHLIST,
-      isPremium: false,
       maxFreeItems: 5,
 
       addItem: (item) => {
@@ -171,11 +172,15 @@ export const useWatchlistStore = create<WatchlistStore>()(
         })),
 
       canAddMore: () => {
-        const { items, isPremium, maxFreeItems } = get();
-        return isPremium || items.length < maxFreeItems;
+        const { items, maxFreeItems } = get();
+        // Premium status lives in user-store — the single source of
+        // truth, set by the paywall and kept in sync with RevenueCat
+        // via registerPremiumSync() (services/revenue-cat.ts). This
+        // store used to carry its OWN isPremium flag that nothing ever
+        // set, which silently kept paying subscribers capped at the
+        // free tier. One flag, one owner; cross-store read is cheap.
+        return useUserStore.getState().isPremium || items.length < maxFreeItems;
       },
-
-      setPremium: (value) => set({ isPremium: value }),
     }),
     {
       name: 'cardpulse-watchlist',

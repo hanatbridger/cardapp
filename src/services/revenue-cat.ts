@@ -24,9 +24,16 @@ import Purchases, {
   type PurchasesOffering,
   type CustomerInfo,
 } from 'react-native-purchases';
+// Direct import (not via stores/index) keeps the edge one-way:
+// revenue-cat → user-store. user-store does not import this module.
+import { useUserStore } from '../stores/user-store';
 
 const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 const ENTITLEMENT_ID = 'premium';
+
+function entitlementActive(info: CustomerInfo | null | undefined): boolean {
+  return info?.entitlements?.active?.[ENTITLEMENT_ID] !== undefined;
+}
 
 let isConfigured = false;
 
@@ -59,6 +66,68 @@ export async function configureRevenueCat(): Promise<void> {
 }
 
 /**
+ * Keep the app's premium flag in lockstep with RevenueCat. Call once
+ * at startup, AFTER configureRevenueCat() has resolved.
+ *
+ * Two mechanisms:
+ *   1. Launch reconciliation — getCustomerInfo() (served from the
+ *      SDK's cache when offline) tells us whether the "premium"
+ *      entitlement is currently active. Catches the two drift cases
+ *      the old code missed: a subscription that expired/was refunded
+ *      while the app was closed (user kept premium forever), and a
+ *      reinstall where the receipt restores server-side but the local
+ *      flag was lost (paying user stuck on free).
+ *   2. Live listener — addCustomerInfoUpdateListener fires on
+ *      purchase, restore, renewal, and expiration detected while the
+ *      app is running, so the flag tracks reality without a restart.
+ *
+ * IMPORTANT: state is only written when RevenueCat actually answers.
+ * A thrown getCustomerInfo (SDK not configured, first-launch network
+ * failure) keeps the persisted value rather than wrongly stripping
+ * premium from a paying user who opened the app in airplane mode —
+ * never conflate "RevenueCat error" with "not premium".
+ */
+let premiumSyncRegistered = false;
+
+export function registerPremiumSync(): void {
+  // Idempotent: the SDK does not dedupe listeners, so a second call
+  // would stack a duplicate. Sole call site today is module scope in
+  // app/_layout.tsx, but the guard makes future call sites safe (and
+  // kills dev Fast-Refresh double-registration).
+  if (Platform.OS === 'web' || !isConfigured || premiumSyncRegistered) return;
+  premiumSyncRegistered = true;
+
+  try {
+    Purchases.addCustomerInfoUpdateListener((info: CustomerInfo) => {
+      useUserStore.getState().setPremium(entitlementActive(info));
+    });
+  } catch (e) {
+    if (__DEV__) console.warn('[RevenueCat] premium listener failed:', e);
+  }
+
+  const reconcile = () => {
+    Purchases.getCustomerInfo()
+      .then((info) => {
+        useUserStore.getState().setPremium(entitlementActive(info));
+      })
+      .catch(() => {
+        // Offline / transient failure — keep the persisted flag.
+      });
+  };
+
+  // Gate the launch reconciliation on user-store hydration. zustand's
+  // persist merge spreads the persisted blob over current state, so a
+  // reconcile that lands BEFORE rehydration finishes would be
+  // clobbered by the stale persisted flag for the rest of the session.
+  // The window is tiny, but the gate closes it completely.
+  if (useUserStore.persist.hasHydrated()) {
+    reconcile();
+  } else {
+    useUserStore.persist.onFinishHydration(() => reconcile());
+  }
+}
+
+/**
  * Identify the user after sign-in (links purchases to their account).
  */
 export async function identifyUser(userId: string): Promise<void> {
@@ -82,18 +151,12 @@ export async function resetUser(): Promise<void> {
   }
 }
 
-/**
- * Check if user has the active "premium" entitlement.
- */
-export async function checkPremiumStatus(): Promise<boolean> {
-  if (Platform.OS === 'web') return false;
-  try {
-    const customerInfo = await Purchases.getCustomerInfo();
-    return customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
-  } catch {
-    return false;
-  }
-}
+// NOTE: a checkPremiumStatus() helper used to live here. It was
+// removed deliberately: its catch-to-false return conflated "RevenueCat
+// didn't answer" with "not premium", which — if fed into setPremium —
+// would strip premium from a paying user who launched offline. Premium
+// state questions go through registerPremiumSync() above; one-off reads
+// use useUserStore.getState().isPremium.
 
 /**
  * Get available subscription offerings.

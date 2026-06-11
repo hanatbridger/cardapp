@@ -41,7 +41,7 @@ const TIME_RANGES = ['1D', '1W', '1M', '3M'];
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
-  const { items, addItem, removeItem, updatePrice, canAddMore, isPremium, maxFreeItems } = useWatchlistStore();
+  const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
   // Default grade comes from user preferences and is persisted across
   // sessions — pick whatever the user last viewed so they don't have to
   // re-tap PSA 10 / Raw on every card.
