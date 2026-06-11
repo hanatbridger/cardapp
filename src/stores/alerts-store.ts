@@ -65,10 +65,16 @@ interface AlertsStore {
   canAddAlert: () => boolean;
   removeAlert: (id: string) => void;
   markTriggered: (id: string) => void;
+  /**
+   * Record that an alert fired. Idempotent: returns null (and does
+   * nothing) if the alert is already triggered in current store state,
+   * so overlapping foreground/background checks evaluating the same
+   * pre-trigger snapshot can't double-record or fire two banners.
+   */
   recordTriggered: (
     alert: PriceAlert,
     triggeredPrice: number,
-  ) => TriggeredAlert;
+  ) => TriggeredAlert | null;
   markTriggeredRead: (id: string) => void;
   markAllTriggeredRead: () => void;
   clearTriggered: () => void;
@@ -94,34 +100,45 @@ export const useAlertsStore = create<AlertsStore>()(
 
       addAlert: (alert) => {
         const { alerts } = get();
-        const existing = alerts.find(
-          (a) =>
-            a.cardId === alert.cardId &&
-            a.grade === alert.grade &&
-            !a.triggered,
+        // Two notions of "existing" for the same card+grade:
+        //  - activeExisting: an un-triggered alert. Editing it (changing
+        //    the target price) is cap-exempt and keeps its slot.
+        //  - anyExisting: includes a previously-TRIGGERED alert. Re-arming
+        //    one must REUSE its row, not append a second — otherwise the
+        //    spent entry leaks into alerts[] forever (resetAlertTriggered
+        //    is never called and the UI only ever removes the active one),
+        //    growing the array without bound across fire/re-arm cycles.
+        const activeExisting = alerts.find(
+          (a) => a.cardId === alert.cardId && a.grade === alert.grade && !a.triggered,
         );
+        const anyExisting =
+          activeExisting ??
+          alerts.find((a) => a.cardId === alert.cardId && a.grade === alert.grade);
         const isPremium = useUserStore.getState().isPremium;
         const activeCount = alerts.filter((a) => !a.triggered).length;
 
-        // A replacement (same card+grade already has an active alert)
-        // never counts against the cap; only a genuinely NEW alert does.
-        if (!existing && !isPremium && activeCount >= MAX_FREE_ALERTS) {
+        // The cap applies whenever this would become a NEW active alert —
+        // i.e. anything except editing an already-active one. Re-arming a
+        // spent alert is a new active alert, so it is still cap-checked.
+        if (!activeExisting && !isPremium && activeCount >= MAX_FREE_ALERTS) {
           return { ok: false, reason: 'cap' };
         }
 
         const entry: PriceAlert = {
           ...alert,
-          id: existing?.id ?? `alert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          id: anyExisting?.id ?? `alert-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           triggered: false,
-          createdAt: existing?.createdAt ?? new Date().toISOString(),
+          // Keep createdAt only when editing a still-active alert; a
+          // re-arm of a spent alert is a fresh arm, so stamp it anew.
+          createdAt: activeExisting?.createdAt ?? new Date().toISOString(),
         };
 
         set({
-          alerts: existing
-            ? alerts.map((a) => (a.id === existing.id ? entry : a))
+          alerts: anyExisting
+            ? alerts.map((a) => (a.id === anyExisting.id ? entry : a))
             : [...alerts, entry],
         });
-        return { ok: true, replaced: Boolean(existing) };
+        return { ok: true, replaced: Boolean(activeExisting) };
       },
 
       removeAlert: (id) =>
@@ -144,6 +161,12 @@ export const useAlertsStore = create<AlertsStore>()(
         })),
 
       recordTriggered: (alert, triggeredPrice) => {
+        // Idempotency guard: if a concurrent check already flipped this
+        // alert to triggered, skip — don't push a duplicate history
+        // entry or signal the caller to fire a second notification.
+        const current = get().alerts.find((a) => a.id === alert.id);
+        if (current && current.triggered) return null;
+
         const entry: TriggeredAlert = {
           id: `t-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
           alertId: alert.id,

@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import { useAlertsStore } from '../stores/alerts-store';
+import { useUserStore } from '../stores/user-store';
 import { findAlertsToTrigger, formatAlertMessage } from './alert-checker';
 import { presentLocalNotification } from './notifications';
 
@@ -19,9 +20,19 @@ export function defineBackgroundAlertTask() {
 
   TaskManager.defineTask(PRICE_ALERT_TASK, async () => {
     try {
-      // Hydrate the persisted store before reading. Zustand's persist
+      // Hydrate the persisted stores before reading. Zustand's persist
       // middleware exposes rehydrate() so background runs see fresh data.
       await useAlertsStore.persist.rehydrate();
+      await useUserStore.persist.rehydrate();
+
+      // Honor the notifications preference here too. The foreground
+      // checker gates on it (use-alert-checker.ts); without the same
+      // gate the OS-woken background task would keep posting banners
+      // after the user turned notifications off in settings.
+      if (!useUserStore.getState().preferences.notificationsEnabled) {
+        return BackgroundFetch.BackgroundFetchResult.NoData;
+      }
+
       const { alerts, recordTriggered } = useAlertsStore.getState();
 
       // findAlertsToTrigger now fetches live prices in parallel —
@@ -35,6 +46,8 @@ export function defineBackgroundAlertTask() {
 
       for (const evaluation of toFire) {
         const entry = recordTriggered(evaluation.alert, evaluation.currentPrice);
+        // null = already recorded by a concurrent (e.g. foreground) check.
+        if (!entry) continue;
         const { title, body } = formatAlertMessage(
           evaluation.alert,
           evaluation.currentPrice,

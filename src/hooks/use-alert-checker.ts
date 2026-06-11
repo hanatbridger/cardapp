@@ -25,6 +25,7 @@ export function useAlertChecker() {
   // without resubscribing on every change.
   const alertsRef = useRef(alerts);
   const enabledRef = useRef(notificationsEnabled);
+  const runningRef = useRef(false);
   alertsRef.current = alerts;
   enabledRef.current = notificationsEnabled;
 
@@ -36,6 +37,15 @@ export function useAlertChecker() {
     // the timer.
     const runCheck = async () => {
       if (!enabledRef.current) return;
+      // In-flight guard: the mount run, the interval, and the
+      // foreground listener can all fire while a previous slow
+      // network pass is still awaiting. Without this, two passes
+      // evaluate the same still-un-triggered snapshot and both fire
+      // — two banners for one crossing. recordTriggered's idempotency
+      // is the second line of defense (and covers the background task,
+      // which this ref can't see).
+      if (runningRef.current) return;
+      runningRef.current = true;
       try {
         const toFire = await findAlertsToTrigger(alertsRef.current);
         for (const evaluation of toFire) {
@@ -43,6 +53,8 @@ export function useAlertChecker() {
             evaluation.alert,
             evaluation.currentPrice,
           );
+          // null = a concurrent check already recorded this fire.
+          if (!entry) continue;
           const { title, body } = formatAlertMessage(
             evaluation.alert,
             evaluation.currentPrice,
@@ -54,6 +66,8 @@ export function useAlertChecker() {
         }
       } catch {
         // Live-price fetch failed for every alert; skip this cycle.
+      } finally {
+        runningRef.current = false;
       }
     };
 
