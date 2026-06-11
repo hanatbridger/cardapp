@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { fetchWithTimeout } from './api-client';
 
 /**
  * Daily trending movers — proxied from collectrics.com via our Vercel
@@ -47,7 +48,7 @@ export async function fetchTrending(
   limit = 12,
   mode: TrendingMode = 'movers',
 ): Promise<TrendingPayload> {
-  const res = await fetch(`${PROXY_ORIGIN}/api/trending?limit=${limit}&mode=${mode}`);
+  const res = await fetchWithTimeout(`${PROXY_ORIGIN}/api/trending?limit=${limit}&mode=${mode}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((body as { error?: string }).error ?? `trending ${res.status}`);

@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import { fetchWithTimeout } from './api-client';
 
 /**
  * Card-news aggregator — proxied via our Vercel Edge function
@@ -35,7 +36,7 @@ interface NewsPayload {
 }
 
 export async function fetchNews(limit = 60): Promise<NewsArticle[]> {
-  const res = await fetch(`${PROXY_ORIGIN}/api/news?limit=${limit}`);
+  const res = await fetchWithTimeout(`${PROXY_ORIGIN}/api/news?limit=${limit}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((body as { error?: string }).error ?? `news ${res.status}`);

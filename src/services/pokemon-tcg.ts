@@ -1,6 +1,18 @@
 import type { PokemonCard } from '../types/card';
+import { fetchWithTimeout } from './api-client';
 
 const BASE_URL = 'https://api.pokemontcg.io/v2';
+
+/**
+ * Escape Lucene special characters in user-supplied search text before
+ * interpolating it into a quoted query term. Without this, a query
+ * containing a double-quote or backslash breaks out of the quoted term
+ * (changing the query's meaning) or produces a malformed query the API
+ * rejects with 400 — surfacing as an empty results screen.
+ */
+function escapeLucene(s: string): string {
+  return s.replace(/([\\"])/g, '\\$1');
+}
 
 interface PokemonTcgResponse {
   data: any[];
@@ -56,20 +68,20 @@ function extractTcgPrice(tcgplayer: any, field: 'market' | 'mid' = 'market'): nu
   return undefined;
 }
 
-/** Japanese sets in the Pokemon TCG API use specific prefixes */
+/** Whether a set is Japanese-exclusive (drives EN/JP price routing). */
 function isJapaneseSet(setId: string, setName: string): boolean {
-  // Japanese set IDs typically start with these prefixes
-  const jpPrefixes = ['sv', 'sm', 'xy', 'bw', 'dp', 'ex', 'ecard'];
   const jpIndicators = ['Japanese', 'Japan', 'プロモ', 'ジャパン'];
 
-  // Check set name for Japanese indicators
+  // Name is the reliable signal — explicit Japanese markers.
   if (jpIndicators.some((ind) => setName.includes(ind))) return true;
 
-  // Japanese-only sets have specific IDs (e.g., svF, svG, sm11a, etc.)
-  // Sets ending with lowercase letters (a, b, c) after numbers are typically JP-exclusive
-  if (/\d+[a-z]$/.test(setId)) return true;
-
-  // Check for common JP-only set ID patterns
+  // Explicit allowlist of known JP-exclusive set ids. We deliberately do
+  // NOT infer language from id suffix shape (the old /\d+[a-z]$/ test):
+  // that also matched English sets/promos whose id ends in a lowercase
+  // letter, mistagging them language:'JP' and sending the wrong-market
+  // language param to the eBay/TCGPlayer proxies, pulling JP prices for
+  // an English card. The shared 'sv'/'sm'/'xy' prefixes are likewise
+  // English too, so a prefix list can't classify language on its own.
   const jpOnlySets = ['svF', 'svG', 'svH', 'sm11a', 'sm11b', 'sm12a'];
   if (jpOnlySets.some((s) => setId.startsWith(s))) return true;
 
@@ -93,7 +105,7 @@ export async function searchCards(
 ): Promise<{ cards: PokemonCard[]; totalCount: number }> {
   // Build Lucene query supported by the Pokemon TCG API
   const parts: string[] = [];
-  if (query && query.length >= 2) parts.push(`name:"${query}*"`);
+  if (query && query.length >= 2) parts.push(`name:"${escapeLucene(query)}*"`);
   if (filters.supertype) parts.push(`supertype:"${filters.supertype}"`);
   if (filters.rarity) parts.push(`rarity:"${filters.rarity}"`);
   if (filters.setId) parts.push(`set.id:${filters.setId}`);
@@ -117,7 +129,7 @@ export async function searchCards(
     orderBy: filters.setId ? 'number' : '-set.releaseDate',
   });
 
-  const response = await fetch(`${BASE_URL}/cards?${params}`);
+  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -165,10 +177,10 @@ export async function searchSets(
     orderBy: '-releaseDate',
   });
   if (query && query.length >= 2) {
-    params.set('q', `name:"${query}*"`);
+    params.set('q', `name:"${escapeLucene(query)}*"`);
   }
 
-  const response = await fetch(`${BASE_URL}/sets?${params}`);
+  const response = await fetchWithTimeout(`${BASE_URL}/sets?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -181,7 +193,7 @@ export async function searchSets(
 }
 
 export async function getSet(id: string): Promise<PokemonSet | null> {
-  const response = await fetch(`${BASE_URL}/sets/${id}`);
+  const response = await fetchWithTimeout(`${BASE_URL}/sets/${id}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);
@@ -217,14 +229,14 @@ export async function searchArtists(
   if (!query || query.length < 2) return { artists: [], totalCount: 0 };
 
   const params = new URLSearchParams({
-    q: `artist:"${query}*"`,
+    q: `artist:"${escapeLucene(query)}*"`,
     page: '1',
     pageSize: String(pageSize),
     // Newest first so each artist's sample thumbnails feel current.
     orderBy: '-set.releaseDate',
   });
 
-  const response = await fetch(`${BASE_URL}/cards?${params}`);
+  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -267,13 +279,13 @@ export async function getCardsByArtist(
   pageSize: number = 60,
 ): Promise<{ cards: PokemonCard[]; totalCount: number }> {
   const params = new URLSearchParams({
-    q: `artist:"${artist}"`,
+    q: `artist:"${escapeLucene(artist)}"`,
     page: String(page),
     pageSize: String(pageSize),
     orderBy: '-set.releaseDate',
   });
 
-  const response = await fetch(`${BASE_URL}/cards?${params}`);
+  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -286,7 +298,7 @@ export async function getCardsByArtist(
 }
 
 export async function getCard(id: string): Promise<PokemonCard | null> {
-  const response = await fetch(`${BASE_URL}/cards/${id}`);
+  const response = await fetchWithTimeout(`${BASE_URL}/cards/${id}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);

@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { getSealedPrice } from '../mocks/sealed';
 import { getPrice, getMockPriceHistory } from '../mocks/prices';
+import { fetchWithTimeout } from './api-client';
 import type { SealedPrice } from '../types/sealed';
 import type { CardPrice, PriceHistory } from '../types/card';
 
@@ -76,7 +77,7 @@ export interface SealedPriceHistoryPoint {
 }
 
 async function getJson<T>(path: string): Promise<T> {
-  const res = await fetch(`${PROXY_ORIGIN}${path}`);
+  const res = await fetchWithTimeout(`${PROXY_ORIGIN}${path}`);
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error((body as { error?: string }).error ?? `proxy ${res.status}`);
