@@ -160,7 +160,7 @@ function CardDetailScreen() {
     if (price && isInWatchlist && id) {
       const savedItem = items.find((i) => i.kind === 'card' && i.cardId === id);
       if (savedItem && savedItem.kind === 'card' && savedItem.grade === selectedGrade) {
-        updatePrice(id, price.currentPrice, price.percentChange);
+        updatePrice(id, price.currentPrice, price.percentChange, selectedGrade);
       }
     }
   }, [price?.currentPrice, isInWatchlist, id, selectedGrade]);
@@ -307,21 +307,27 @@ function CardDetailScreen() {
             <IconChevronLeft size={24} color={colors.onSurface} />
           </Pressable>
           <View style={{ flexDirection: 'row', gap: spacing[3] }}>
-            <Pressable
-              onPress={handleToggleWatchlist}
-              hitSlop={8}
-              style={{ padding: spacing[1] }}
-              accessibilityRole="button"
-              accessibilityLabel={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
-            >
-              {/* IconCirclePlus / IconCircleCheck mirror the iOS Music
-                  "Add to Library" pattern — circle-plus communicates
-                  the add affordance clearly, circle-check confirms the
-                  added state and still reads as "tap to remove". */}
-              {isInWatchlist
-                ? <IconCircleCheck size={24} color={colors.primary} strokeWidth={2} />
-                : <IconCirclePlus size={24} color={colors.onSurface} strokeWidth={2} />}
-            </Pressable>
+            {/* Watchlist add/remove is hidden on the PSA10 tab: graded
+                tracking is still gated (the tab shows only ComingSoon),
+                Home filters PSA10 rows out, and adding one here created a
+                silent invisible entry that still consumed a free slot. */}
+            {selectedGrade !== 'PSA10' && (
+              <Pressable
+                onPress={handleToggleWatchlist}
+                hitSlop={8}
+                style={{ padding: spacing[1] }}
+                accessibilityRole="button"
+                accessibilityLabel={isInWatchlist ? 'Remove from watchlist' : 'Add to watchlist'}
+              >
+                {/* IconCirclePlus / IconCircleCheck mirror the iOS Music
+                    "Add to Library" pattern — circle-plus communicates
+                    the add affordance clearly, circle-check confirms the
+                    added state and still reads as "tap to remove". */}
+                {isInWatchlist
+                  ? <IconCircleCheck size={24} color={colors.primary} strokeWidth={2} />
+                  : <IconCirclePlus size={24} color={colors.onSurface} strokeWidth={2} />}
+              </Pressable>
+            )}
             <Pressable onPress={openAlertModal} hitSlop={8} style={{ padding: spacing[1] }}>
               {hasAlert
                 ? <IconBellFilled size={22} color={colors.primary} />

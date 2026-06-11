@@ -38,7 +38,12 @@ export function PriceChart({
   const containerRef = useRef<View>(null);
   const layoutRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
-  if (data.length < 2) return null;
+  // NOTE: the `data.length < 2` early return lives AFTER all hooks below.
+  // Returning here would skip the four useCallback hooks and violate the
+  // Rules of Hooks if this component ever re-renders across the 2-point
+  // boundary while mounted. The geometry consts compute harmless
+  // NaN/empty values for short data — they're never rendered because the
+  // guard returns null before the JSX.
 
   // Chart area dimensions (excluding labels)
   const chartHeight = interactive ? totalHeight - LABEL_HEIGHT : totalHeight;
@@ -120,6 +125,9 @@ export function PriceChart({
   const handleEnd = useCallback(() => {
     setActivePoint(null);
   }, []);
+
+  // All hooks are declared above this point — safe to bail now.
+  if (data.length < 2) return null;
 
   const formatDate = (dateStr: string) => {
     const d = new Date(dateStr);

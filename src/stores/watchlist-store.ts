@@ -108,8 +108,13 @@ interface WatchlistStore {
   /**
    * Stamp last-known price onto an item. `id` is the cardId for card
    * items and productId for sealed items — the store figures out which.
+   * For card items pass `grade` so the price only lands on that grade's
+   * row: a card watched at both UNGRADED and PSA10 trades at very
+   * different prices (graded is 5-10x raw), and matching on cardId alone
+   * would clobber the other grade's last-known price with the wrong
+   * number. Omitting grade falls back to matching every grade (legacy).
    */
-  updatePrice: (id: string, price: number, priceChange: number) => void;
+  updatePrice: (id: string, price: number, priceChange: number, grade?: GradeType) => void;
   canAddMore: () => boolean;
 }
 
@@ -158,13 +163,17 @@ export const useWatchlistStore = create<WatchlistStore>()(
           ),
         })),
 
-      updatePrice: (id, price, priceChange) =>
+      updatePrice: (id, price, priceChange, grade) =>
         set((state) => ({
           items: state.items.map((i) => {
             if (i.kind === 'sealed' && i.productId === id) {
               return { ...i, lastPrice: price, lastPriceChange: priceChange };
             }
-            if (i.kind === 'card' && i.cardId === id) {
+            if (
+              i.kind === 'card' &&
+              i.cardId === id &&
+              (grade === undefined || i.grade === grade)
+            ) {
               return { ...i, lastPrice: price, lastPriceChange: priceChange };
             }
             return i;
@@ -179,7 +188,15 @@ export const useWatchlistStore = create<WatchlistStore>()(
         // store used to carry its OWN isPremium flag that nothing ever
         // set, which silently kept paying subscribers capped at the
         // free tier. One flag, one owner; cross-store read is cheap.
-        return useUserStore.getState().isPremium || items.length < maxFreeItems;
+        if (useUserStore.getState().isPremium) return true;
+        // Count only the items the user can actually SEE. Home hides
+        // PSA10 card rows while graded tracking is gated, so counting
+        // them here would let invisible legacy entries eat free slots —
+        // blocking adds while the on-screen count still reads e.g. 3/5.
+        const visible = items.filter(
+          (i) => !(i.kind === 'card' && i.grade === 'PSA10'),
+        ).length;
+        return visible < maxFreeItems;
       },
     }),
     {
