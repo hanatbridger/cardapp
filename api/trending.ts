@@ -94,6 +94,18 @@ function extractProductId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+// Double Rare is the base ex-card rarity (the two-black-star bulk of
+// every modern set). They dominate the leaderboard by count and aren't
+// the cards users track for movement/valuation, so we drop them from
+// every trending mode. Collectrics tags them rarity-name "Double Rare"
+// / rarity-code "DR". NOTE: do NOT match code "RR" — that's Radiant
+// Rare, a distinct (and wanted) rarity.
+function isDoubleRare(r: CollectricsRow): boolean {
+  const name = (r['rarity-name'] ?? '').trim().toLowerCase();
+  const code = (r['rarity-code'] ?? '').trim().toLowerCase();
+  return name === 'double rare' || code === 'dr';
+}
+
 /**
  * Resolve a single tile's TCGPlayer productId to a Pokemon TCG card id
  * by querying the Pokemon TCG API for a name+set match.
@@ -255,7 +267,8 @@ export default async function handler(req: Request): Promise<Response> {
         (r) =>
           typeof r['raw-price'] === 'number' &&
           r['raw-price']! > 0 &&
-          typeof r['dod-change-pct'] === 'number',
+          typeof r['dod-change-pct'] === 'number' &&
+          !isDoubleRare(r),
       )
       .map((r): TrendingTile | null => {
         const productId = extractProductId(r['image-url'] ?? '');
