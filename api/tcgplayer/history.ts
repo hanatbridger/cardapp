@@ -107,6 +107,16 @@ export default async function handler(req: Request): Promise<Response> {
     }
   }
 
+  // Whether productId was resolved through the TRUSTED Pokemon TCG API
+  // path below (step 2). Only then is the cardId↔productId pairing
+  // confirmed by a source we control — which gates the service-role
+  // backfill in step 4. A caller-supplied ?productId= paired with an
+  // arbitrary ?id= is NOT trusted: without this gate, an attacker
+  // could stamp any cardId onto a product's snapshot rows, making a
+  // real card's chart resolve to (and serve) a different card's price
+  // history to every user.
+  let confirmedViaApi = false;
+
   // 2. If still no productId resolved AND we have a cardId, look up
   // Pokemon TCG API → get the tcgplayer URL → extract productId →
   // find snapshots with that productId. This handles the cold-start
@@ -139,6 +149,7 @@ export default async function handler(req: Request): Promise<Response> {
           // productId), we still don't have the productId — bail.
           if (/^\d+$/.test(m[1])) {
             productId = m[1];
+            confirmedViaApi = true;
           }
         }
       }
@@ -159,14 +170,21 @@ export default async function handler(req: Request): Promise<Response> {
     .order('snapshot_date', { ascending: true });
 
   if (error) {
-    return json(500, { error: 'DB query failed', detail: error.message });
+    console.error('[tcgplayer/history] DB query failed:', error.message);
+    return json(500, { error: 'DB query failed' });
   }
 
-  // 4. Opportunistic backfill: if we just resolved a cardId for
-  // product_id rows that had null card_id, stamp the cardId on those
-  // rows so future lookups skip the Pokemon TCG API round-trip.
-  // (Best-effort — failures here don't affect the response.)
-  if (cardId && snapshots && snapshots.length > 0) {
+  // 4. Opportunistic backfill: stamp the cardId onto this product's
+  // null-card_id rows so future lookups skip the Pokemon TCG API
+  // round-trip. ONLY when the mapping was confirmed by the trusted API
+  // path (confirmedViaApi) — never on a caller-supplied productId,
+  // which would let an unauthenticated request poison the mapping.
+  // Awaited rather than fire-and-forget: on Edge the function may be
+  // frozen right after the response returns, dropping a floating
+  // promise; since this now runs only on genuine cold-start
+  // resolution it's rare, so the few ms is acceptable for a write
+  // that actually lands.
+  if (confirmedViaApi && cardId && snapshots && snapshots.length > 0) {
     const needsBackfill = snapshots.some((s: SnapshotRow) => s.card_id === null);
     if (needsBackfill) {
       // Use service-role for the UPDATE since RLS blocks anon writes.
@@ -176,12 +194,15 @@ export default async function handler(req: Request): Promise<Response> {
         const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
           auth: { persistSession: false, autoRefreshToken: false },
         });
-        admin
-          .from('price_snapshots')
-          .update({ card_id: cardId })
-          .eq('product_id', productId)
-          .is('card_id', null)
-          .then(() => {});
+        try {
+          await admin
+            .from('price_snapshots')
+            .update({ card_id: cardId })
+            .eq('product_id', productId)
+            .is('card_id', null);
+        } catch {
+          // Best-effort optimization — never fail the response over it.
+        }
       }
     }
   }

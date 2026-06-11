@@ -55,13 +55,27 @@ function extractProductId(url: string): string | null {
   return m ? m[1] : null;
 }
 
+// Length-independent constant-time string compare — avoids leaking
+// the secret's length or a prefix-match position via response timing.
+function timingSafeEqual(a: string, b: string): boolean {
+  // XOR the longer length in so mismatched lengths still do constant
+  // work relative to the longer string and never short-circuit.
+  const len = Math.max(a.length, b.length);
+  let diff = a.length ^ b.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (a.charCodeAt(i) || 0) ^ (b.charCodeAt(i) || 0);
+  }
+  return diff === 0;
+}
+
 export default async function handler(req: Request): Promise<Response> {
   // Vercel injects Authorization: Bearer ${CRON_SECRET} on every cron
   // invocation when CRON_SECRET is set in the project env. Reject any
-  // request without it so randos can't trigger ingest.
+  // request without it so randos can't trigger ingest. Constant-time
+  // compare so the secret can't be recovered via timing.
   const expected = process.env.CRON_SECRET;
   const auth = req.headers.get('authorization') ?? '';
-  if (!expected || auth !== `Bearer ${expected}`) {
+  if (!expected || !timingSafeEqual(auth, `Bearer ${expected}`)) {
     return new Response('Unauthorized', { status: 401 });
   }
 

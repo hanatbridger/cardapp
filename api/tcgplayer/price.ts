@@ -58,18 +58,36 @@ function json(status: number, body: unknown): Response {
   });
 }
 
+// fetch with a hard timeout — this is a user-facing endpoint (card
+// detail price), so a hung upstream must not pin the request open
+// until Vercel's function timeout. 6s is generous for these APIs.
+async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  ms = 6000,
+): Promise<Response> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function resolveProductId(cardId: string): Promise<string | null> {
   // Don't follow the redirect — read the Location header directly.
-  const res = await fetch(`https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`, {
-    redirect: 'manual',
-  });
+  const res = await fetchWithTimeout(
+    `https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`,
+    { redirect: 'manual' },
+  );
   const location = res.headers.get('location') ?? '';
   const match = location.match(/tcgplayer\.com\/product\/(\d+)/);
   return match ? match[1] : null;
 }
 
 async function fetchMarketPrice(productId: string): Promise<TcgDetails | null> {
-  const res = await fetch(
+  const res = await fetchWithTimeout(
     `https://mp-search-api.tcgplayer.com/v1/product/${productId}/details`,
     {
       // Match the user-agent TCGPlayer's own SPA sends so we don't get
@@ -121,6 +139,10 @@ export default async function handler(req: Request): Promise<Response> {
     };
     return json(200, body);
   } catch (err) {
-    return json(500, { error: 'tcgplayer proxy failure', detail: String(err) });
+    // Log the detail server-side (Vercel logs); return a generic
+    // message so internal error strings / stack info aren't echoed
+    // to clients.
+    console.error('[tcgplayer/price] failure:', err);
+    return json(500, { error: 'tcgplayer proxy failure' });
   }
 }

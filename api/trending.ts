@@ -209,12 +209,29 @@ async function resolveCardId(
   }
 }
 
+// Parse a caller-supplied limit into a positive integer in [1, max],
+// falling back to `def` for missing / non-numeric / zero / negative
+// input. Prevents slice(0, negative|NaN) pathologies and bounds any
+// downstream per-item fan-out.
+function clampLimit(raw: string | null, def: number, max: number): number {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n < 1) return def;
+  return Math.min(n, max);
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
 
   const url = new URL(req.url);
-  const limit = Math.min(Number(url.searchParams.get('limit') ?? '12'), 24);
+  // Clamp limit to a sane positive integer. Without this, `?limit=-1`
+  // produced slice(0, -1) → the entire collectrics feed (hundreds of
+  // tiles), and the post-slice cardId resolver then fanned out one
+  // Pokemon TCG API lookup PER tile — an unauthenticated request
+  // amplifying into hundreds of upstream calls (DoS + rate-limit-ban
+  // risk on the shared 1000/hr quota). `?limit=abc` → NaN → slice(0,
+  // NaN) → [] also handled (falls back to the default).
+  const limit = clampLimit(url.searchParams.get('limit'), 12, 24);
   const modeRaw = (url.searchParams.get('mode') ?? 'movers').toLowerCase();
   const mode: Mode =
     modeRaw === 'undervalued' || modeRaw === 'overvalued' ? modeRaw : 'movers';
@@ -330,6 +347,7 @@ export default async function handler(req: Request): Promise<Response> {
     };
     return json(200, body);
   } catch (err) {
-    return json(500, { error: 'trending proxy failure', detail: String(err) });
+    console.error('[trending] proxy failure:', err);
+    return json(500, { error: 'trending proxy failure' });
   }
 }

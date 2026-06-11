@@ -213,12 +213,21 @@ async function fetchSource(source: NewsSource): Promise<NewsArticle[]> {
   }
 }
 
+// Positive-integer limit in [1, max]; falls back to `def` for
+// missing / non-numeric / zero / negative input so slice() never sees
+// a NaN (→ empty edge-cached response) or negative bound.
+function clampLimit(raw: string | null, def: number, max: number): number {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n) || n < 1) return def;
+  return Math.min(n, max);
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
 
   const url = new URL(req.url);
-  const limit = Math.min(Number(url.searchParams.get('limit') ?? '50'), 100);
+  const limit = clampLimit(url.searchParams.get('limit'), 50, 100);
 
   const settled = await Promise.allSettled(SOURCES.map(fetchSource));
   const all: NewsArticle[] = settled.flatMap((s) =>
