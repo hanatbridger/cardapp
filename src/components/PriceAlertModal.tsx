@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { View, Modal, Pressable, TextInput, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Modal, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { IconX } from '@tabler/icons-react-native';
+import { IconX, IconTrash } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Button } from './Button';
 import { SegmentedControl } from './SegmentedControl';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius, shadows, typography } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
+import type { PriceAlert } from '../stores/alerts-store';
 
 interface PriceAlertModalProps {
   visible: boolean;
@@ -15,6 +16,17 @@ interface PriceAlertModalProps {
   onSubmit: (type: 'above' | 'below', price: number) => void;
   cardName: string;
   currentPrice?: number;
+  /** When set, the modal opens in edit mode — prefilled from this alert. */
+  existingAlert?: PriceAlert;
+  /** Remove the existing alert. Only rendered when editing. */
+  onRemove?: () => void;
+}
+
+// Default target when creating a fresh alert: ±10% off current price,
+// nudging the user toward a sensible threshold instead of a blank field.
+function defaultTarget(type: 0 | 1, currentPrice?: number): string {
+  if (!currentPrice) return '';
+  return (type === 0 ? currentPrice * 1.1 : currentPrice * 0.9).toFixed(0);
 }
 
 export function PriceAlertModal({
@@ -23,14 +35,31 @@ export function PriceAlertModal({
   onSubmit,
   cardName,
   currentPrice,
+  existingAlert,
+  onRemove,
 }: PriceAlertModalProps) {
-  const { colors, glass } = useTheme();
-  const [alertType, setAlertType] = useState(0); // 0 = above, 1 = below
-  const [priceInput, setPriceInput] = useState(
-    currentPrice ? (alertType === 0 ? (currentPrice * 1.1).toFixed(0) : (currentPrice * 0.9).toFixed(0)) : '',
-  );
-
+  const { colors } = useTheme();
+  const isEditing = Boolean(existingAlert);
+  const [alertType, setAlertType] = useState<0 | 1>(0); // 0 = above, 1 = below
+  const [priceInput, setPriceInput] = useState('');
   const [error, setError] = useState('');
+
+  // Re-seed the form whenever the sheet opens. In edit mode prefill from
+  // the existing rule; otherwise fall back to the ±10% default. Keyed on
+  // `visible` so reopening always reflects current props rather than the
+  // stale state from the previous open.
+  useEffect(() => {
+    if (!visible) return;
+    if (existingAlert) {
+      const t = existingAlert.type === 'above' ? 0 : 1;
+      setAlertType(t);
+      setPriceInput(String(existingAlert.targetPrice));
+    } else {
+      setAlertType(0);
+      setPriceInput(defaultTarget(0, currentPrice));
+    }
+    setError('');
+  }, [visible, existingAlert, currentPrice]);
 
   const handleSubmit = () => {
     const price = parseFloat(priceInput);
@@ -42,6 +71,11 @@ export function PriceAlertModal({
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     onSubmit(alertType === 0 ? 'above' : 'below', price);
     onClose();
+  };
+
+  const handleRemove = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    onRemove?.();
   };
 
   return (
@@ -72,7 +106,7 @@ export function PriceAlertModal({
 
             {/* Header */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text variant="headingSm">Set Price Alert</Text>
+              <Text variant="headingSm">{isEditing ? 'Edit Price Alert' : 'Set Price Alert'}</Text>
               <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" accessibilityRole="button">
                 <IconX size={20} color={colors.onSurfaceMuted} />
               </Pressable>
@@ -87,9 +121,12 @@ export function PriceAlertModal({
               options={['Above', 'Below']}
               selected={alertType}
               onSelect={(i) => {
-                setAlertType(i);
-                if (currentPrice) {
-                  setPriceInput(i === 0 ? (currentPrice * 1.1).toFixed(0) : (currentPrice * 0.9).toFixed(0));
+                const t = (i === 0 ? 0 : 1) as 0 | 1;
+                setAlertType(t);
+                // Only auto-fill the default when creating; while editing,
+                // keep whatever target the user already had.
+                if (!isEditing && currentPrice) {
+                  setPriceInput(defaultTarget(t, currentPrice));
                 }
               }}
             />
@@ -142,8 +179,21 @@ export function PriceAlertModal({
               size="lg"
               onPress={handleSubmit}
             >
-              Set Alert
+              {isEditing ? 'Update Alert' : 'Set Alert'}
             </Button>
+
+            {/* Remove — edit mode only */}
+            {isEditing && onRemove ? (
+              <Button
+                variant="ghost"
+                fullWidth
+                size="lg"
+                icon={<IconTrash size={18} color={colors.danger} />}
+                onPress={handleRemove}
+              >
+                Remove Alert
+              </Button>
+            ) : null}
 
             {/* Bottom spacing for safe area */}
             <View style={{ height: spacing[4] }} />

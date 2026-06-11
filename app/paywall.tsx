@@ -69,8 +69,8 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
   },
   {
     icon: IconBellRinging,
-    title: 'Price alerts',
-    body: 'Get pushed the moment any card crosses the price you set — raw or graded.',
+    title: 'Unlimited price alerts',
+    body: 'Free keeps 3 active alerts. Premium removes the cap — track every threshold, raw or graded.',
   },
 ];
 

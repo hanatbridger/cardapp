@@ -31,7 +31,7 @@ import { cardShareUrl } from '../../src/constants/links';
 // Card data/valuation handled internally by AIValuation component
 import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
 import { useWatchlistStore, useUserStore } from '../../src/stores';
-import { useAlertsStore } from '../../src/stores/alerts-store';
+import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
 import { useCardDetail, useCardPrice, usePriceHistory } from '../../src/hooks';
 
@@ -63,7 +63,7 @@ function CardDetailScreen() {
   const prevGradeRef = useRef(GRADE_OPTIONS[gradeIndex]);
   const [refreshing, setRefreshing] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const { alerts: allAlerts, addAlert } = useAlertsStore();
+  const { alerts: allAlerts, addAlert, removeAlert } = useAlertsStore();
 
   // Tick once a minute so the "Updated Xm ago" label stays fresh
   useEffect(() => {
@@ -128,9 +128,28 @@ function CardDetailScreen() {
   // Bell reflects whether the *current grade tab* has an active alert.
   // A triggered alert is treated as inactive (filled bell only means
   // "watching" — once it's fired the user needs to reset it).
-  const hasAlert = allAlerts.some(
-    (a) => a.cardId === id && a.grade === GRADE_OPTIONS[gradeIndex] && !a.triggered,
+  const existingAlert = allAlerts.find(
+    (a) => a.cardId === id && a.grade === selectedGrade && !a.triggered,
   );
+  const hasAlert = Boolean(existingAlert);
+
+  // Open the alert modal, gating new alerts behind the free cap.
+  // Editing/removing an EXISTING alert is always allowed; only a NEW
+  // alert beyond MAX_FREE_ALERTS on the free tier triggers the upsell.
+  const openAlertModal = () => {
+    if (existingAlert || useAlertsStore.getState().canAddAlert()) {
+      setAlertModalVisible(true);
+      return;
+    }
+    Alert.alert(
+      'Alert limit reached',
+      `Free accounts can keep ${MAX_FREE_ALERTS} active price alerts. Upgrade to Premium for unlimited alerts, or remove an existing alert first.`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Upgrade', onPress: () => router.push('/paywall') },
+      ],
+    );
+  };
 
   const isInWatchlist = items.some(
     (i) => i.kind === 'card' && i.cardId === id,
@@ -303,7 +322,7 @@ function CardDetailScreen() {
                 ? <IconCircleCheck size={24} color={colors.primary} strokeWidth={2} />
                 : <IconCirclePlus size={24} color={colors.onSurface} strokeWidth={2} />}
             </Pressable>
-            <Pressable onPress={() => setAlertModalVisible(true)} hitSlop={8} style={{ padding: spacing[1] }}>
+            <Pressable onPress={openAlertModal} hitSlop={8} style={{ padding: spacing[1] }}>
               {hasAlert
                 ? <IconBellFilled size={22} color={colors.primary} />
                 : <IconBellRinging size={22} color={colors.onSurfaceMuted} />}
@@ -452,7 +471,7 @@ function CardDetailScreen() {
                 </View>
               </Card>
               <Pressable
-                onPress={() => setAlertModalVisible(true)}
+                onPress={openAlertModal}
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -681,18 +700,42 @@ function CardDetailScreen() {
             onClose={() => setAlertModalVisible(false)}
             cardName={card.name}
             currentPrice={price?.currentPrice}
+            existingAlert={existingAlert}
+            onRemove={
+              existingAlert
+                ? () => {
+                    removeAlert(existingAlert.id);
+                    setAlertModalVisible(false);
+                  }
+                : undefined
+            }
             onSubmit={async (type, targetPrice) => {
-              // Ask for OS permission the first time the user creates an
-              // alert. We still record the alert even if denied — the
-              // in-app notifications screen works without OS permission.
-              const granted = await requestNotificationPermission();
-              addAlert({
+              // openAlertModal already gated the cap, but re-check at
+              // submit time in case state changed while the modal was
+              // open (e.g. an alert fired). addAlert upserts on
+              // card+grade, so editing never trips the cap.
+              const result = addAlert({
                 cardId: id ?? '',
                 cardName: card.name,
                 grade: selectedGrade,
                 type,
                 targetPrice,
               });
+              if (!result.ok) {
+                Alert.alert(
+                  'Alert limit reached',
+                  `Free accounts can keep ${MAX_FREE_ALERTS} active price alerts. Upgrade to Premium for unlimited alerts.`,
+                  [
+                    { text: 'Not now', style: 'cancel' },
+                    { text: 'Upgrade', onPress: () => router.push('/paywall') },
+                  ],
+                );
+                return;
+              }
+              // Ask for OS permission the first time the user creates an
+              // alert. We still record the alert even if denied — the
+              // in-app notifications screen works without OS permission.
+              const granted = await requestNotificationPermission();
               if (!granted && Platform.OS !== 'web') {
                 Alert.alert(
                   'Notifications disabled',
