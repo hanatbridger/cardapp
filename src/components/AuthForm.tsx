@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Pressable, Platform } from 'react-native';
-import { IconBrandApple, IconBrandGoogle, IconMail, IconLock, IconUser } from '@tabler/icons-react-native';
+import { IconBrandApple, IconMail, IconLock, IconUser } from '@tabler/icons-react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { Input } from './Input';
 import { Button } from './Button';
+import { GoogleGLogo } from './GoogleGLogo';
 import { spacing, radius } from '../theme/tokens';
 
 export type AuthMode = 'signin' | 'signup';
@@ -44,11 +45,8 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
 
   const verb = mode === 'signin' ? 'Sign in' : 'Sign up';
 
-  // Google button — white surface, neutral border, brand "G". Google's
-  // brand guidelines want their multicolor "G" asset; IconBrandGoogle
-  // is a monochrome stand-in that reads clearly and is acceptable for
-  // launch. Swap for the official asset in a polish pass if Google
-  // flags it (they rarely do for a neutral-styled button).
+  // Google button — white surface, neutral border, official multicolor
+  // "G" mark (GoogleGLogo) per Google's Sign-In branding guidelines.
   const GoogleButton = onGoogle ? (
     <Pressable
       onPress={onGoogle}
@@ -67,7 +65,7 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
       accessibilityRole="button"
       accessibilityLabel={`${verb} with Google`}
     >
-      <IconBrandGoogle size={20} color="#4285F4" strokeWidth={2.5} />
+      <GoogleGLogo size={18} />
       <Text variant="labelLg" color="#1F1F1F">
         {Platform.OS === 'ios' || Platform.OS === 'web'
           ? `${verb} with Google`
@@ -103,6 +101,7 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
   if (appleOnly) {
     return (
       <View style={{ gap: spacing[3] }}>
+        {GoogleButton}
         <Pressable
           onPress={onApple}
           style={({ pressed }) => ({
@@ -125,7 +124,6 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
               : `Continue with Apple`}
           </Text>
         </Pressable>
-        {GoogleButton}
         <Text
           variant="caption"
           color={colors.onSurfaceMuted}
@@ -189,6 +187,9 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
         <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
       </View>
 
+      {/* Google Sign In */}
+      {GoogleButton}
+
       {/* Apple Sign In */}
       <Pressable
         onPress={onApple}
@@ -212,9 +213,6 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
             : `Continue with Apple`}
         </Text>
       </Pressable>
-
-      {/* Google Sign In */}
-      {GoogleButton}
     </View>
   );
 }
