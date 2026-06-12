@@ -21,7 +21,7 @@ import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useUserStore } from '../../src/stores';
 import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useCollapsingHeader, useTrending } from '../../src/hooks';
-import { MOCK_PRICES, TRENDING_SEARCHES, TRENDING_ARTISTS } from '../../src/mocks';
+import { MOCK_PRICES, TRENDING_ARTISTS } from '../../src/mocks';
 import { CARD_SCORES } from '../../src/data/card-scores';
 import { getValuation } from '../../src/services/price-prediction';
 import type { PokemonCard } from '../../src/types/card';
@@ -184,11 +184,6 @@ function SearchScreen() {
     router.push(`/artist/${encodeURIComponent(artist.name)}`);
   };
 
-  const handleTrendingPress = (term: string) => {
-    setQuery(term);
-    addRecentSearch(term);
-  };
-
   // X-style "Cancel" handler — blur the input, dismiss the keyboard, and
   // wipe the draft query so tapping back into search starts clean. If the
   // session was launched from Home (via the top-right search icon), pop
@@ -315,7 +310,6 @@ function SearchScreen() {
       {/* Results */}
       {mode === 'cards' && !showCardResults ? (
         <CardsEmptyState
-          onTrendingPress={handleTrendingPress}
           onScroll={scrollHandler}
           topInset={headerHeight + stickyHeight}
           undervaluedPicks={undervaluedPicks}
@@ -480,20 +474,16 @@ function SearchFocusOverlay({
 }
 
 function CardsEmptyState({
-  onTrendingPress,
   onScroll,
   topInset = 0,
   undervaluedPicks,
   overvaluedPicks,
 }: {
-  onTrendingPress: (term: string) => void;
   onScroll?: any;
   topInset?: number;
   undervaluedPicks: AIPickItem[];
   overvaluedPicks: AIPickItem[];
 }) {
-  const { colors } = useTheme();
-
   return (
     <Animated.ScrollView
       style={{ flex: 1 }}
@@ -502,39 +492,11 @@ function CardsEmptyState({
       onScroll={onScroll}
       scrollEventThrottle={16}
     >
-      <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[5], gap: spacing[2] }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}>
-          <IconTrendingUp size={14} color={colors.warning} />
-          <Text variant="labelLg" color={colors.onSurfaceVariant}>Trending Searches</Text>
-        </View>
-        <View style={{ gap: spacing[1] }}>
-          {TRENDING_SEARCHES.slice(0, 5).map((term, i) => (
-            <Pressable
-              key={term}
-              onPress={() => onTrendingPress(term)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: spacing[2],
-                gap: spacing[3],
-                borderBottomWidth: 1,
-                borderBottomColor: colors.outlineVariant,
-              }}
-            >
-              <Text variant="caption" color={colors.onSurfaceMuted} style={{ width: 20 }}>
-                {i + 1}
-              </Text>
-              <Text variant="bodyMd">{term}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Undervalued / Overvalued picks — daily collectrics feed (see
-          undervalQuery / overvalQuery at the top of the component).
-          Each list silently hides when its data isn't ready, so first
-          paint stays clean instead of showing skeletons. */}
-      <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[5], gap: spacing[5] }}>
+      {/* Undervalued / Overvalued picks sit directly under the search row
+          (Trending Searches was removed). Each list silently hides when
+          its data isn't ready, so first paint stays clean instead of
+          showing skeletons. */}
+      <View style={{ paddingHorizontal: HORIZONTAL_PADDING, paddingTop: spacing[4], gap: spacing[5] }}>
         <AIPicks title="Undervalued Right Now" items={undervaluedPicks} type="undervalued" />
         <AIPicks title="Potentially Overvalued" items={overvaluedPicks} type="overvalued" />
       </View>
