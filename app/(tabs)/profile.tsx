@@ -163,7 +163,23 @@ function ProfileScreen() {
           <Card glass style={{ padding: 0, overflow: 'hidden' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3], paddingVertical: spacing[3], paddingHorizontal: spacing[4] }}>
               <View style={{ flex: 1, gap: spacing['0.5'] }}>
-                <Text variant="headingSm">{profile.displayName}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                  <Text variant="headingSm" numberOfLines={1} style={{ flexShrink: 1 }}>
+                    {profile.displayName}
+                  </Text>
+                  {isPremium && (
+                    <View
+                      style={{
+                        backgroundColor: colors.primary,
+                        borderRadius: radius.full,
+                        paddingHorizontal: spacing[2],
+                        paddingVertical: spacing['0.5'],
+                      }}
+                    >
+                      <Text variant="labelSm" color={colors.onPrimary}>PRO</Text>
+                    </View>
+                  )}
+                </View>
                 <Text variant="bodySm" color={colors.onSurfaceVariant}>
                   {profile.email}
                 </Text>
