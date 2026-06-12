@@ -75,7 +75,8 @@
           "iosUrlScheme": "com.googleusercontent.apps.864170396383-4da514g9biulc0374haev0khj9iing07"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/withModularHeaders.js"
     ],
     "extra": {
       "router": {},
