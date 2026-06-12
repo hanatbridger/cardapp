@@ -94,16 +94,23 @@ function extractProductId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-// Double Rare is the base ex-card rarity (the two-black-star bulk of
-// every modern set). They dominate the leaderboard by count and aren't
-// the cards users track for movement/valuation, so we drop them from
-// every trending mode. Collectrics tags them rarity-name "Double Rare"
-// / rarity-code "DR". NOTE: do NOT match code "RR" — that's Radiant
-// Rare, a distinct (and wanted) rarity.
-function isDoubleRare(r: CollectricsRow): boolean {
+// Low-signal rarities we drop from every trending mode (movers,
+// undervalued, overvalued). These dominate the leaderboard by count but
+// aren't the cards users track for movement/valuation:
+//   - Double Rare      (rarity-name "Double Rare" / code "DR") — the base
+//                       two-black-star ex-card rarity, the bulk of any set
+//   - ACE SPEC Rare    (name "ACE SPEC Rare" / code "AS")
+//   - Common / Uncommon (name "Common"/"Uncommon" / code "C"/"U")
+// NOTE: code "RR" is Radiant Rare — a distinct, wanted rarity — so it is
+// deliberately NOT matched here.
+function isExcludedRarity(r: CollectricsRow): boolean {
   const name = (r['rarity-name'] ?? '').trim().toLowerCase();
   const code = (r['rarity-code'] ?? '').trim().toLowerCase();
-  return name === 'double rare' || code === 'dr';
+  if (name === 'double rare' || code === 'dr') return true;
+  if (name.includes('ace spec') || code === 'as') return true;
+  if (name === 'common' || code === 'c') return true;
+  if (name === 'uncommon' || code === 'u') return true;
+  return false;
 }
 
 /**
@@ -268,7 +275,7 @@ export default async function handler(req: Request): Promise<Response> {
           typeof r['raw-price'] === 'number' &&
           r['raw-price']! > 0 &&
           typeof r['dod-change-pct'] === 'number' &&
-          !isDoubleRare(r),
+          !isExcludedRarity(r),
       )
       .map((r): TrendingTile | null => {
         const productId = extractProductId(r['image-url'] ?? '');
