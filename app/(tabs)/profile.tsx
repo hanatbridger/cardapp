@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Platform, Linking } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import {
@@ -121,17 +121,13 @@ function ProfileScreen() {
     }
   };
 
-  // TODO(launch): once CardPulse is live in the App Store / Play Store,
-  // wire this to the real listing. Best path is `expo-store-review`'s
-  // `requestReview()` for the native in-app prompt, falling back to
-  // `Linking.openURL` for a deep link to the listing. Until then this
-  // button is hidden — the placeholder URL `id6740000000` would 404 and
-  // looked broken to anyone who tapped it.
+  // Live App Store listing (CardPulse: Card Tracker). ?action=write-review
+  // drops the user straight onto the review sheet instead of the listing,
+  // which is what a "Rate" button promises.
   const handleRate = () => {
-    Alert.alert(
-      'Thanks!',
-      "CardPulse isn't on the App Store yet. We'll prompt you to rate the app once it's live.",
-    );
+    Linking.openURL(
+      'https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336?action=write-review',
+    ).catch(() => {});
   };
 
   return (
