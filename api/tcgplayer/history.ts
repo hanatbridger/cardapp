@@ -117,41 +117,34 @@ export default async function handler(req: Request): Promise<Response> {
   // history to every user.
   let confirmedViaApi = false;
 
-  // 2. If still no productId resolved AND we have a cardId, look up
-  // Pokemon TCG API → get the tcgplayer URL → extract productId →
-  // find snapshots with that productId. This handles the cold-start
-  // case where the cron has stored snapshots with NULL card_id and
-  // we need to map a cardId to one.
+  // 2. If still no productId resolved AND we have a cardId, resolve it by
+  // FOLLOWING the prices.pokemontcg.io redirect (same approach as
+  // api/tcgplayer/price.ts). GET with redirect:'manual' returns a Location
+  // header that ends at tcgplayer.com/product/{productId} — that numeric
+  // id matches the product_id the snapshot cron stores from collectrics.
+  //
+  // The Pokemon TCG API's own `tcgplayer.url` field is only
+  // `prices.pokemontcg.io/tcgplayer/{cardId}` — it has NO numeric product
+  // id — so parsing that (the old approach) never resolved anything and
+  // every chart came back empty even though the snapshot rows existed.
   if (!productId && cardId) {
     try {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 2500);
       const res = await fetch(
-        `https://api.pokemontcg.io/v2/cards/${encodeURIComponent(cardId)}`,
+        `https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`,
         {
+          redirect: 'manual',
           headers: { 'user-agent': 'CardPulse History Resolver' },
           signal: ctl.signal,
         },
       );
       clearTimeout(timer);
-      if (res.ok) {
-        const data = await res.json();
-        const tcgUrl: string | undefined = data?.data?.tcgplayer?.url;
-        // tcgplayer.url looks like https://prices.pokemontcg.io/tcgplayer/<id>
-        // which 302-redirects to a /product/{productId} page — but
-        // the more useful path: Pokemon TCG API also exposes the
-        // product url directly. Match either pattern.
-        const m =
-          tcgUrl?.match(/\/product\/(\d+)/) ??
-          tcgUrl?.match(/tcgplayer\/(.+)$/);
-        if (m) {
-          // If we extracted a Pokemon TCG id-style suffix (not a numeric
-          // productId), we still don't have the productId — bail.
-          if (/^\d+$/.test(m[1])) {
-            productId = m[1];
-            confirmedViaApi = true;
-          }
-        }
+      const location = res.headers.get('location') ?? '';
+      const m = location.match(/tcgplayer\.com\/product\/(\d+)/);
+      if (m) {
+        productId = m[1];
+        confirmedViaApi = true;
       }
     } catch {
       // Resolver miss is fine — we'll return empty below.
