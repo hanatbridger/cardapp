@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { useUserStore } from '../stores/user-store';
 import {
-  CURRENCIES,
+  currencyMeta,
   DEFAULT_CURRENCY,
-  type CurrencyCode,
+  FALLBACK_RATES,
 } from '../constants/currencies';
 import { useFxRates } from './use-fx-rates';
 
@@ -13,30 +13,37 @@ import { useFxRates } from './use-fx-rates';
  * decimals). Every price in the app flows through here, so flipping the
  * currency preference re-renders all of them.
  *
- * Mirrors the legacy USD formatter's rule: >= 1000 shows grouped whole
- * units, below shows the currency's decimals; null/NaN degrade to "--".
+ * Mirrors the legacy USD rule: >= 1000 shows grouped whole units, below
+ * shows the currency's decimals; null/NaN degrade to "--". If no rate is
+ * available yet for an exotic currency, it falls back to the raw USD value
+ * rather than showing a converted number with the wrong rate.
  */
 export function useMoney(): (usd: number | null | undefined) => string {
   // `?? DEFAULT_CURRENCY` covers users persisted before the currency
   // preference existed (their preferences blob has no `currency` key).
   const currency = useUserStore(
-    (s) => (s.preferences.currency ?? DEFAULT_CURRENCY) as CurrencyCode,
+    (s) => s.preferences.currency ?? DEFAULT_CURRENCY,
   );
   const rates = useFxRates();
 
   return useCallback(
     (usd) => {
       if (usd == null || !Number.isFinite(usd)) return '--';
-      const meta = CURRENCIES[currency] ?? CURRENCIES[DEFAULT_CURRENCY];
-      const rate = rates[currency] ?? 1;
-      const amount = usd * rate;
-      // Branch on the rounded value so e.g. 999.999 formats as 1,000.
-      const rounded = Math.round(amount * 100) / 100;
-      if (rounded >= 1000) {
-        return `${meta.symbol}${Math.round(amount).toLocaleString('en-US')}`;
-      }
-      return `${meta.symbol}${amount.toFixed(meta.decimals)}`;
+      const rate = rates[currency] ?? FALLBACK_RATES[currency];
+      // No rate for this currency yet (offline + exotic pick) — show the
+      // honest USD value rather than a wrongly-converted number.
+      if (rate == null) return `$${formatAmount(usd, 2)}`;
+
+      const meta = currencyMeta(currency);
+      return `${meta.symbol}${formatAmount(usd * rate, meta.decimals)}`;
     },
     [currency, rates],
   );
+}
+
+function formatAmount(amount: number, decimals: number): string {
+  // Branch on the rounded value so e.g. 999.999 formats as 1,000.
+  const rounded = Math.round(amount * 100) / 100;
+  if (rounded >= 1000) return Math.round(amount).toLocaleString('en-US');
+  return amount.toFixed(decimals);
 }

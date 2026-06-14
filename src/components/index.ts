@@ -20,6 +20,7 @@ export { AIValuation } from './AIValuation';
 export { AIPicks, type AIPickItem } from './AIPicks';
 export { ScreenBackground } from './ScreenBackground';
 export { PriceAlertModal } from './PriceAlertModal';
+export { CurrencyPickerModal } from './CurrencyPickerModal';
 export { WatchlistFullModal } from './WatchlistFullModal';
 export { CardFundamentals } from './CardFundamentals';
 export { MarketDynamics } from './MarketDynamics';

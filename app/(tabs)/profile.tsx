@@ -1,17 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, ScrollView, Pressable, Alert, Platform, Linking } from 'react-native';
 import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import {
   IconCrown, IconShield, IconFileText, IconHelpCircle, IconLogout,
-  IconChevronRight, IconDeviceMobile, IconStar,
+  IconChevronRight, IconDeviceMobile, IconStar, IconCoin,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, Card, Button, ScreenBackground, SegmentedControl, withErrorBoundary } from '../../src/components';
+import { Text, Card, Button, ScreenBackground, SegmentedControl, CurrencyPickerModal, withErrorBoundary } from '../../src/components';
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
-import { CURRENCIES, CURRENCY_CODES, DEFAULT_CURRENCY } from '../../src/constants/currencies';
+import { currencyMeta, DEFAULT_CURRENCY } from '../../src/constants/currencies';
 import { useUserStore } from '../../src/stores/user-store';
 
 interface SettingsRowProps {
@@ -83,6 +83,7 @@ function ProfileScreen() {
   const themePreference = useUserStore((s) => s.preferences.theme);
   const currency = useUserStore((s) => s.preferences.currency ?? DEFAULT_CURRENCY);
   const updatePreference = useUserStore((s) => s.updatePreference);
+  const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
   const selectedThemeIndex = Math.max(0, THEME_VALUES.indexOf(themePreference));
 
   const handleSignOut = () => {
@@ -227,56 +228,22 @@ function ProfileScreen() {
         </View>
 
         {/* Currency — prices are sourced in USD and converted to the
-            chosen currency via useMoney(). Writes to preferences.currency;
-            every price across the app re-renders on change. */}
+            chosen currency via useMoney(). The row opens a searchable tray
+            of every currency; selecting one writes preferences.currency
+            and every price across the app re-renders. */}
         <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
           <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
             CURRENCY
           </Text>
         </View>
-        <View
-          style={{
-            paddingHorizontal: HORIZONTAL_PADDING,
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: spacing[2],
-          }}
-        >
-          {CURRENCY_CODES.map((code) => {
-            const selected = currency === code;
-            return (
-              <Pressable
-                key={code}
-                onPress={() => updatePreference('currency', code)}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={`${CURRENCIES[code].label} (${code})`}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: spacing[1],
-                  paddingHorizontal: spacing[3],
-                  paddingVertical: spacing[2],
-                  borderRadius: radius.full,
-                  backgroundColor: selected ? colors.primary : colors.surfaceVariant,
-                  borderWidth: 1,
-                  borderColor: selected ? colors.primary : colors.outlineVariant,
-                  opacity: pressed ? 0.85 : 1,
-                })}
-              >
-                <Text variant="labelLg" color={selected ? colors.onPrimary : colors.onSurface}>
-                  {code}
-                </Text>
-                <Text
-                  variant="labelLg"
-                  color={selected ? withAlpha(colors.onPrimary, 0.8) : colors.onSurfaceMuted}
-                >
-                  {CURRENCIES[code].symbol}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+        <Card style={{ marginHorizontal: HORIZONTAL_PADDING, padding: 0, overflow: 'hidden' }}>
+          <SettingsRow
+            icon={<IconCoin size={18} color={colors.onSurfaceVariant} />}
+            label="Display currency"
+            value={`${currency} · ${currencyMeta(currency).symbol.trim()}`}
+            onPress={() => setCurrencyPickerVisible(true)}
+          />
+        </Card>
 
         {/* Legal */}
         <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
@@ -354,6 +321,13 @@ function ProfileScreen() {
 
         <View style={{ height: spacing[4] }} />
       </ScrollView>
+
+      <CurrencyPickerModal
+        visible={currencyPickerVisible}
+        selected={currency}
+        onSelect={(code) => updatePreference('currency', code)}
+        onClose={() => setCurrencyPickerVisible(false)}
+      />
     </ScreenBackground>
   );
 }
