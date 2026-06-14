@@ -4,17 +4,21 @@
 //
 // Flow:
 //   1. Vercel hits this endpoint with `Authorization: Bearer ${CRON_SECRET}`
-//   2. We re-fetch mycollectrics.com/api/card_leaderboard (same upstream
-//      the user-facing /api/trending uses) but for the FULL list, not
-//      just movers — every row becomes a snapshot.
-//   3. Each row is upserted into public.price_snapshots with
-//      ON CONFLICT (product_id, snapshot_date, source) DO UPDATE — so a
-//      manual retry within the same UTC day is idempotent.
-//   4. Resolver pass for cardId happens lazily — we store product_id
-//      always, and resolve card_id on demand at chart fetch time
-//      (api/tcgplayer/history.ts). This keeps the cron fast and lets
-//      late-published Pokemon TCG API entries catch up without a
-//      reingest.
+//   2. We fetch mycollectrics.com/api/card_leaderboard (same upstream the
+//      user-facing /api/trending uses) for the FULL list.
+//   3. Each card's `sparkline.ungraded-price` is a ~30-day daily series,
+//      so we expand every row into one snapshot per day and upsert them
+//      into public.price_snapshots ON CONFLICT (product_id, snapshot_date,
+//      source) DO NOTHING. A single successful run therefore BACKFILLS a
+//      full ~30-day chart instead of accumulating one point per day over
+//      a month. Cards without a sparkline fall back to a single
+//      today's-price row.
+//   4. card_id is resolved lazily — we store product_id always, and map
+//      card_id on demand at chart fetch time (api/tcgplayer/history.ts).
+//
+// To populate immediately after first deploy, trigger it manually:
+//   curl -H "Authorization: Bearer $CRON_SECRET" \
+//     https://<deployment>/api/cron/snapshot-prices
 //
 // Required env (Vercel project):
 //   SUPABASE_URL                — same one used elsewhere
@@ -28,6 +32,11 @@ import { createClient } from '@supabase/supabase-js';
 
 export const config = { runtime: 'edge' };
 
+interface SparklinePoint {
+  date: string; // YYYY-MM-DD
+  value: number;
+}
+
 interface CollectricsRow {
   id: string;
   'product-name': string;
@@ -36,6 +45,12 @@ interface CollectricsRow {
   'raw-price'?: number;
   'dod-change-pct'?: number;
   'baseline-change-pct'?: number;
+  // The leaderboard ships a ~30-day daily history per card. This is what
+  // lets us build real charts immediately instead of waiting 30 days for
+  // a once-a-day snapshot to accumulate.
+  sparkline?: {
+    'ungraded-price'?: SparklinePoint[];
+  };
 }
 
 interface SnapshotRow {
@@ -110,34 +125,63 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  // 2. Map rows → snapshot inserts. Keep ONLY rows with a usable
-  // product_id + raw_price. Everything else (missing image, no price)
-  // is junk for our purposes.
+  // 2. Map rows → snapshot inserts. Each card's `sparkline.ungraded-price`
+  // is a ~30-day daily series; we emit one snapshot per point so a single
+  // run backfills a full chart. Cards without a sparkline fall back to a
+  // single row from today's raw-price (the old behaviour) so they're not
+  // dropped. card_id stays null — resolved lazily at chart-fetch time
+  // (api/tcgplayer/history.ts). dod/baseline aren't carried per historical
+  // day; the chart only needs date + price.
   const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD in UTC
-  const snapshots: SnapshotRow[] = rows
-    .map((r): SnapshotRow | null => {
-      const product_id = extractProductId(r['image-url'] ?? '');
-      const raw_price = r['raw-price'];
-      if (!product_id || typeof raw_price !== 'number' || raw_price <= 0) {
-        return null;
+  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+  const snapshots: SnapshotRow[] = [];
+
+  for (const r of rows) {
+    const product_id = extractProductId(r['image-url'] ?? '');
+    if (!product_id) continue;
+
+    const series = r.sparkline?.['ungraded-price'];
+    if (Array.isArray(series) && series.length > 0) {
+      for (const p of series) {
+        if (
+          p &&
+          typeof p.value === 'number' &&
+          p.value > 0 &&
+          typeof p.date === 'string' &&
+          ISO_DATE.test(p.date)
+        ) {
+          snapshots.push({
+            product_id,
+            card_id: null,
+            snapshot_date: p.date,
+            raw_price: p.value,
+            dod_change_pct: null,
+            baseline_change_pct: null,
+            source: 'collectrics',
+          });
+        }
       }
-      return {
+      continue;
+    }
+
+    // Fallback: no sparkline — record today's price only.
+    const raw_price = r['raw-price'];
+    if (typeof raw_price === 'number' && raw_price > 0) {
+      snapshots.push({
         product_id,
-        card_id: null, // resolved lazily in api/tcgplayer/history
+        card_id: null,
         snapshot_date: today,
         raw_price,
         dod_change_pct:
-          typeof r['dod-change-pct'] === 'number'
-            ? r['dod-change-pct'] * 100
-            : null,
+          typeof r['dod-change-pct'] === 'number' ? r['dod-change-pct'] * 100 : null,
         baseline_change_pct:
           typeof r['baseline-change-pct'] === 'number'
             ? r['baseline-change-pct'] * 100
             : null,
         source: 'collectrics',
-      };
-    })
-    .filter((s): s is SnapshotRow => s !== null);
+      });
+    }
+  }
 
   if (snapshots.length === 0) {
     return new Response(
@@ -146,40 +190,47 @@ export default async function handler(req: Request): Promise<Response> {
     );
   }
 
-  // 3. Upsert. Batch in chunks to avoid hitting payload limits on
-  // large leaderboards (~2-3k rows on a busy day).
+  // 3. Insert in chunks. ignoreDuplicates:true makes the job resumable
+  // and cheap: the first run inserts the whole ~30-day backfill (~50k
+  // rows); if it times out, the next run skips what already landed and
+  // continues. Subsequent daily runs only insert each card's newest day.
+  // Historical sparkline values are stable, so not re-updating them is
+  // fine. Larger chunks keep the request count (and wall-clock) low so we
+  // stay inside the edge time budget.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const CHUNK = 500;
-  let inserted = 0;
+  const CHUNK = 1000;
+  let processed = 0;
   for (let i = 0; i < snapshots.length; i += CHUNK) {
     const chunk = snapshots.slice(i, i + CHUNK);
     const { error } = await admin
       .from('price_snapshots')
       .upsert(chunk, {
         onConflict: 'product_id,snapshot_date,source',
-        ignoreDuplicates: false,
+        ignoreDuplicates: true,
       });
     if (error) {
       return new Response(
         JSON.stringify({
           error: 'Upsert failed',
           chunk_start: i,
+          processed,
           detail: error.message,
         }),
         { status: 500, headers: { 'Content-Type': 'application/json' } },
       );
     }
-    inserted += chunk.length;
+    processed += chunk.length;
   }
 
   return new Response(
     JSON.stringify({
-      snapshot_date: today,
-      total_rows: rows.length,
-      inserted,
+      run_date: today,
+      cards: rows.length,
+      snapshot_rows: snapshots.length,
+      processed,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );
