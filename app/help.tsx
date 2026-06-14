@@ -127,7 +127,7 @@ function HelpScreen() {
               <Button
                 variant="outlined"
                 icon={<IconMail size={16} color={colors.primary} />}
-                onPress={() => Linking.openURL('mailto:han@bridgercreative.com?subject=CardPulse%20Support')}
+                onPress={() => Linking.openURL('mailto:hanwong118@gmail.com?subject=CardPulse%20Support')}
               >
                 Contact Support
               </Button>
