@@ -24,7 +24,7 @@ import {
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
-import { formatPrice, formatRelativeTime } from '../../src/utils/format';
+import { formatRelativeTime } from '../../src/utils/format';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING, LARGE_CARD_BORDER_RADIUS } from '../../src/constants/layout';
 import { cardShareUrl } from '../../src/constants/links';
@@ -33,7 +33,7 @@ import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
 import { useWatchlistStore, useUserStore } from '../../src/stores';
 import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
-import { useCardDetail, useCardPrice, usePriceHistory } from '../../src/hooks';
+import { useCardDetail, useCardPrice, usePriceHistory, useMoney } from '../../src/hooks';
 
 const screenWidth = Dimensions.get('window').width;
 const TIME_RANGES = ['1D', '1W', '1M', '3M'];
@@ -41,6 +41,7 @@ const TIME_RANGES = ['1D', '1W', '1M', '3M'];
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  const formatMoney = useMoney();
   const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
   // Default grade comes from user preferences and is persisted across
   // sessions — pick whatever the user last viewed so they don't have to
@@ -339,7 +340,7 @@ function CardDetailScreen() {
               onPress={async () => {
                 try {
                   const url = cardShareUrl(id);
-                  const priceLine = price ? ` — currently ${formatPrice(price.currentPrice)}` : '';
+                  const priceLine = price ? ` — currently ${formatMoney(price.currentPrice)}` : '';
                   await Share.share({
                     // iOS uses `url` for the rich link target; Android folds it
                     // into the message body. We include it in `message` too so
@@ -423,12 +424,12 @@ function CardDetailScreen() {
               <Card elevated>
                 <View style={{ gap: spacing[3] }}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] }}>
-                    <Text variant="displaySm">{formatPrice(price.currentPrice)}</Text>
+                    <Text variant="displaySm">{formatMoney(price.currentPrice)}</Text>
                     <PriceChange percent={price.percentChange} size="md" />
                   </View>
                   <Text variant="caption" color={colors.onSurfaceMuted}>
                     {price.lastSaleDate
-                      ? `Last sale ${formatPrice(price.lastSalePrice)} on ${price.lastSaleDate} via `
+                      ? `Last sale ${formatMoney(price.lastSalePrice)} on ${price.lastSaleDate} via `
                       : 'Price via '}
                     <Text
                       variant="caption"
@@ -611,6 +612,7 @@ function CardDetailScreen() {
                   height={200}
                   width={screenWidth - HORIZONTAL_PADDING * 2 - spacing[6] * 2}
                   interactive
+                  formatValue={formatMoney}
                 />
               </View>
             </Card>

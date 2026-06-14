@@ -23,15 +23,16 @@ import {
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
-import { formatPrice, formatRelativeTime } from '../../src/utils/format';
+import { formatRelativeTime } from '../../src/utils/format';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { SEALED_TYPE_LABEL } from '../../src/mocks/sealed';
-import { useSealedProduct, useSealedPrice } from '../../src/hooks';
+import { useSealedProduct, useSealedPrice, useMoney } from '../../src/hooks';
 import { useWatchlistStore } from '../../src/stores';
 
 function SealedDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  const formatMoney = useMoney();
   const productQuery = useSealedProduct(id);
   const product = productQuery.data ?? null;
   const priceQuery = useSealedPrice(id, product?.tcgplayerProductId);
@@ -221,7 +222,7 @@ function SealedDetailScreen() {
                     variant="display"
                     style={{ fontVariant: ['tabular-nums'] as any }}
                   >
-                    {formatPrice(price.currentPrice)}
+                    {formatMoney(price.currentPrice)}
                   </Text>
                   <PriceChange percent={price.percentChange} size="md" />
                 </View>
@@ -236,7 +237,7 @@ function SealedDetailScreen() {
                   <View style={{ flex: 1, gap: spacing['0.5'] }}>
                     <Text variant="caption" color={colors.onSurfaceVariant}>MSRP</Text>
                     <Text variant="bodyMd" style={{ fontVariant: ['tabular-nums'] as any }}>
-                      {formatPrice(product.msrp)}
+                      {formatMoney(product.msrp)}
                     </Text>
                   </View>
                   {vsMsrp !== null ? (
@@ -264,7 +265,7 @@ function SealedDetailScreen() {
                 <Text variant="caption" color={colors.onSurfaceMuted}>
                   Last sale {formatRelativeTime(new Date(price.lastSaleDate).getTime())} ·{' '}
                   <Text variant="caption" style={{ fontVariant: ['tabular-nums'] as any }}>
-                    {formatPrice(price.lastSalePrice)}
+                    {formatMoney(price.lastSalePrice)}
                   </Text>
                 </Text>
               ) : null}
@@ -282,19 +283,19 @@ function SealedDetailScreen() {
                   <View style={{ flex: 1, gap: spacing['0.5'] }}>
                     <Text variant="caption" color={colors.onSurfaceVariant}>Low</Text>
                     <Text variant="headingMd" style={{ fontVariant: ['tabular-nums'] as any }}>
-                      {formatPrice(price.lowPrice)}
+                      {formatMoney(price.lowPrice)}
                     </Text>
                   </View>
                   <View style={{ flex: 1, gap: spacing['0.5'] }}>
                     <Text variant="caption" color={colors.onSurfaceVariant}>Avg</Text>
                     <Text variant="headingMd" style={{ fontVariant: ['tabular-nums'] as any }}>
-                      {formatPrice(price.averagePrice)}
+                      {formatMoney(price.averagePrice)}
                     </Text>
                   </View>
                   <View style={{ flex: 1, gap: spacing['0.5'] }}>
                     <Text variant="caption" color={colors.onSurfaceVariant}>High</Text>
                     <Text variant="headingMd" style={{ fontVariant: ['tabular-nums'] as any }}>
-                      {formatPrice(price.highPrice)}
+                      {formatMoney(price.highPrice)}
                     </Text>
                   </View>
                 </View>

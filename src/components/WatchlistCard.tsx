@@ -10,7 +10,7 @@ import { PriceChange } from './PriceChange';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { CARD_BORDER_RADIUS } from '../constants/layout';
-import { formatPrice } from '../utils/format';
+import { useMoney } from '../hooks/use-money';
 import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getValuation } from '../services/price-prediction';
@@ -44,6 +44,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   fallbackPrice,
 }: WatchlistCardProps) {
   const { colors } = useTheme();
+  const formatMoney = useMoney();
 
   // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
   // from every watchlist surface until the eBay live proxy ships.
@@ -149,7 +150,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
         {price ? (
           <>
             <Text variant="headingSm">
-              {formatPrice(price.currentPrice)}
+              {formatMoney(price.currentPrice)}
             </Text>
             <PriceChange percent={price.percentChange} size="sm" />
           </>

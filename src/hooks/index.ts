@@ -11,3 +11,5 @@ export {
   useSealedPriceHistory,
 } from './use-sealed';
 export { useTrending, useTrendingMovers } from './use-trending';
+export { useFxRates } from './use-fx-rates';
+export { useMoney } from './use-money';

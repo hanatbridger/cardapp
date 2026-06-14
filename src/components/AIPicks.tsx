@@ -6,7 +6,7 @@ import { IconTrendingUp, IconTrendingDown, IconBrain } from '@tabler/icons-react
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
-import { formatPrice } from '../utils/format';
+import { useMoney } from '../hooks/use-money';
 import type { CardScore } from '../services/price-prediction';
 
 export interface AIPickItem {
@@ -35,6 +35,7 @@ interface AIPicksProps {
 
 function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'overvalued' }) {
   const { colors } = useTheme();
+  const formatMoney = useMoney();
   const isUnder = type === 'undervalued';
   const accentColor = isUnder ? colors.success : colors.danger;
   const Icon = isUnder ? IconTrendingUp : IconTrendingDown;
@@ -67,7 +68,7 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
         <Text variant="caption" color={colors.onSurfaceMuted}>{item.setName}</Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: spacing['0.5'] }}>
-        <Text variant="labelLg">{formatPrice(item.marketPrice)}</Text>
+        <Text variant="labelLg">{formatMoney(item.marketPrice)}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing['0.5'] }}>
           <Icon size={12} color={accentColor} />
           <Text variant="labelSm" color={accentColor}>

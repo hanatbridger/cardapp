@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GradeType } from '../constants/grades';
+import type { CurrencyCode } from '../constants/currencies';
 import { setUser as setSentryUser } from '../services/sentry';
 import { supabase, signOutFromSupabase, deleteUserAccount } from '../services/supabase';
 
@@ -16,6 +17,8 @@ interface UserPreferences {
   hapticEnabled: boolean;
   defaultGrade: GradeType;
   notificationsEnabled: boolean;
+  /** Display currency — prices are sourced in USD and converted to this. */
+  currency: CurrencyCode;
 }
 
 type AuthProvider = 'email' | 'apple' | 'google';
@@ -67,6 +70,7 @@ export const useUserStore = create<UserStore>()(
         hapticEnabled: true,
         defaultGrade: 'PSA10',
         notificationsEnabled: true,
+        currency: 'USD',
       },
       recentSearches: [],
       hasCompletedOnboarding: false,
@@ -148,6 +152,7 @@ export const useUserStore = create<UserStore>()(
             // PSA 10 is gated at launch — Raw is the only viewable grade
             defaultGrade: 'UNGRADED',
             notificationsEnabled: true,
+            currency: 'USD',
           },
           recentSearches: [],
           // Leave hasCompletedOnboarding alone. Resetting it makes

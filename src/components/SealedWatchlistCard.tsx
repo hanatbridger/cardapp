@@ -9,7 +9,7 @@ import { PriceChange } from './PriceChange';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { CARD_BORDER_RADIUS } from '../constants/layout';
-import { formatPrice } from '../utils/format';
+import { useMoney } from '../hooks/use-money';
 import { useSealedPrice } from '../hooks/use-sealed';
 import { SEALED_TYPE_LABEL } from '../mocks/sealed';
 import type { SealedType } from '../types/sealed';
@@ -41,6 +41,7 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
   fallbackPriceChange,
 }: SealedWatchlistCardProps) {
   const { colors } = useTheme();
+  const formatMoney = useMoney();
 
   // Shares the React Query cache with the detail screen so the same
   // sealed product always reads the same Market Price across the app.
@@ -103,7 +104,7 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
         {currentPrice !== undefined ? (
           <>
             <Text variant="headingSm" style={{ fontVariant: ['tabular-nums'] as any }}>
-              {formatPrice(currentPrice)}
+              {formatMoney(currentPrice)}
             </Text>
             {percentChange !== undefined ? <PriceChange percent={percentChange} size="sm" /> : null}
           </>

@@ -13,6 +13,13 @@ interface PriceChartProps {
   color?: string;
   showGradient?: boolean;
   interactive?: boolean;
+  /**
+   * Formats a (USD) value for the crosshair + axis labels. Defaults to
+   * plain USD; the card screen passes a currency-aware formatter so chart
+   * labels follow the user's display currency. The line geometry uses raw
+   * values and is scale-invariant, so only the labels need converting.
+   */
+  formatValue?: (value: number) => string;
 }
 
 interface TouchInfo {
@@ -32,6 +39,7 @@ export function PriceChart({
   color: colorOverride,
   showGradient = true,
   interactive = false,
+  formatValue = (v) => `$${v.toFixed(2)}`,
 }: PriceChartProps) {
   const { colors } = useTheme();
   const [activePoint, setActivePoint] = useState<TouchInfo | null>(null);
@@ -162,7 +170,7 @@ export function PriceChart({
         >
           {activePoint ? (
             <>
-              <Text variant="headingMd">${activePoint.price.toFixed(2)}</Text>
+              <Text variant="headingMd">{formatValue(activePoint.price)}</Text>
               <Text variant="caption" color={colors.onSurfaceMuted}>
                 {formatDate(activePoint.date)}
               </Text>
@@ -210,14 +218,14 @@ export function PriceChart({
                 x={chartWidth + 8} y={pad + 4}
                 fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
               >
-                ${maxPrice.toFixed(0)}
+                {formatValue(maxPrice)}
               </SvgText>
               {/* Low label */}
               <SvgText
                 x={chartWidth + 8} y={chartHeight - pad + 4}
                 fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
               >
-                ${minPrice.toFixed(0)}
+                {formatValue(minPrice)}
               </SvgText>
             </>
           )}

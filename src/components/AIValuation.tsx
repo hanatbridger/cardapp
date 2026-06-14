@@ -9,7 +9,7 @@ import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getMarketDynamics } from '../data/ebay-market-dynamics';
 import { getValuation, type Valuation } from '../services/price-prediction';
-import { formatPrice } from '../utils/format';
+import { useMoney } from '../hooks/use-money';
 import type { PokemonCard } from '../types/card';
 
 interface AIValuationProps {
@@ -75,6 +75,7 @@ function computeMarketSignal(
 
 export function AIValuation({ card, marketPrice }: AIValuationProps) {
   const { colors } = useTheme();
+  const formatMoney = useMoney();
 
   const score = getCardScore(card.id);
   const dynamics = getMarketDynamics(card.id);
@@ -144,7 +145,7 @@ export function AIValuation({ card, marketPrice }: AIValuationProps) {
               {labelText}
             </Text>
             <Text variant="caption" color={colors.onSurfaceMuted}>
-              AI predicted fair value: {formatPrice(valuation.predictedPrice)}
+              AI predicted fair value: {formatMoney(valuation.predictedPrice)}
             </Text>
           </View>
         </View>

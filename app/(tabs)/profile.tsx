@@ -11,6 +11,7 @@ import { Text, Card, Button, ScreenBackground, SegmentedControl, withErrorBounda
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { CURRENCIES, CURRENCY_CODES, DEFAULT_CURRENCY } from '../../src/constants/currencies';
 import { useUserStore } from '../../src/stores/user-store';
 
 interface SettingsRowProps {
@@ -80,6 +81,7 @@ function ProfileScreen() {
   const { colors } = useTheme();
   const { profile, signOut, deleteAccount, isPremium } = useUserStore();
   const themePreference = useUserStore((s) => s.preferences.theme);
+  const currency = useUserStore((s) => s.preferences.currency ?? DEFAULT_CURRENCY);
   const updatePreference = useUserStore((s) => s.updatePreference);
   const selectedThemeIndex = Math.max(0, THEME_VALUES.indexOf(themePreference));
 
@@ -222,6 +224,58 @@ function ProfileScreen() {
             selected={selectedThemeIndex}
             onSelect={(i) => updatePreference('theme', THEME_VALUES[i])}
           />
+        </View>
+
+        {/* Currency — prices are sourced in USD and converted to the
+            chosen currency via useMoney(). Writes to preferences.currency;
+            every price across the app re-renders on change. */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
+          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
+            CURRENCY
+          </Text>
+        </View>
+        <View
+          style={{
+            paddingHorizontal: HORIZONTAL_PADDING,
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: spacing[2],
+          }}
+        >
+          {CURRENCY_CODES.map((code) => {
+            const selected = currency === code;
+            return (
+              <Pressable
+                key={code}
+                onPress={() => updatePreference('currency', code)}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                accessibilityLabel={`${CURRENCIES[code].label} (${code})`}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: spacing[1],
+                  paddingHorizontal: spacing[3],
+                  paddingVertical: spacing[2],
+                  borderRadius: radius.full,
+                  backgroundColor: selected ? colors.primary : colors.surfaceVariant,
+                  borderWidth: 1,
+                  borderColor: selected ? colors.primary : colors.outlineVariant,
+                  opacity: pressed ? 0.85 : 1,
+                })}
+              >
+                <Text variant="labelLg" color={selected ? colors.onPrimary : colors.onSurface}>
+                  {code}
+                </Text>
+                <Text
+                  variant="labelLg"
+                  color={selected ? withAlpha(colors.onPrimary, 0.8) : colors.onSurfaceMuted}
+                >
+                  {CURRENCIES[code].symbol}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* Legal */}
