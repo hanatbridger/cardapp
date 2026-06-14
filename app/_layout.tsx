@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import * as Notifications from 'expo-notifications';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { queryClient } from '../src/lib/query-client';
@@ -25,6 +26,7 @@ import {
   registerRevenueCatIdentitySync,
 } from '../src/services/revenue-cat';
 import { configureGoogleSignin } from '../src/services/google-auth';
+import { registerForPushNotifications } from '../src/services/push';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
   useFonts,
@@ -61,6 +63,11 @@ configureGoogleSignin();
 // handler in the same pass — both are no-ops on web.
 defineBackgroundAlertTask();
 configureNotificationHandler();
+
+// Register this device's Expo push token with the backend so the server
+// can deliver news pushes even when the app is closed. No-op unless
+// notification permission is already granted (no launch-time prompt).
+registerForPushNotifications();
 
 // Pump Supabase token refresh while the app is foregrounded. Without
 // this RN suspends timers in the background and refresh-on-wake
@@ -146,8 +153,29 @@ function AuthGate() {
 }
 
 function AlertCheckerHost() {
+  const router = useRouter();
   useAlertChecker();
   useNewsNotifier();
+
+  // Route notification taps (there was no handler before, so tapping a
+  // notification just opened the app). News pushes open the News tab;
+  // alert/card notifications open the card. Covers warm taps and the
+  // cold-start case (app launched from a tapped notification).
+  useEffect(() => {
+    const route = (data: Record<string, unknown> | undefined) => {
+      if (!data) return;
+      if (data.type === 'news') router.push('/(tabs)/news');
+      else if (typeof data.cardId === 'string') router.push(`/card/${data.cardId}`);
+    };
+    const sub = Notifications.addNotificationResponseReceivedListener((r) =>
+      route(r.notification.request.content.data as Record<string, unknown>),
+    );
+    Notifications.getLastNotificationResponseAsync().then((r) => {
+      if (r) route(r.notification.request.content.data as Record<string, unknown>);
+    });
+    return () => sub.remove();
+  }, [router]);
+
   return null;
 }
 
