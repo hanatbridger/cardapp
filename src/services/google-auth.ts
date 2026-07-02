@@ -61,15 +61,41 @@ export function configureGoogleSignin(): void {
  */
 export const GOOGLE_SIGN_IN_CANCELLED = 'GOOGLE_SIGN_IN_CANCELLED';
 
+// Re-entrancy guard. GoogleSignIn-iOS crashes the process
+// ("An OAuth redirect was sent to a OIDExternalUserAgentSession after it
+// already completed", google/GoogleSignIn-iOS#547) when a second sign-in
+// starts while one is in flight — e.g. a double-tap on the button before
+// the sheet opens, or cancel + immediate re-tap. The AuthForm button has
+// no disabled state and the native module has no concurrency guard, so
+// this module-level flag is the single choke point protecting every
+// caller. The duplicate call throws the cancel sentinel, which callers
+// already swallow silently.
+let signInInFlight = false;
+
 /**
  * Native (iOS) Google sign-in. Resolves to a GoogleProfile on success.
- * Throws GOOGLE_SIGN_IN_CANCELLED if the user dismisses the sheet, or
- * a real Error on any other failure.
+ * Throws GOOGLE_SIGN_IN_CANCELLED if the user dismisses the sheet (or if
+ * a sign-in is already in flight), or a real Error on any other failure.
  */
 export async function signInWithGoogleNative(): Promise<GoogleProfile> {
   if (Platform.OS === 'web') {
     throw new Error('signInWithGoogleNative called on web');
   }
+  // Check BEFORE setting: the duplicate call must bail here without
+  // touching the flag, so its rejection can't clear the original
+  // call's guard (which would dead-end sign-in).
+  if (signInInFlight) {
+    throw new Error(GOOGLE_SIGN_IN_CANCELLED);
+  }
+  signInInFlight = true;
+  try {
+    return await runGoogleSignInNative();
+  } finally {
+    signInInFlight = false;
+  }
+}
+
+async function runGoogleSignInNative(): Promise<GoogleProfile> {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   const mod = require('@react-native-google-signin/google-signin');
   const { GoogleSignin, statusCodes } = mod;
