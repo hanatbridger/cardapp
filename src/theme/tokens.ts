@@ -321,8 +321,9 @@ export const glass = {
 
 export const gradients = {
   light: {
-    colors: ['#E8ECFF', '#F3E8FF', '#E8F4FF'] as const,
-    // Soft purple-blue morph — visible but not overwhelming
+    colors: ['#FFFFFF', '#FFFFFF', '#FFFFFF'] as const,
+    // Plain white canvas — the earlier lavender morph read as an
+    // off-brand color cast in light mode. Cards separate via borders.
   },
   dark: {
     colors: ['#0D1117', '#151025', '#0D1822'] as const,
