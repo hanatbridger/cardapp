@@ -1,186 +1,242 @@
 import { Tabs } from 'expo-router';
-import { View, Pressable, Platform } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, Pressable, Platform, Animated } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { Haptics } from '../../src/utils/haptics';
 import { IconHome, IconBell, IconUser, IconSearch, IconNews } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { spacing, radius } from '../../src/theme/tokens';
-import { withAlpha } from '../../src/utils/withAlpha';
+import { spacing } from '../../src/theme/tokens';
+import { useAlertsStore } from '../../src/stores/alerts-store';
 
-// Brand book v1.1 motif #3: floating tab bar.
-// Left: standalone 64pt glass circle with Home.
-// Right: flexible 64pt glass pill with Search · Bell · Profile.
-// Both surfaces share the same liquid-glass recipe, and every tab —
-// including Home — uses the same 48pt tonal-indigo active indicator so
-// the four tabs feel like one control. Figma ref: node 60:2.
-const BAR_HEIGHT = 64;
-const HOME_SIZE = BAR_HEIGHT;
-const ACTIVE_PILL_SIZE = 48;
+// Liquid-glass floating tab bar — a single frosted capsule that FLOATS
+// near the bottom edge; scene content scrolls underneath it (that live
+// backdrop is what the blur frosts — do not dock it or give it a solid
+// bg). One raised glass pill slides between tabs on selection.
+//
+// The rgba tints, inset-shadow recipe, #ff3b30 badge red, and the SVG
+// refraction filters below are SPEC-MANDATED values for this surface
+// (Apple-style liquid glass), intentionally not theme tokens — same
+// exception class as AuthForm's Apple HIG colors. Everything else
+// (icon color, spacing) stays tokenized.
+const TRACK_RADIUS = 100;
+const TRACK_PAD = 4;
 const ICON_SIZE = 26;
-const BLUR_INTENSITY = 40;
+const ICON_STROKE = 2;
+const ITEM_VPAD = 14;
+const BLUR_INTENSITY = 32;
+const FADE_MS = 240;
+const SLIDE_SPRING = { tension: 58, friction: 12 };
+const POP_SPRING = { tension: 300, friction: 10 };
+const POP_SCALE = 1.1;
+const INACTIVE_OPACITY = 0.2;
+
+// Display order — icon-only; label survives as the a11y name.
+const TABS = [
+  { name: 'index', label: 'Home', Icon: IconHome },
+  { name: 'search', label: 'Search', Icon: IconSearch },
+  { name: 'news', label: 'News', Icon: IconNews },
+  { name: 'notifications', label: 'Notifications', Icon: IconBell },
+  { name: 'profile', label: 'Profile', Icon: IconUser },
+] as const;
+
+// ── Web frosted glass ────────────────────────────────────────────────
+// Baseline (Safari/Firefox): plain backdrop blur. Chromium upgrade:
+// SVG displacement filters give real refraction — content scrolling
+// under the bar visibly bends, which is the "liquid" part. Gated on
+// CSS.supports('backdrop-filter','url(#x)'); injected once.
+const WEB_GLASS_ID = 'cardpulse-liquid-glass';
+
+function injectWebGlass() {
+  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+  if (document.getElementById(WEB_GLASS_ID)) return;
+
+  const hasRefraction =
+    typeof CSS !== 'undefined' && CSS.supports('backdrop-filter', 'url(#x)');
+
+  if (hasRefraction) {
+    const defs = document.createElement('div');
+    defs.id = `${WEB_GLASS_ID}-defs`;
+    defs.setAttribute('aria-hidden', 'true');
+    defs.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden';
+    defs.innerHTML = `<svg><defs>
+      <filter id="lg" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.013 0.018" numOctaves="2" seed="7" result="n"/>
+        <feGaussianBlur in="n" stdDeviation="2.2" result="nb"/>
+        <feDisplacementMap in="SourceGraphic" in2="nb" scale="28" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+      <filter id="lg-sm" x="-35%" y="-35%" width="170%" height="170%" color-interpolation-filters="sRGB">
+        <feTurbulence type="fractalNoise" baseFrequency="0.02 0.026" numOctaves="2" seed="7" result="n"/>
+        <feGaussianBlur in="n" stdDeviation="1.8" result="nb"/>
+        <feDisplacementMap in="SourceGraphic" in2="nb" scale="16" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs></svg>`;
+    document.body.appendChild(defs);
+  }
+
+  const style = document.createElement('style');
+  style.id = WEB_GLASS_ID;
+  // Filter chain order matters: refract (url) → soften (blur) → liven
+  // (saturate). Inset shadows: top specular rim, bottom shade, hairline.
+  style.textContent = hasRefraction
+    ? `[data-glass="track"]{backdrop-filter:url(#lg) blur(2px) saturate(1.6);-webkit-backdrop-filter:url(#lg) blur(2px) saturate(1.6);box-shadow:inset 0 1px 1px rgba(255,255,255,0.40),inset 0 -1px 1px rgba(0,0,0,0.22),inset 0 0 0 1px rgba(255,255,255,0.10);}
+[data-glass="pill"]{backdrop-filter:url(#lg-sm) blur(1px) saturate(1.5);-webkit-backdrop-filter:url(#lg-sm) blur(1px) saturate(1.5);box-shadow:inset 0 1px 1px rgba(255,255,255,0.50),inset 0 -1px 1px rgba(0,0,0,0.22),inset 0 0 0 1px rgba(255,255,255,0.14);}`
+    : `[data-glass="track"]{backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);}`;
+  document.head.appendChild(style);
+}
+
+const AbsoluteFill = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
+
+// RN's types don't know react-native-web's dataSet prop (renders as
+// data-* attributes, which the injected CSS targets).
+const glassAttr = (kind: 'track' | 'pill') =>
+  Platform.OS === 'web' ? ({ dataSet: { glass: kind } } as any) : null;
 
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { colors, isDark } = useTheme();
   const insets = useSafeAreaInsets();
+  const [trackWidth, setTrackWidth] = useState(0);
 
-  // Respect per-screen `tabBarStyle: { display: 'none' }` — used by the
-  // Explore tab when its focused search overlay is open so the overlay
-  // reads as full-screen (same as X's Explore focus mode).
   const focusedRoute = state.routes[state.index];
+  const activeIndex = Math.max(0, TABS.findIndex((t) => t.name === focusedRoute.name));
+
+  // Sliding pill position + press pop scale. One element translates —
+  // never per-tab backgrounds.
+  const slideX = useRef(new Animated.Value(0)).current;
+  const popScale = useRef(new Animated.Value(1)).current;
+  const hasSnapped = useRef(false);
+  // Per-tab icon dim/brighten crossfade.
+  const fades = useRef(
+    TABS.map((t) => new Animated.Value(t.name === focusedRoute.name ? 1 : INACTIVE_OPACITY)),
+  ).current;
+
+  const pillWidth = trackWidth > 0 ? (trackWidth - TRACK_PAD * 2) / TABS.length : 0;
+
+  useEffect(() => {
+    injectWebGlass();
+  }, []);
+
+  // Snap into place on first layout; spring on every later change.
+  useEffect(() => {
+    if (pillWidth <= 0) return;
+    const x = activeIndex * pillWidth;
+    if (!hasSnapped.current) {
+      slideX.setValue(x);
+      hasSnapped.current = true;
+      return;
+    }
+    Animated.spring(slideX, { toValue: x, useNativeDriver: true, ...SLIDE_SPRING }).start();
+  }, [activeIndex, pillWidth, slideX]);
+
+  useEffect(() => {
+    Animated.parallel(
+      TABS.map((t, i) =>
+        Animated.timing(fades[i], {
+          toValue: t.name === focusedRoute.name ? 1 : INACTIVE_OPACITY,
+          duration: FADE_MS,
+          useNativeDriver: true,
+        }),
+      ),
+    ).start();
+  }, [focusedRoute.name, fades]);
+
+  const hasUnread = useAlertsStore((s) => s.triggered.some((t) => !t.isRead));
+
+  // Respect per-screen `tabBarStyle: { display: 'none' }` (Explore's
+  // focused-search overlay). AFTER all hooks — Rules of Hooks.
   const focusedOptions = descriptors?.[focusedRoute.key]?.options;
   if (focusedOptions?.tabBarStyle?.display === 'none') return null;
 
-  // News sits between Search and Notifications. Four cells now share
-  // the right glass pill, each still flex:1 so they divide evenly.
-  const rightTabs = ['search', 'news', 'notifications', 'profile'];
-  const icons: Record<string, typeof IconHome> = {
-    search: IconSearch,
-    news: IconNews,
-    notifications: IconBell,
-    profile: IconUser,
-  };
+  // Tints UNDER the blur (spec values).
+  const trackTint = isDark ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.05)';
+  const pillFill = isDark ? 'rgba(255,255,255,0.10)' : '#ffffff';
+  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(17,24,39,0.08)';
 
-  const homeRoute = state.routes.find((r: any) => r.name === 'index');
-  const homeFocused = homeRoute ? state.index === state.routes.indexOf(homeRoute) : false;
-
-  // Liquid-glass surface — more translucent than before so the canvas
-  // shows through; the higher BlurView intensity does the heavy lifting.
-  const glassTint = isDark ? 'rgba(22, 27, 34, 0.40)' : 'rgba(255, 255, 255, 0.60)';
-  const hairline = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.08)';
-
-  const webGlass =
-    Platform.OS === 'web'
-      ? ({
-          backdropFilter: 'blur(24px) saturate(180%)',
-          WebkitBackdropFilter: 'blur(24px) saturate(180%)',
-        } as any)
-      : {};
-
-  // pointerEvents lives in style (not as a prop) so it works on
-  // React Native Fabric / New Architecture. Without this, the BlurView
-  // / glass tint layers default to `auto` and swallow every tap that
-  // lands in the pill's dead zones — including taps on rows of the
-  // home FlatList that visually sit ABOVE the bar but extend slightly
-  // behind it due to how scroll content overshoots the bar.
-  const renderGlassSurface = (shapeRadius: number) =>
-    Platform.OS === 'web' ? (
-      <View
-        style={{
-          ...StyleAbsoluteFill,
-          backgroundColor: glassTint,
-          borderWidth: 1,
-          borderColor: hairline,
-          borderRadius: shapeRadius,
-          pointerEvents: 'none',
-          ...webGlass,
-        }}
-      />
-    ) : (
-      <BlurView
-        intensity={BLUR_INTENSITY}
-        tint={isDark ? 'dark' : 'light'}
-        style={{
-          ...StyleAbsoluteFill,
-          borderRadius: shapeRadius,
-          borderWidth: 1,
-          borderColor: hairline,
-          overflow: 'hidden',
-          pointerEvents: 'none',
-        }}
-      />
-    );
+  const popIn = () =>
+    Animated.spring(popScale, { toValue: POP_SCALE, useNativeDriver: true, ...POP_SPRING }).start();
+  const popOut = () =>
+    Animated.spring(popScale, { toValue: 1, useNativeDriver: true, ...POP_SPRING }).start();
 
   return (
-    // box-none lives in style for Fabric compatibility. As a prop it's
-    // unreliable on New Architecture; the wrapper would default to
-    // `auto` and capture every tap that lands in its absolute-
-    // positioned bounding box — including the home FlatList's content
-    // that flows beneath the floating bar.
+    // pointerEvents lives in style (not a prop) for Fabric/New-Arch
+    // reliability — box-none so taps in the side margins fall through
+    // to content scrolling beneath the floating bar.
     <View
       style={{
         position: 'absolute',
-        bottom: Math.max(insets.bottom, 8) + 4,
-        left: spacing[4],
-        right: spacing[4],
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing[2],
+        left: 0,
+        right: 0,
+        bottom: 0,
+        paddingHorizontal: spacing[4],
+        paddingBottom: insets.bottom + 10,
         pointerEvents: 'box-none',
       }}
     >
-      {/* Home — standalone glass circle. Same active treatment as the
-          right-pill tabs: an inner 48pt tonal-indigo pill appears when
-          focused, icon flips to primary. */}
-      <Pressable
-        onPress={() => {
-          if (homeRoute) {
-            Haptics.selectionAsync();
-            navigation.navigate('index');
-          }
-        }}
-        hitSlop={8}
-        accessibilityLabel="Home"
-        accessibilityRole="button"
-        accessibilityState={{ selected: homeFocused }}
-        style={{
-          width: HOME_SIZE,
-          height: HOME_SIZE,
-          borderRadius: HOME_SIZE / 2,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {renderGlassSurface(HOME_SIZE / 2)}
-        <View
-          style={{
-            width: ACTIVE_PILL_SIZE,
-            height: ACTIVE_PILL_SIZE,
-            borderRadius: ACTIVE_PILL_SIZE / 2,
-            alignItems: 'center',
-            justifyContent: 'center',
-            backgroundColor: homeFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
-          }}
-        >
-          <IconHome
-            size={ICON_SIZE}
-            color={homeFocused ? colors.primary : colors.onSurfaceVariant}
-            strokeWidth={homeFocused ? 2 : 1.75}
-          />
-        </View>
-      </Pressable>
-
-      {/* Right group — Search, Bell, Profile in a glass pill. The wrapper
-          and the inner row are pointerEvents="box-none" so clicks in the
-          dead zones around the 48pt Pressables (top/bottom strips,
-          horizontal padding) pass through to the content beneath instead
-          of being swallowed by the glass. */}
+      {/* Shadow lives on this WRAPPER — the capsule is overflow:hidden
+          and would clip its own shadow. */}
       <View
         style={{
-          flex: 1,
-          height: BAR_HEIGHT,
-          borderRadius: BAR_HEIGHT / 2,
-          overflow: 'hidden',
-          pointerEvents: 'box-none',
+          borderRadius: TRACK_RADIUS,
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.4,
+              shadowRadius: 20,
+            },
+            // Android elevation needs a background to cast from.
+            android: { elevation: 16, backgroundColor: trackTint },
+            web: { boxShadow: '0 10px 20px rgba(0,0,0,0.40)' } as any,
+            default: {},
+          }),
         }}
       >
-        {renderGlassSurface(BAR_HEIGHT / 2)}
+        {/* Frosted capsule track — clips the glass layers. */}
         <View
+          onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+          {...glassAttr('track')}
           style={{
-            flex: 1,
             flexDirection: 'row',
-            alignItems: 'center',
-            paddingHorizontal: spacing[2],
-            pointerEvents: 'box-none',
+            borderRadius: TRACK_RADIUS,
+            padding: TRACK_PAD,
+            overflow: 'hidden',
+            ...(Platform.OS !== 'web' ? { borderWidth: 1, borderColor: hairline } : null),
           }}
         >
-          {rightTabs.map((tabName) => {
-            const route = state.routes.find((r: any) => r.name === tabName);
+          {/* Native frost: BlurView behind a translucent tint fill. On
+              web the blur/refraction comes from the injected CSS. */}
+          {Platform.OS !== 'web' && (
+            <BlurView
+              intensity={BLUR_INTENSITY}
+              tint={isDark ? 'dark' : 'light'}
+              style={{ ...AbsoluteFill, pointerEvents: 'none' }}
+            />
+          )}
+          <View style={{ ...AbsoluteFill, backgroundColor: trackTint, pointerEvents: 'none' }} />
+
+          {/* The raised glass pill — slides to the active tab. */}
+          {pillWidth > 0 && (
+            <Animated.View
+              {...glassAttr('pill')}
+              style={{
+                position: 'absolute',
+                top: TRACK_PAD,
+                bottom: TRACK_PAD,
+                left: TRACK_PAD,
+                width: pillWidth,
+                borderRadius: TRACK_RADIUS,
+                backgroundColor: pillFill,
+                transform: [{ translateX: slideX }, { scale: popScale }],
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+
+          {TABS.map((tab, i) => {
+            const route = state.routes.find((r: any) => r.name === tab.name);
             if (!route) return null;
-            const realIndex = state.routes.indexOf(route);
-            const isFocused = state.index === realIndex;
-            const IconComponent = icons[tabName] || IconSearch;
+            const isFocused = focusedRoute.name === tab.name;
+            const showDot = tab.name === 'notifications' && hasUnread;
 
             const onPress = () => {
               const event = navigation.emit({
@@ -198,23 +254,41 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
               <Pressable
                 key={route.key}
                 onPress={onPress}
+                onPressIn={popIn}
+                onPressOut={popOut}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isFocused }}
-                accessibilityLabel={tabName}
+                accessibilityLabel={tab.label}
                 style={{
                   flex: 1,
-                  height: ACTIVE_PILL_SIZE,
-                  borderRadius: radius.full,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: isFocused ? withAlpha(colors.primary, 0.15) : 'transparent',
+                  paddingVertical: ITEM_VPAD,
                 }}
               >
-                <IconComponent
-                  size={ICON_SIZE}
-                  color={isFocused ? colors.primary : colors.onSurfaceVariant}
-                  strokeWidth={isFocused ? 2 : 1.75}
-                />
+                <View>
+                  <Animated.View style={{ opacity: fades[i] }}>
+                    <tab.Icon size={ICON_SIZE} color={colors.onSurface} strokeWidth={ICON_STROKE} />
+                  </Animated.View>
+                  {/* Unread dot sits OUTSIDE the opacity fade so it stays
+                      bright while its tab is idle. Ring in the track fill
+                      color so it reads over the glyph. */}
+                  {showDot && (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: -2,
+                        right: -4,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: '#ff3b30',
+                        borderWidth: 1.5,
+                        borderColor: trackTint,
+                      }}
+                    />
+                  )}
+                </View>
               </Pressable>
             );
           })}
@@ -223,8 +297,6 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
     </View>
   );
 }
-
-const StyleAbsoluteFill = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
 export default function TabLayout() {
   return (

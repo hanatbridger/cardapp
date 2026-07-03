@@ -109,17 +109,20 @@ function TokenRow({ name, color, usage }: { name: string; color: string; usage: 
 }
 
 // ── Floating tab bar preview ───────────────────────────────
-// Static mirror of app/(tabs)/_layout.tsx FloatingTabBar used in the
-// design-system screen. Must track it — when the real bar changes,
-// update this preview too so the design system stays faithful.
-const TAB_BAR_HEIGHT = 64;
+// Static mirror of app/(tabs)/_layout.tsx FloatingTabBar (liquid-glass
+// capsule) used in the design-system screen. Must track it — when the
+// real bar changes, update this preview too so the design system stays
+// faithful. The rgba tints are the bar's spec-mandated glass values.
 const TAB_ICON_SIZE = 26;
+const TRACK_PAD = 4;
+const ITEM_VPAD = 14;
 
 function TabBarPreview({ activeIndex }: { activeIndex: number }) {
   const { colors, isDark } = useTheme();
-  const glassTint = isDark ? 'rgba(22, 27, 34, 0.40)' : 'rgba(255, 255, 255, 0.60)';
-  const hairline = isDark ? 'rgba(255, 255, 255, 0.10)' : 'rgba(17, 24, 39, 0.08)';
-  const ACTIVE_PILL = 48;
+  const [trackWidth, setTrackWidth] = React.useState(0);
+  const trackTint = isDark ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.05)';
+  const pillFill = isDark ? 'rgba(255,255,255,0.10)' : '#ffffff';
+  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(17,24,39,0.08)';
   const tabs = [
     { key: 'home', Icon: IconHome },
     { key: 'search', Icon: IconSearch },
@@ -127,83 +130,63 @@ function TabBarPreview({ activeIndex }: { activeIndex: number }) {
     { key: 'notifications', Icon: IconBell },
     { key: 'profile', Icon: IconUser },
   ] as const;
-  const [, ...right] = tabs;
-  const homeActive = activeIndex === 0;
+  const pillWidth = trackWidth > 0 ? (trackWidth - TRACK_PAD * 2) / tabs.length : 0;
 
-  const Glass = ({ style }: { style?: any }) =>
-    Platform.OS === 'web' ? (
-      <View
-        pointerEvents="none"
-        style={[
-          style,
-          { backgroundColor: glassTint, borderWidth: 1, borderColor: hairline },
-          { backdropFilter: 'blur(24px) saturate(180%)', WebkitBackdropFilter: 'blur(24px) saturate(180%)' } as any,
-        ]}
-      />
-    ) : (
-      <BlurView
-        pointerEvents="none"
-        intensity={40}
-        tint={isDark ? 'dark' : 'light'}
-        style={[style, { borderWidth: 1, borderColor: hairline, overflow: 'hidden' }]}
-      />
-    );
-
-  const activePill = (isActive: boolean) => ({
-    width: ACTIVE_PILL,
-    height: ACTIVE_PILL,
-    borderRadius: ACTIVE_PILL / 2,
-    alignItems: 'center' as const,
-    justifyContent: 'center' as const,
-    backgroundColor: isActive ? withAlpha(colors.primary, 0.15) : 'transparent',
-  });
+  const webGlass =
+    Platform.OS === 'web'
+      ? ({ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any)
+      : null;
 
   return (
-    <View style={{ flexDirection: 'row', gap: spacing[2], alignItems: 'center' }}>
-      {/* Home — glass circle with the same inner active pill as the right group. */}
+    <View
+      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+      style={{
+        flexDirection: 'row',
+        borderRadius: 100,
+        padding: TRACK_PAD,
+        overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: hairline,
+        ...webGlass,
+      }}
+    >
+      {Platform.OS !== 'web' && (
+        <BlurView
+          pointerEvents="none"
+          intensity={32}
+          tint={isDark ? 'dark' : 'light'}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        />
+      )}
       <View
-        style={{
-          width: TAB_BAR_HEIGHT,
-          height: TAB_BAR_HEIGHT,
-          borderRadius: TAB_BAR_HEIGHT / 2,
-          overflow: 'hidden',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Glass
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }}
+        pointerEvents="none"
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: trackTint }}
+      />
+      {/* Static raised pill at the active slot */}
+      {pillWidth > 0 && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: TRACK_PAD,
+            bottom: TRACK_PAD,
+            left: TRACK_PAD + activeIndex * pillWidth,
+            width: pillWidth,
+            borderRadius: 100,
+            backgroundColor: pillFill,
+          }}
         />
-        <View style={activePill(homeActive)}>
-          <IconHome
-            size={TAB_ICON_SIZE}
-            color={homeActive ? colors.primary : colors.onSurfaceVariant}
-            strokeWidth={homeActive ? 2 : 1.75}
-          />
+      )}
+      {tabs.map((tab, i) => (
+        <View
+          key={tab.key}
+          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: ITEM_VPAD }}
+        >
+          <View style={{ opacity: activeIndex === i ? 1 : 0.2 }}>
+            <tab.Icon size={TAB_ICON_SIZE} color={colors.onSurface} strokeWidth={2} />
+          </View>
         </View>
-      </View>
-      {/* Right pill */}
-      <View style={{ flex: 1, height: TAB_BAR_HEIGHT, borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden' }}>
-        <Glass
-          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: TAB_BAR_HEIGHT / 2 }}
-        />
-        <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing[2] }}>
-          {right.map((tab, i) => {
-            const isActive = activeIndex === i + 1;
-            return (
-              <View key={tab.key} style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <View style={activePill(isActive)}>
-                  <tab.Icon
-                    size={TAB_ICON_SIZE}
-                    color={isActive ? colors.primary : colors.onSurfaceVariant}
-                    strokeWidth={isActive ? 2 : 1.75}
-                  />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      </View>
+      ))}
     </View>
   );
 }

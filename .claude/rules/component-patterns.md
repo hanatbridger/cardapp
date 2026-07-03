@@ -65,18 +65,20 @@ Sizes: `sm`, `md`, `lg`. Auto color from `success`/`danger`. Trending icon prefi
 Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded amber/gray — to be tokenized.
 
 ### `FloatingTabBar` (in `app/(tabs)/_layout.tsx`)
-Custom floating tab bar — brand book motif #3. Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
+Liquid-glass floating tab bar (Apple-style frosted capsule). Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
 
-**Layout:** `[● Home]  [Search · Bell · Profile]`
-- **Height:** 64pt bar, 26pt icons.
-- **Liquid-glass surface:** `BlurView` on native (intensity 40, theme-matched tint), `backdrop-filter: blur(24px) saturate(180%)` on web. Tint `rgba(22,27,34,0.40)` dark / `rgba(255,255,255,0.60)` light. Hairline border `rgba(255,255,255,0.10)` dark / `rgba(17,24,39,0.08)` light. Both the home circle and the right pill render the **same** surface so they read as one control.
-- **Home (left):** 64×64 glass circle. Uses the identical 48pt active indicator as the right-group tabs — never a solid-fill state.
-- **Right pill:** `flex: 1`, 64pt tall, `radius.full`. Contains Search / Bell / Profile in evenly-divided cells.
-- **Active indicator (all four tabs):** 48pt pill with `withAlpha(primary, 0.15)` background, icon `colors.primary`, strokeWidth 2.
-- **Inactive icon:** `colors.onSurfaceVariant`, strokeWidth 1.75, transparent bg.
-- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`.
-- **Hit testing:** outer wrapper uses `pointerEvents="box-none"` so the bar only captures taps on its actual Pressables — never on empty space between the circle and the pill.
-- All tabs trigger `Haptics.selectionAsync()` on press.
+**Anatomy:** one frosted translucent CAPSULE floating near the bottom (never docked — content scrolls underneath it; the live backdrop is what the blur frosts). Icon-only tabs (Home · Search · News · Bell · Profile), labels kept as a11y names. A single raised glass pill SLIDES to the active tab (one element translating — never per-tab backgrounds).
+
+- **Geometry:** capsule `radius 100`, inner padding 4; tab items `flex: 1`, vertical padding 14; icons 26pt, strokeWidth 2 (both states). Pill inset 4, width = (trackWidth − 8) / tabCount.
+- **Container:** `absolute`, left/right 0, bottom 0, `paddingHorizontal spacing[4]`, `paddingBottom = safeArea + 10`, `pointerEvents: 'box-none'` (in style, for Fabric).
+- **Shadow:** on a WRAPPER around the capsule (the capsule is `overflow: hidden` and would clip its own shadow). y10 / blur 20 / #000 @40% (Android `elevation 16`).
+- **Frost — native:** `BlurView` intensity 32, theme tint, absolute-fill as first child, under a translucent tint fill.
+- **Frost — web:** injected CSS. Baseline `backdrop-filter: blur(24px)`; Chromium gets SVG `feDisplacementMap` refraction filters (`#lg` track / `#lg-sm` pill) + inset specular shadows, gated on `CSS.supports('backdrop-filter','url(#x)')`. Applied via `dataSet={{ glass }}` → `[data-glass]` selectors.
+- **Tints (spec values, deliberately not tokens):** dark — track `rgba(0,0,0,0.10)`, pill `rgba(255,255,255,0.10)`; light — track `rgba(0,0,0,0.05)`, pill `#ffffff`. Icon color `colors.onSurface`; inactive opacity 0.2, active 1.0.
+- **Motion:** pill slides with spring (tension 58, friction 12); snaps (no animation) on first layout. Press pop: pill scales to 1.10 while held, springs back. Icon opacity crossfade 240ms.
+- **Unread badge:** 12pt dot (#ff3b30, 1.5pt ring in the track tint) on the Bell glyph when un-read triggered alerts exist; sits OUTSIDE the opacity fade so it stays bright on idle tabs.
+- **Scroll clearance:** screens reserve `TAB_BAR_HEIGHT` (96) of bottom padding so content scrolls under the bar but nothing hides behind it.
+- All tabs trigger `Haptics.selectionAsync()` on press; the Explore focused-search overlay still hides the bar via `tabBarStyle.display: 'none'`.
 
 ## Domain components
 
