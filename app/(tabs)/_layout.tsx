@@ -9,10 +9,14 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { spacing } from '../../src/theme/tokens';
 import { useAlertsStore } from '../../src/stores/alerts-store';
 
-// Liquid-glass floating tab bar — a single frosted capsule that FLOATS
+// Liquid-glass floating tab bar — Apple-style frosted glass that FLOATS
 // near the bottom edge; scene content scrolls underneath it (that live
 // backdrop is what the blur frosts — do not dock it or give it a solid
-// bg). One raised glass pill slides between tabs on selection.
+// bg). Two surfaces sharing one glass recipe, echoing the brand motif:
+//   [● Home]   [Search · News · Bell · Profile]
+// The right capsule carries a raised glass pill that SLIDES between its
+// tabs; the Home circle carries its own inner pill that fades in when
+// Home is active (a pill can't slide across separate surfaces).
 //
 // The rgba tints, inset-shadow recipe, #ff3b30 badge red, and the SVG
 // refraction filters below are SPEC-MANDATED values for this surface
@@ -24,6 +28,9 @@ const TRACK_PAD = 4;
 const ICON_SIZE = 26;
 const ICON_STROKE = 2;
 const ITEM_VPAD = 14;
+// Capsule height = icon + item padding + track padding; the Home circle
+// matches it so the two surfaces read as one control.
+const BAR_HEIGHT = ICON_SIZE + ITEM_VPAD * 2 + TRACK_PAD * 2; // 62
 const BLUR_INTENSITY = 32;
 const FADE_MS = 240;
 const SLIDE_SPRING = { tension: 58, friction: 12 };
@@ -31,14 +38,16 @@ const POP_SPRING = { tension: 300, friction: 10 };
 const POP_SCALE = 1.1;
 const INACTIVE_OPACITY = 0.2;
 
-// Display order — icon-only; label survives as the a11y name.
-const TABS = [
-  { name: 'index', label: 'Home', Icon: IconHome },
+// Display order — icon-only; labels survive as a11y names. Home is a
+// standalone circle; the rest live in the right capsule.
+const HOME_TAB = { name: 'index', label: 'Home', Icon: IconHome } as const;
+const RIGHT_TABS = [
   { name: 'search', label: 'Search', Icon: IconSearch },
   { name: 'news', label: 'News', Icon: IconNews },
   { name: 'notifications', label: 'Notifications', Icon: IconBell },
   { name: 'profile', label: 'Profile', Icon: IconUser },
 ] as const;
+const ALL_TABS = [HOME_TAB, ...RIGHT_TABS] as const;
 
 // ── Web frosted glass ────────────────────────────────────────────────
 // Baseline (Safari/Firefox): plain backdrop blur. Chromium upgrade:
@@ -98,47 +107,64 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const [trackWidth, setTrackWidth] = useState(0);
 
   const focusedRoute = state.routes[state.index];
-  const activeIndex = Math.max(0, TABS.findIndex((t) => t.name === focusedRoute.name));
+  const homeActive = focusedRoute.name === HOME_TAB.name;
+  // Index within the right capsule; -1 while Home is active.
+  const rightActiveIndex = RIGHT_TABS.findIndex((t) => t.name === focusedRoute.name);
 
   // Sliding pill position + press pop scale. One element translates —
-  // never per-tab backgrounds.
+  // never per-tab backgrounds. The pill fades out while Home is active;
+  // Home's own inner pill fades in (opacity-crossfade between surfaces).
   const slideX = useRef(new Animated.Value(0)).current;
   const popScale = useRef(new Animated.Value(1)).current;
+  const pillOpacity = useRef(new Animated.Value(rightActiveIndex >= 0 ? 1 : 0)).current;
+  const homePillOpacity = useRef(new Animated.Value(homeActive ? 1 : 0)).current;
   const hasSnapped = useRef(false);
   // Per-tab icon dim/brighten crossfade.
   const fades = useRef(
-    TABS.map((t) => new Animated.Value(t.name === focusedRoute.name ? 1 : INACTIVE_OPACITY)),
+    ALL_TABS.map((t) => new Animated.Value(t.name === focusedRoute.name ? 1 : INACTIVE_OPACITY)),
   ).current;
 
-  const pillWidth = trackWidth > 0 ? (trackWidth - TRACK_PAD * 2) / TABS.length : 0;
+  const pillWidth =
+    trackWidth > 0 ? (trackWidth - TRACK_PAD * 2) / RIGHT_TABS.length : 0;
 
   useEffect(() => {
     injectWebGlass();
   }, []);
 
-  // Snap into place on first layout; spring on every later change.
+  // Snap into place on first layout; spring on every later change. While
+  // Home is active the pill holds its last slot and just fades.
   useEffect(() => {
-    if (pillWidth <= 0) return;
-    const x = activeIndex * pillWidth;
+    if (pillWidth <= 0 || rightActiveIndex < 0) return;
+    const x = rightActiveIndex * pillWidth;
     if (!hasSnapped.current) {
       slideX.setValue(x);
       hasSnapped.current = true;
       return;
     }
     Animated.spring(slideX, { toValue: x, useNativeDriver: true, ...SLIDE_SPRING }).start();
-  }, [activeIndex, pillWidth, slideX]);
+  }, [rightActiveIndex, pillWidth, slideX]);
 
   useEffect(() => {
-    Animated.parallel(
-      TABS.map((t, i) =>
+    Animated.parallel([
+      Animated.timing(pillOpacity, {
+        toValue: rightActiveIndex >= 0 ? 1 : 0,
+        duration: FADE_MS,
+        useNativeDriver: true,
+      }),
+      Animated.timing(homePillOpacity, {
+        toValue: homeActive ? 1 : 0,
+        duration: FADE_MS,
+        useNativeDriver: true,
+      }),
+      ...ALL_TABS.map((t, i) =>
         Animated.timing(fades[i], {
           toValue: t.name === focusedRoute.name ? 1 : INACTIVE_OPACITY,
           duration: FADE_MS,
           useNativeDriver: true,
         }),
       ),
-    ).start();
-  }, [focusedRoute.name, fades]);
+    ]).start();
+  }, [focusedRoute.name, rightActiveIndex, homeActive, fades, pillOpacity, homePillOpacity]);
 
   const hasUnread = useAlertsStore((s) => s.triggered.some((t) => !t.isRead));
 
@@ -157,6 +183,35 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const popOut = () =>
     Animated.spring(popScale, { toValue: 1, useNativeDriver: true, ...POP_SPRING }).start();
 
+  // Shadow lives on WRAPPERS — both glass surfaces are overflow:hidden
+  // and would clip their own shadows.
+  const shadowStyle = Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.4,
+      shadowRadius: 20,
+    },
+    // Android elevation needs a background to cast from.
+    android: { elevation: 16, backgroundColor: trackTint },
+    web: { boxShadow: '0 10px 20px rgba(0,0,0,0.40)' } as any,
+    default: {},
+  });
+
+  const tabPress = (route: any, isFocused: boolean) => {
+    const event = navigation.emit({
+      type: 'tabPress',
+      target: route.key,
+      canPreventDefault: true,
+    });
+    if (!isFocused && !event.defaultPrevented) {
+      Haptics.selectionAsync();
+      navigation.navigate(route.name);
+    }
+  };
+
+  const homeRoute = state.routes.find((r: any) => r.name === HOME_TAB.name);
+
   return (
     // pointerEvents lives in style (not a prop) for Fabric/New-Arch
     // reliability — box-none so taps in the side margins fall through
@@ -167,31 +222,68 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         left: 0,
         right: 0,
         bottom: 0,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing[2],
         paddingHorizontal: spacing[4],
         paddingBottom: insets.bottom + 10,
         pointerEvents: 'box-none',
       }}
     >
-      {/* Shadow lives on this WRAPPER — the capsule is overflow:hidden
-          and would clip its own shadow. */}
-      <View
-        style={{
-          borderRadius: TRACK_RADIUS,
-          ...Platform.select({
-            ios: {
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 10 },
-              shadowOpacity: 0.4,
-              shadowRadius: 20,
-            },
-            // Android elevation needs a background to cast from.
-            android: { elevation: 16, backgroundColor: trackTint },
-            web: { boxShadow: '0 10px 20px rgba(0,0,0,0.40)' } as any,
-            default: {},
-          }),
-        }}
-      >
-        {/* Frosted capsule track — clips the glass layers. */}
+      {/* ── Home — standalone glass circle ── */}
+      {homeRoute && (
+        <View style={{ borderRadius: BAR_HEIGHT / 2, ...shadowStyle }}>
+          <Pressable
+            onPress={() => tabPress(homeRoute, homeActive)}
+            onPressIn={popIn}
+            onPressOut={popOut}
+            accessibilityRole="button"
+            accessibilityState={{ selected: homeActive }}
+            accessibilityLabel={HOME_TAB.label}
+            {...glassAttr('track')}
+            style={{
+              width: BAR_HEIGHT,
+              height: BAR_HEIGHT,
+              borderRadius: BAR_HEIGHT / 2,
+              overflow: 'hidden',
+              alignItems: 'center',
+              justifyContent: 'center',
+              ...(Platform.OS !== 'web' ? { borderWidth: 1, borderColor: hairline } : null),
+            }}
+          >
+            {Platform.OS !== 'web' && (
+              <BlurView
+                intensity={BLUR_INTENSITY}
+                tint={isDark ? 'dark' : 'light'}
+                style={{ ...AbsoluteFill, pointerEvents: 'none' }}
+              />
+            )}
+            <View style={{ ...AbsoluteFill, backgroundColor: trackTint, pointerEvents: 'none' }} />
+            {/* Home's raised pill — fades in when Home is active. */}
+            <Animated.View
+              {...glassAttr('pill')}
+              style={{
+                position: 'absolute',
+                top: TRACK_PAD,
+                bottom: TRACK_PAD,
+                left: TRACK_PAD,
+                right: TRACK_PAD,
+                borderRadius: (BAR_HEIGHT - TRACK_PAD * 2) / 2,
+                backgroundColor: pillFill,
+                opacity: homePillOpacity,
+                transform: [{ scale: popScale }],
+                pointerEvents: 'none',
+              }}
+            />
+            <Animated.View style={{ opacity: fades[0] }}>
+              <HOME_TAB.Icon size={ICON_SIZE} color={colors.onSurface} strokeWidth={ICON_STROKE} />
+            </Animated.View>
+          </Pressable>
+        </View>
+      )}
+
+      {/* ── Right capsule — Search · News · Bell · Profile ── */}
+      <View style={{ flex: 1, borderRadius: TRACK_RADIUS, ...shadowStyle }}>
         <View
           onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
           {...glassAttr('track')}
@@ -226,34 +318,23 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 width: pillWidth,
                 borderRadius: TRACK_RADIUS,
                 backgroundColor: pillFill,
+                opacity: pillOpacity,
                 transform: [{ translateX: slideX }, { scale: popScale }],
                 pointerEvents: 'none',
               }}
             />
           )}
 
-          {TABS.map((tab, i) => {
+          {RIGHT_TABS.map((tab, i) => {
             const route = state.routes.find((r: any) => r.name === tab.name);
             if (!route) return null;
             const isFocused = focusedRoute.name === tab.name;
             const showDot = tab.name === 'notifications' && hasUnread;
 
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
-              if (!isFocused && !event.defaultPrevented) {
-                Haptics.selectionAsync();
-                navigation.navigate(route.name);
-              }
-            };
-
             return (
               <Pressable
                 key={route.key}
-                onPress={onPress}
+                onPress={() => tabPress(route, isFocused)}
                 onPressIn={popIn}
                 onPressOut={popOut}
                 accessibilityRole="button"
@@ -267,7 +348,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 }}
               >
                 <View>
-                  <Animated.View style={{ opacity: fades[i] }}>
+                  <Animated.View style={{ opacity: fades[i + 1] }}>
                     <tab.Icon size={ICON_SIZE} color={colors.onSurface} strokeWidth={ICON_STROKE} />
                   </Animated.View>
                   {/* Unread dot sits OUTSIDE the opacity fade so it stays

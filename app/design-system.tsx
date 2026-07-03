@@ -123,33 +123,23 @@ function TabBarPreview({ activeIndex }: { activeIndex: number }) {
   const trackTint = isDark ? 'rgba(0,0,0,0.10)' : 'rgba(0,0,0,0.05)';
   const pillFill = isDark ? 'rgba(255,255,255,0.10)' : '#ffffff';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(17,24,39,0.08)';
-  const tabs = [
-    { key: 'home', Icon: IconHome },
+  const BAR = TAB_ICON_SIZE + ITEM_VPAD * 2 + TRACK_PAD * 2; // 62 — matches the real bar
+  const rightTabs = [
     { key: 'search', Icon: IconSearch },
     { key: 'news', Icon: IconNews },
     { key: 'notifications', Icon: IconBell },
     { key: 'profile', Icon: IconUser },
   ] as const;
-  const pillWidth = trackWidth > 0 ? (trackWidth - TRACK_PAD * 2) / tabs.length : 0;
+  const homeActive = activeIndex === 0;
+  const pillWidth = trackWidth > 0 ? (trackWidth - TRACK_PAD * 2) / rightTabs.length : 0;
 
   const webGlass =
     Platform.OS === 'web'
       ? ({ backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' } as any)
       : null;
 
-  return (
-    <View
-      onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-      style={{
-        flexDirection: 'row',
-        borderRadius: 100,
-        padding: TRACK_PAD,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: hairline,
-        ...webGlass,
-      }}
-    >
+  const Frost = () => (
+    <>
       {Platform.OS !== 'web' && (
         <BlurView
           pointerEvents="none"
@@ -162,31 +152,85 @@ function TabBarPreview({ activeIndex }: { activeIndex: number }) {
         pointerEvents="none"
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: trackTint }}
       />
-      {/* Static raised pill at the active slot */}
-      {pillWidth > 0 && (
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: TRACK_PAD,
-            bottom: TRACK_PAD,
-            left: TRACK_PAD + activeIndex * pillWidth,
-            width: pillWidth,
-            borderRadius: 100,
-            backgroundColor: pillFill,
-          }}
-        />
-      )}
-      {tabs.map((tab, i) => (
-        <View
-          key={tab.key}
-          style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: ITEM_VPAD }}
-        >
-          <View style={{ opacity: activeIndex === i ? 1 : 0.2 }}>
-            <tab.Icon size={TAB_ICON_SIZE} color={colors.onSurface} strokeWidth={2} />
-          </View>
+    </>
+  );
+
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+      {/* Home — standalone glass circle with its own raised pill */}
+      <View
+        style={{
+          width: BAR,
+          height: BAR,
+          borderRadius: BAR / 2,
+          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderWidth: 1,
+          borderColor: hairline,
+          ...webGlass,
+        }}
+      >
+        <Frost />
+        {homeActive && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: TRACK_PAD,
+              bottom: TRACK_PAD,
+              left: TRACK_PAD,
+              right: TRACK_PAD,
+              borderRadius: (BAR - TRACK_PAD * 2) / 2,
+              backgroundColor: pillFill,
+            }}
+          />
+        )}
+        <View style={{ opacity: homeActive ? 1 : 0.2 }}>
+          <IconHome size={TAB_ICON_SIZE} color={colors.onSurface} strokeWidth={2} />
         </View>
-      ))}
+      </View>
+
+      {/* Right capsule with the sliding pill at the active slot */}
+      <View
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+        style={{
+          flex: 1,
+          flexDirection: 'row',
+          borderRadius: 100,
+          padding: TRACK_PAD,
+          overflow: 'hidden',
+          borderWidth: 1,
+          borderColor: hairline,
+          ...webGlass,
+        }}
+      >
+        <Frost />
+        {pillWidth > 0 && !homeActive && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: TRACK_PAD,
+              bottom: TRACK_PAD,
+              left: TRACK_PAD + (activeIndex - 1) * pillWidth,
+              width: pillWidth,
+              borderRadius: 100,
+              backgroundColor: pillFill,
+            }}
+          />
+        )}
+        {rightTabs.map((tab, i) => (
+          <View
+            key={tab.key}
+            style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: ITEM_VPAD }}
+          >
+            <View style={{ opacity: activeIndex === i + 1 ? 1 : 0.2 }}>
+              <tab.Icon size={TAB_ICON_SIZE} color={colors.onSurface} strokeWidth={2} />
+            </View>
+          </View>
+        ))}
+      </View>
     </View>
   );
 }

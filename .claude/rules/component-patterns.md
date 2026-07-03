@@ -67,9 +67,9 @@ Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded a
 ### `FloatingTabBar` (in `app/(tabs)/_layout.tsx`)
 Liquid-glass floating tab bar (Apple-style frosted capsule). Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
 
-**Anatomy:** one frosted translucent CAPSULE floating near the bottom (never docked — content scrolls underneath it; the live backdrop is what the blur frosts). Icon-only tabs (Home · Search · News · Bell · Profile), labels kept as a11y names. A single raised glass pill SLIDES to the active tab (one element translating — never per-tab backgrounds).
+**Anatomy:** `[● Home]  [Search · News · Bell · Profile]` — a standalone frosted circle for Home plus a frosted capsule for the rest, both floating near the bottom (never docked — content scrolls underneath; the live backdrop is what the blur frosts), sharing one glass recipe and `gap: spacing[2]`. Icon-only, labels kept as a11y names. A single raised glass pill SLIDES between the capsule's tabs (one element translating — never per-tab backgrounds); the Home circle has its own inner pill that opacity-crossfades in when Home is active (a pill can't slide across separate surfaces).
 
-- **Geometry:** capsule `radius 100`, inner padding 4; tab items `flex: 1`, vertical padding 14; icons 26pt, strokeWidth 2 (both states). Pill inset 4, width = (trackWidth − 8) / tabCount.
+- **Geometry:** both surfaces 62pt tall (26 icon + 14×2 item pad + 4×2 track pad); capsule `radius 100`, Home a circle; inner padding 4; capsule tab items `flex: 1`, vertical padding 14; icons 26pt, strokeWidth 2 (both states). Pills inset 4; sliding pill width = (trackWidth − 8) / 4.
 - **Container:** `absolute`, left/right 0, bottom 0, `paddingHorizontal spacing[4]`, `paddingBottom = safeArea + 10`, `pointerEvents: 'box-none'` (in style, for Fabric).
 - **Shadow:** on a WRAPPER around the capsule (the capsule is `overflow: hidden` and would clip its own shadow). y10 / blur 20 / #000 @40% (Android `elevation 16`).
 - **Frost — native:** `BlurView` intensity 32, theme tint, absolute-fill as first child, under a translucent tint fill.
