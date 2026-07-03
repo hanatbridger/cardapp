@@ -43,7 +43,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   language,
   fallbackPrice,
 }: WatchlistCardProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const formatMoney = useMoney();
 
   // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
@@ -98,7 +98,10 @@ export const WatchlistCard = React.memo(function WatchlistCard({
       style={{
         flexDirection: 'row',
         padding: spacing[3],
-        backgroundColor: colors.surface,
+        // Light mode: surfaceVariant (the Trending tiles' light grey) —
+        // on the white canvas, `surface` cards disappeared into the bg.
+        // Dark mode: keep `surface` as before.
+        backgroundColor: isDark ? colors.surface : colors.surfaceVariant,
         borderRadius: CARD_BORDER_RADIUS,
         borderWidth: 1,
         borderColor: colors.outline,

@@ -28,7 +28,7 @@ import type { NewsArticle } from '../services/news';
 const THUMB = 84;
 
 export const NewsCard = React.memo(function NewsCard({ article }: { article: NewsArticle }) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
 
   const open = () => {
     if (!article.url) return;
@@ -51,7 +51,9 @@ export const NewsCard = React.memo(function NewsCard({ article }: { article: New
     flexDirection: 'row' as const,
     gap: spacing[3],
     padding: spacing[3],
-    backgroundColor: colors.surface,
+    // Light: Trending-tile grey (white cards vanished on the white
+    // canvas). Dark: unchanged.
+    backgroundColor: isDark ? colors.surface : colors.surfaceVariant,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.outline,

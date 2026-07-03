@@ -40,7 +40,7 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
   fallbackPrice,
   fallbackPriceChange,
 }: SealedWatchlistCardProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const formatMoney = useMoney();
 
   // Shares the React Query cache with the detail screen so the same
@@ -59,7 +59,9 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
       style={{
         flexDirection: 'row',
         padding: spacing[3],
-        backgroundColor: colors.surface,
+        // Light: Trending-tile grey (white cards vanished on the white
+        // canvas). Dark: unchanged.
+        backgroundColor: isDark ? colors.surface : colors.surfaceVariant,
         borderRadius: CARD_BORDER_RADIUS,
         borderWidth: 1,
         borderColor: colors.outline,
