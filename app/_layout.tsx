@@ -161,7 +161,11 @@ function AlertCheckerHost() {
   // notification just opened the app). News pushes open the News tab;
   // alert/card notifications open the card. Covers warm taps and the
   // cold-start case (app launched from a tapped notification).
+  // Native only: expo-notifications does not implement the response APIs
+  // on web — getLastNotificationResponseAsync THROWS there, which took
+  // down the web bundle. There are no notification taps on web anyway.
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     const route = (data: Record<string, unknown> | undefined) => {
       if (!data) return;
       if (data.type === 'news') router.push('/(tabs)/news');
