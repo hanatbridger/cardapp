@@ -76,7 +76,8 @@
         }
       ],
       "expo-web-browser",
-      "./plugins/withModularHeaders.js"
+      "./plugins/withModularHeaders.js",
+      "expo-font"
     ],
     "extra": {
       "router": {},
