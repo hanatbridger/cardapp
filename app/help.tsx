@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Pressable, Linking } from 'react-native';
+import { View, Pressable, Linking, Alert } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { IconChevronDown, IconChevronUp, IconMail } from '@tabler/icons-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
@@ -7,6 +7,8 @@ import { Text, Card, Button, CollapsingHeader, withErrorBoundary } from '../src/
 import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { useCollapsingHeader } from '../src/hooks';
+
+const SUPPORT_EMAIL = 'hanwong118@gmail.com';
 
 const FAQ = [
   {
@@ -127,7 +129,17 @@ function HelpScreen() {
               <Button
                 variant="outlined"
                 icon={<IconMail size={16} color={colors.primary} />}
-                onPress={() => Linking.openURL('mailto:hanwong118@gmail.com?subject=CardPulse%20Support')}
+                onPress={() =>
+                  // Rejects when no mail app/account is configured (Mail
+                  // deleted, fresh device) — fall back to showing the
+                  // address instead of a silently dead button.
+                  Linking.openURL(`mailto:${SUPPORT_EMAIL}?subject=CardPulse%20Support`).catch(() => {
+                    Alert.alert(
+                      'No mail app available',
+                      `Email us at ${SUPPORT_EMAIL} and we'll get back to you within 24 hours.`,
+                    );
+                  })
+                }
               >
                 Contact Support
               </Button>

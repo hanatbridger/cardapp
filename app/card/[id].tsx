@@ -448,7 +448,7 @@ function CardDetailScreen() {
                               : price.source === 'pricecharting'
                                 ? `https://www.pricecharting.com/search-products?q=${encodeURIComponent(cardSearch)}&type=prices`
                                 : `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`;
-                        Linking.openURL(sourceUrl);
+                        Linking.openURL(sourceUrl).catch(() => {});
                       }}
                     >
                       {price.source === 'tcgplayer' ? 'TCGPlayer' :
@@ -531,7 +531,7 @@ function CardDetailScreen() {
                     onPress={() => {
                       const url = card.tcgPlayerUrl
                         ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`;
-                      Linking.openURL(url);
+                      Linking.openURL(url).catch(() => {});
                     }}
                     style={{
                       flexDirection: 'row',
@@ -656,7 +656,7 @@ function CardDetailScreen() {
                       const cardSearch = `${card.name} ${card.set.name} ${card.number}`;
                       Linking.openURL(
                         `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch)}&LH_Sold=1&LH_Complete=1&_sop=13`,
-                      );
+                      ).catch(() => {});
                     }}
                     style={{
                       flexDirection: 'row',
@@ -676,7 +676,7 @@ function CardDetailScreen() {
                     onPress={() => {
                       const url = card.tcgPlayerUrl
                         ?? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`;
-                      Linking.openURL(url);
+                      Linking.openURL(url).catch(() => {});
                     }}
                     style={{
                       flexDirection: 'row',
