@@ -1,0 +1,57 @@
+diff --git a/node_modules/react-native/ReactCommon/react/renderer/core/EventEmitter.cpp b/node_modules/react-native/ReactCommon/react/renderer/core/EventEmitter.cpp
+index 68d1564..f824f2d 100644
+--- a/node_modules/react-native/ReactCommon/react/renderer/core/EventEmitter.cpp
++++ b/node_modules/react-native/ReactCommon/react/renderer/core/EventEmitter.cpp
+@@ -94,11 +94,27 @@ void EventEmitter::dispatchEvent(
+     return;
+   }
+ 
++  // Backport of react-native commit 5dea3b5 (ships in 0.87): copy
++  // eventTarget_ / shadowNodeFamily_ under DispatchMutex. Without the
++  // lock this copy races setEnabled()'s eventTarget_.reset() (held
++  // under DispatchMutex on the commit thread via
++  // ShadowTree::commit -> updateMountedFlag), producing a torn/dangling
++  // SharedEventTarget — the use-after-free behind our production
++  // EXC_BAD_ACCESS fatals (willDispatchEvent/getTag at 0x8 and
++  // updateRendering at 0x100000008).
++  SharedEventTarget eventTarget;
++  std::weak_ptr<const ShadowNodeFamily> shadowNodeFamily;
++  {
++    std::scoped_lock lock(DispatchMutex());
++    eventTarget = eventTarget_;
++    shadowNodeFamily = shadowNodeFamily_;
++  }
++
+   eventDispatcher->dispatchEvent(RawEvent(
+       normalizeEventType(std::move(type)),
+       std::move(payload),
+-      eventTarget_,
+-      shadowNodeFamily_,
++      std::move(eventTarget),
++      std::move(shadowNodeFamily),
+       category));
+ }
+ 
+@@ -120,11 +136,20 @@ void EventEmitter::dispatchUniqueEvent(
+     return;
+   }
+ 
++  // See dispatchEvent above — same 5dea3b5 backport.
++  SharedEventTarget eventTarget;
++  std::weak_ptr<const ShadowNodeFamily> shadowNodeFamily;
++  {
++    std::scoped_lock lock(DispatchMutex());
++    eventTarget = eventTarget_;
++    shadowNodeFamily = shadowNodeFamily_;
++  }
++
+   eventDispatcher->dispatchUniqueEvent(RawEvent(
+       normalizeEventType(std::move(type)),
+       std::move(payload),
+-      eventTarget_,
+-      shadowNodeFamily_,
++      std::move(eventTarget),
++      std::move(shadowNodeFamily),
+       RawEvent::Category::Continuous));
+ }
+ 
