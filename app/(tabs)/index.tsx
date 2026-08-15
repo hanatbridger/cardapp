@@ -23,7 +23,7 @@ import { useWatchlistStore, useUserStore } from '../../src/stores';
 import type { WatchlistItem } from '../../src/stores';
 import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
-import { useTrendingMovers } from '../../src/hooks';
+import { useTrendingMovers, useBatchPrices } from '../../src/hooks';
 import type { TrendingTile } from '../../src/services/trending';
 
 // Floating tab bar occupies 64pt + safe-area bottom + offset. Pad the
@@ -47,12 +47,27 @@ function WatchlistScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const queryClient = useQueryClient();
 
+  // One batched price request for every visible card row instead of a
+  // per-row /api/tcgplayer/price call (the old N+1). PSA10 rows are
+  // already filtered out above, so every id here is UNGRADED —
+  // TCGPlayer territory.
+  const watchlistCardIds = useMemo(
+    () => items.filter((i) => i.kind === 'card').map((i) => i.cardId),
+    [items],
+  );
+  const batchQuery = useBatchPrices(watchlistCardIds);
+  const batchPrices = batchQuery.data;
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Invalidate every price query so each card re-fetches live data.
-    // useCardPrice is keyed `['prices', ...]` so this catches all of them.
-    await queryClient.invalidateQueries({ queryKey: ['prices'] });
+    // useCardPrice is keyed `['prices', ...]`; the Home batch is keyed
+    // `['batch-prices', ...]` — both need the kick.
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['prices'] }),
+      queryClient.invalidateQueries({ queryKey: ['batch-prices'] }),
+    ]);
     setRefreshing(false);
   }, [queryClient]);
 
@@ -96,6 +111,7 @@ function WatchlistScreen() {
       // Refresh live prices too — the new rail should show live numbers,
       // not yesterday's cached % moves.
       queryClient.invalidateQueries({ queryKey: ['prices'] });
+      queryClient.invalidateQueries({ queryKey: ['batch-prices'] });
     }, scheduleNextTick());
     return () => clearTimeout(timer);
   }, [dayKey, queryClient]);
@@ -304,6 +320,13 @@ function WatchlistScreen() {
                 grade={item.grade}
                 language={item.language}
                 rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
+                // Batched live price for this row. Passing null (batch
+                // loading, or no price for this card) keeps the row's
+                // internal per-row query DISABLED and renders the
+                // fallback — that's the whole point of the batch. If the
+                // batch request itself errored, pass undefined so rows
+                // fall back to their own per-row fetch as a safety net.
+                livePrice={batchQuery.isError ? undefined : batchPrices?.[item.cardId] ?? null}
                 // Fallback shown only briefly while the live query loads, or if it fails.
                 // The real price comes from useCardPrice inside WatchlistCard — same
                 // source as the detail screen, so numbers always agree.

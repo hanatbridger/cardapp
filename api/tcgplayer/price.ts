@@ -99,11 +99,63 @@ async function fetchMarketPrice(productId: string): Promise<TcgDetails | null> {
   return (await res.json()) as TcgDetails;
 }
 
+const MAX_BATCH_IDS = 20;
+
+// Batch variant of the single-id pipeline. Per-card failures collapse
+// to null rather than failing the whole batch — the watchlist renders
+// its fallback price for that row.
+async function fetchPriceForCard(cardId: string): Promise<PriceResponse | null> {
+  try {
+    const productId = await resolveProductId(cardId);
+    if (!productId) return null;
+    const details = await fetchMarketPrice(productId);
+    if (!details?.marketPrice) return null;
+    const price = details.marketPrice;
+    return {
+      productId,
+      currentPrice: price,
+      previousPrice: price,
+      percentChange: 0,
+      averagePrice: price,
+      highPrice: price,
+      lowPrice: price,
+      salesCount: details.listings ?? 0,
+      lastSaleDate: '',
+      lastSalePrice: price,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
 
   const url = new URL(req.url);
+
+  // Batch path — GET ?ids=a,b,c (max 20). Response shape:
+  // { prices: { [cardId]: PriceResponse | null } }. The single-id
+  // path below keeps its exact deployed shape.
+  const idsParam = url.searchParams.get('ids');
+  if (idsParam !== null) {
+    const ids = idsParam
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (ids.length === 0) return json(400, { error: 'missing ids' });
+    if (ids.length > MAX_BATCH_IDS) {
+      return json(400, { error: `too many ids (max ${MAX_BATCH_IDS})` });
+    }
+
+    const results = await Promise.all(ids.map(fetchPriceForCard));
+    const prices: Record<string, PriceResponse | null> = {};
+    ids.forEach((id, i) => {
+      prices[id] = results[i];
+    });
+    return json(200, { prices });
+  }
+
   // `id` is the Pokemon TCG card id (e.g. "me2pt5-277"). We accept the
   // legacy `cardId` query param as a fallback so consumers that hit
   // this from older builds keep working.

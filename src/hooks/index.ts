@@ -1,6 +1,8 @@
 export { useCardSearch, useSetSearch, useSet, useArtistSearch, useArtistCards, useRelatedCards } from './use-card-search';
 export { useCardDetail } from './use-card-detail';
 export { useCardPrice } from './use-card-price';
+export { useBatchPrices } from './use-batch-prices';
+export type { BatchPriceEntry, BatchPrices } from './use-batch-prices';
 export { usePriceHistory } from './use-price-history';
 export { useAlertChecker } from './use-alert-checker';
 export { useCollapsingHeader } from './use-collapsing-header';

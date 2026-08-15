@@ -30,6 +30,14 @@ interface WatchlistCardProps {
   language?: 'EN' | 'JP';
   /** Fallback price (mock / last-known) shown while live price loads or if it fails */
   fallbackPrice?: CardPrice;
+  /**
+   * Batched live price supplied by the parent (useBatchPrices). When
+   * PROVIDED (even as null), the internal per-row useCardPrice query is
+   * disabled — the parent owns fetching. null means the batch had no
+   * price for this card; render fallbackPrice. Omit the prop entirely
+   * to keep the legacy per-row fetch.
+   */
+  livePrice?: { currentPrice: number; percentChange: number } | null;
 }
 
 export const WatchlistCard = React.memo(function WatchlistCard({
@@ -42,6 +50,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   rarity,
   language,
   fallbackPrice,
+  livePrice,
 }: WatchlistCardProps) {
   const { colors, isDark } = useTheme();
   const formatMoney = useMoney();
@@ -50,16 +59,36 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   // so the same card always shows the same number across the app.
   // Empty cardName disables the query for PSA10 rows (rendered null
   // below): the hook must still be CALLED for rules-of-hooks, but a
-  // never-rendered row shouldn't pay for a price fetch.
-  const { data: livePrice } = useCardPrice({
-    cardName: grade === 'PSA10' ? '' : cardName,
+  // never-rendered row shouldn't pay for a price fetch. The same trick
+  // disables it when the parent supplies a batched livePrice — the
+  // batch endpoint already fetched this card, no per-row round-trip.
+  const hasBatchedPrice = livePrice !== undefined;
+  const { data: internalPrice } = useCardPrice({
+    cardName: grade === 'PSA10' || hasBatchedPrice ? '' : cardName,
     grade,
     cardId,
     setName,
     cardNumber: setNumber,
     language,
   });
-  const price = livePrice ?? fallbackPrice;
+  const price: CardPrice | undefined = hasBatchedPrice
+    ? livePrice
+      ? {
+          cardName,
+          grade,
+          currentPrice: livePrice.currentPrice,
+          previousPrice: livePrice.currentPrice,
+          percentChange: livePrice.percentChange,
+          lastSaleDate: '',
+          lastSalePrice: livePrice.currentPrice,
+          averagePrice: livePrice.currentPrice,
+          highPrice: livePrice.currentPrice,
+          lowPrice: livePrice.currentPrice,
+          salesCount: 0,
+          source: 'tcgplayer',
+        }
+      : fallbackPrice
+    : internalPrice ?? fallbackPrice;
 
   // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
   // from every watchlist surface until the eBay live proxy ships.

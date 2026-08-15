@@ -1,6 +1,8 @@
 import type { PriceAlert } from '../stores/alerts-store';
 import { getPrice } from '../mocks/prices';
 import { fetchRawCardPrice } from './tcgplayer';
+import { queryClient } from '../lib/query-client';
+import type { CardPrice } from '../types/card';
 
 export interface AlertEvaluation {
   alert: PriceAlert;
@@ -35,10 +37,34 @@ export async function evaluateAlert(
   let currentPrice: number | undefined;
 
   if (alert.grade === 'UNGRADED') {
-    // Try live first; the function internally falls back to mock if
-    // the proxy errors, so we just need to grab whatever it returns.
-    const live = await fetchRawCardPrice(alert.cardId, alert.cardName);
-    currentPrice = live?.currentPrice;
+    // Routed through the shared React Query client with the SAME key
+    // shape + staleTime as useCardPrice (['prices', cardName, setName,
+    // cardNumber, grade, language] / 1h) so the checker reads the UI's
+    // cached entry instead of re-fetching. Alerts don't store setName/
+    // cardNumber/language, so those key slots are undefined here —
+    // cache hits happen when the UI query's slots are also undefined;
+    // otherwise fetchQuery populates its own entry once per hour.
+    // fetchRawCardPrice internally falls back to mock on proxy errors,
+    // so a fulfilled query still means "best available price".
+    try {
+      const live = await queryClient.fetchQuery<CardPrice | null>({
+        queryKey: [
+          'prices',
+          alert.cardName,
+          undefined,
+          undefined,
+          alert.grade,
+          undefined,
+        ],
+        queryFn: () => fetchRawCardPrice(alert.cardId, alert.cardName),
+        staleTime: 60 * 60 * 1000,
+        retry: false,
+      });
+      currentPrice = live?.currentPrice;
+    } catch {
+      // Transient failure — leave currentPrice undefined so the alert
+      // survives to the next cycle instead of being mis-evaluated.
+    }
   } else {
     // PSA10 path — mocked until eBay sold-listings pricing ships.
     const mock = getPrice(alert.cardId, alert.grade);
