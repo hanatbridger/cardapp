@@ -99,11 +99,29 @@ function ProfileScreen() {
     }
   };
 
+  // Server delete must succeed before we navigate away — a failed
+  // delete presented as success is an Apple 5.1.1(v) violation.
+  // Mirrors app/settings.tsx.
+  const performDeleteAccount = async () => {
+    try {
+      await deleteAccount();
+      router.replace('/(auth)/login');
+    } catch (e: any) {
+      const msg =
+        e?.message ??
+        'Something went wrong. Please try again, or email privacy@cardpulse.app for help.';
+      if (Platform.OS === 'web') {
+        window.alert(`Could not delete account\n\n${msg}`);
+      } else {
+        Alert.alert('Could not delete account', msg);
+      }
+    }
+  };
+
   const handleDeleteAccount = () => {
     if (Platform.OS === 'web') {
       if (window.confirm('Are you sure? This will permanently delete your account and all data. This cannot be undone.')) {
-        deleteAccount();
-        router.replace('/(auth)/login');
+        performDeleteAccount();
       }
     } else {
       Alert.alert(
@@ -115,8 +133,7 @@ function ProfileScreen() {
             text: 'Delete Account',
             style: 'destructive',
             onPress: () => {
-              deleteAccount();
-              router.replace('/(auth)/login');
+              performDeleteAccount();
             },
           },
         ],

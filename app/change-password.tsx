@@ -12,6 +12,7 @@ import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { safeGoBack } from '../src/utils/safeGoBack';
 import { useCollapsingHeader } from '../src/hooks';
+import { supabase } from '../src/services/supabase';
 
 function ChangePasswordScreen() {
   const { colors } = useTheme();
@@ -39,10 +40,39 @@ function ChangePasswordScreen() {
     }
 
     setLoading(true);
-    // In production this calls the backend to verify current password
-    // and update to the new one. Stubbed for MVP.
-    await new Promise((r) => setTimeout(r, 400));
-    setLoading(false);
+    try {
+      // updateUser alone would accept ANY value in the current-password
+      // field (Supabase has no reauthentication check on that call), so
+      // verify it for real by re-signing-in first. This also covers a
+      // hijacked open session: without the current password you can't
+      // rotate it to lock the owner out.
+      const { data: userData, error: userErr } = await supabase.auth.getUser();
+      const email = userData?.user?.email;
+      if (userErr || !email) {
+        setError('Session expired. Sign in again and retry.');
+        return;
+      }
+      const { error: reauthErr } = await supabase.auth.signInWithPassword({
+        email,
+        password: currentPassword,
+      });
+      if (reauthErr) {
+        setError('Current password is incorrect');
+        return;
+      }
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (updateErr) {
+        setError(updateErr.message || 'Could not update password. Please try again.');
+        return;
+      }
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not update password. Please try again.');
+      return;
+    } finally {
+      setLoading(false);
+    }
 
     const msg = 'Password updated successfully.';
     if (Platform.OS === 'web') {

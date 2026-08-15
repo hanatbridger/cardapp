@@ -83,10 +83,10 @@ export default async function handler(req: Request): Promise<Response> {
   // every user-owned table (profiles, watchlist, alerts, etc.).
   const { error: delErr } = await admin.auth.admin.deleteUser(userId);
   if (delErr) {
-    return json(500, {
-      error: 'Account deletion failed',
-      detail: delErr.message,
-    });
+    // Log the detail server-side (Vercel logs); return a generic
+    // message so internal error strings aren't echoed to clients.
+    console.error('[account/delete] deleteUser failed:', delErr);
+    return json(500, { error: 'Account deletion failed' });
   }
 
   return new Response(null, { status: 204, headers: CORS });
