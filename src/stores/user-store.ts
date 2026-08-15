@@ -147,7 +147,10 @@ export const useUserStore = create<UserStore>()(
         set({
           profile: { displayName: '', username: '', email: '' },
           preferences: {
-            theme: 'system',
+            // Dark is the app default everywhere — first install and
+            // post-deletion reset must agree or deleting an account
+            // silently flips the theme.
+            theme: 'dark',
             hapticEnabled: true,
             // PSA 10 is gated at launch — Raw is the only viewable grade
             defaultGrade: 'UNGRADED',
