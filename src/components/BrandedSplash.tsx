@@ -5,12 +5,12 @@ import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing } from '../theme/tokens';
 
-const MIN_DISPLAY_MS = 1100;
-const FADE_OUT_MS = 320;
+const MIN_DISPLAY_MS = 350;
+const FADE_OUT_MS = 200;
 
 /**
- * Full-screen branded splash rendered on top of the app for the first
- * ~1.1s after fonts load. The native Expo splash (assets/splash-icon.png)
+ * Full-screen branded splash rendered on top of the app for a short
+ * beat after fonts load. The native Expo splash (assets/splash-icon.png)
  * already shows the logomark on the dark brand canvas — this overlay
  * picks up where it leaves off by adding the "CardPulse" wordmark and
  * tagline, then fades into the app. Matches the native splash's
@@ -41,8 +41,8 @@ export function BrandedSplash({ ready }: { ready: boolean }) {
   return (
     // pointerEvents lives in style (not as a prop) so it works on
     // React Native Fabric / New Architecture. Without this in style,
-    // the fading splash overlay (which is mounted for ~1.4s on cold
-    // launch and absolutely positioned to fill the screen) silently
+    // the fading splash overlay (mounted for its full display+fade
+    // window and absolutely positioned to fill the screen) silently
     // captured every touch on the underlying app surface — leaving
     // the home screen un-tappable for the first second after launch.
     <Animated.View

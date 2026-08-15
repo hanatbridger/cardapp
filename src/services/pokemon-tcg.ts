@@ -3,6 +3,15 @@ import { fetchWithTimeout } from './api-client';
 
 const BASE_URL = 'https://api.pokemontcg.io/v2';
 
+// Keyless clients get pokemontcg.io's throttled tier (slow responses,
+// load-shed 500s under pressure). A key from dev.pokemontcg.io lifts the
+// rate limit substantially; requests work without one, just worse.
+const API_KEY = process.env.EXPO_PUBLIC_POKEMONTCG_API_KEY;
+
+function tcgFetch(url: string) {
+  return fetchWithTimeout(url, API_KEY ? { headers: { 'X-Api-Key': API_KEY } } : {});
+}
+
 /**
  * Escape Lucene special characters in user-supplied search text before
  * interpolating it into a quoted query term. Without this, a query
@@ -129,7 +138,7 @@ export async function searchCards(
     orderBy: filters.setId ? 'number' : '-set.releaseDate',
   });
 
-  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -159,7 +168,7 @@ export async function getSimilarCards(
     orderBy: '-set.releaseDate',
     select: 'id,name,images,set,number',
   });
-  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -206,7 +215,7 @@ export async function searchSets(
     params.set('q', `name:"${escapeLucene(query)}*"`);
   }
 
-  const response = await fetchWithTimeout(`${BASE_URL}/sets?${params}`);
+  const response = await tcgFetch(`${BASE_URL}/sets?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -219,7 +228,7 @@ export async function searchSets(
 }
 
 export async function getSet(id: string): Promise<PokemonSet | null> {
-  const response = await fetchWithTimeout(`${BASE_URL}/sets/${id}`);
+  const response = await tcgFetch(`${BASE_URL}/sets/${id}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);
@@ -262,7 +271,7 @@ export async function searchArtists(
     orderBy: '-set.releaseDate',
   });
 
-  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -311,7 +320,7 @@ export async function getCardsByArtist(
     orderBy: '-set.releaseDate',
   });
 
-  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -324,7 +333,7 @@ export async function getCardsByArtist(
 }
 
 export async function getCard(id: string): Promise<PokemonCard | null> {
-  const response = await fetchWithTimeout(`${BASE_URL}/cards/${id}`);
+  const response = await tcgFetch(`${BASE_URL}/cards/${id}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);

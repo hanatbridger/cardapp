@@ -30,10 +30,8 @@ import { registerForPushNotifications } from '../src/services/push';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
   useFonts,
-  SpaceGrotesk_300Light,
   SpaceGrotesk_400Regular,
   SpaceGrotesk_500Medium,
-  SpaceGrotesk_600SemiBold,
   SpaceGrotesk_700Bold,
 } from '@expo-google-fonts/space-grotesk';
 
@@ -184,11 +182,11 @@ function AlertCheckerHost() {
 }
 
 export default function RootLayout() {
+  // Brand book locks weights to 400/500/700 — 300/600 were never
+  // reachable (no variant uses them) so they don't gate first render.
   const [fontsLoaded, fontError] = useFonts({
-    SpaceGrotesk_300Light,
     SpaceGrotesk_400Regular,
     SpaceGrotesk_500Medium,
-    SpaceGrotesk_600SemiBold,
     SpaceGrotesk_700Bold,
   });
 
@@ -231,8 +229,8 @@ export default function RootLayout() {
               <Stack.Screen name="design-system" />
             </Stack>
             {/* Branded splash overlay — the native Expo splash shows the
-                logomark on the dark brand canvas; this extends the same
-                canvas for ~1.1s to add the "CardPulse" wordmark and
+                logomark on the dark brand canvas; this briefly extends
+                the same canvas to add the "CardPulse" wordmark and
                 tagline, then fades into the first screen. Mounted AFTER
                 the Stack so it paints on top. Self-unmounts after fade. */}
             <BrandedSplash ready={!!(fontsLoaded || fontError)} />

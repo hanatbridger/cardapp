@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, ScrollView, FlatList, Dimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal } from 'react-native';
+import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -35,7 +35,6 @@ import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
 import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards } from '../../src/hooks';
 
-const screenWidth = Dimensions.get('window').width;
 // No 1D: history is one snapshot per day, so a 1-day window can never
 // hold the 3 points the chart needs — it only ever showed the
 // "building history" placeholder.
@@ -44,6 +43,9 @@ const TIME_RANGES = ['1W', '1M', '3M'];
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  // Module-scope Dimensions.get is 0 on web before first layout and
+  // stale after rotation — it fed PriceChart a negative width.
+  const { width: screenWidth } = useWindowDimensions();
   const formatMoney = useMoney();
   const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
   // Always open on Raw. PSA 10 is still a coming-soon panel, so landing
@@ -361,8 +363,15 @@ function CardDetailScreen() {
 
         {/* Card image */}
         <View style={{ alignItems: 'center', paddingVertical: spacing[4] }}>
+          {/* The small variant is almost always already in expo-image's
+              disk cache from whatever list the user tapped, so it paints
+              immediately while the ~1MB hi-res PNG streams in. */}
           <Image
             source={{ uri: card.images.large }}
+            placeholder={{ uri: card.images.small }}
+            placeholderContentFit="contain"
+            priority="high"
+            cachePolicy="memory-disk"
             accessibilityLabel={`${card.name} card from ${card.set.name}`}
             style={{
               width: screenWidth * 0.6,
@@ -801,7 +810,7 @@ function CardDetailScreen() {
           <WatchlistFullModal
             visible={watchlistFullVisible}
             onClose={() => setWatchlistFullVisible(false)}
-            currentCount={items.length}
+            currentCount={items.filter((i) => !(i.kind === 'card' && i.grade === 'PSA10')).length}
             maxCount={maxFreeItems}
           />
         </>

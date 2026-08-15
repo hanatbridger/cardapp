@@ -6,6 +6,9 @@ import { findAlertsToTrigger, formatAlertMessage } from '../services/alert-check
 import { presentLocalNotification } from '../services/notifications';
 
 const FOREGROUND_INTERVAL_MS = 60 * 1000; // 1 minute while app is open
+// First run deferred so per-alert price fetches don't race cold-start
+// network (image prefetch, initial queries).
+const FIRST_RUN_DELAY_MS = 8 * 1000;
 
 /**
  * Runs the alert checker on app foreground + on a 1-minute interval while
@@ -71,14 +74,15 @@ export function useAlertChecker() {
       }
     };
 
-    // Run immediately on mount, then on interval, then on every foreground.
-    runCheck();
+    // Deferred first run, then on interval, then on every foreground.
+    const firstRun = setTimeout(runCheck, FIRST_RUN_DELAY_MS);
     const interval = setInterval(runCheck, FOREGROUND_INTERVAL_MS);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') runCheck();
     });
 
     return () => {
+      clearTimeout(firstRun);
       clearInterval(interval);
       sub.remove();
     };
