@@ -33,7 +33,7 @@ import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
 import { useWatchlistStore } from '../../src/stores';
 import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
-import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards } from '../../src/hooks';
+import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards, useCardStats } from '../../src/hooks';
 
 // No 1D: history is one snapshot per day, so a 1-day window can never
 // hold the 3 points the chart needs — it only ever showed the
@@ -119,6 +119,10 @@ function CardDetailScreen() {
   // Other printings of this character for the Similar-cards rail.
   const { data: related } = useRelatedCards(card);
   const relatedCards = related ?? [];
+  // Real eBay market dynamics + daily sold aggregates (collectrics
+  // proxy). Null for unmapped cards and outages; sections fall back.
+  const { data: cardStats } = useCardStats(card?.name, card?.number);
+  const recentSales = cardStats?.sales ?? [];
 
   // Filter history by selected time range
   const filteredHistory = useMemo(() => {
@@ -644,24 +648,63 @@ function CardDetailScreen() {
               <CardFundamentals card={card} marketPrice={price?.currentPrice} />
 
               {/* eBay Market Dynamics — demand pressure & supply saturation */}
-              <MarketDynamics cardId={card.id} />
+              <MarketDynamics cardId={card.id} live={cardStats?.dynamics} />
             </>
           )}
 
-          {/* Recent sales CTA — links out to the real eBay sold-listings
-              filter for the current card. We don't have a live sales
-              feed yet so we point users at the canonical source rather
-              than fabricating per-listing data (Apple Guideline 4.1
-              treats placeholder data presented as real as misleading
-              content and grounds for rejection). Hidden on PSA 10
-              along with the rest of the price section. */}
-          {selectedGrade !== 'PSA10' && price && (
+          {/* Recent sales — daily sold aggregates from the card-stats
+              proxy when the card is tracked, otherwise a link-out (we
+              never fabricate listings; Apple Guideline 4.1 treats fake
+              data presented as real as grounds for rejection). Hidden
+              on PSA 10 along with the rest of the price section. */}
+          {selectedGrade !== 'PSA10' && (price || recentSales.length > 0) && (
             <Card>
               <View style={{ gap: spacing[3] }}>
                 <Text variant="labelLg">Recent sales</Text>
-                <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ lineHeight: 20 }}>
-                  Live transaction history is rolling out next. In the meantime, browse the latest {card.name} #{card.number} sales on eBay or {card.tcgPlayerUrl ? 'TCGPlayer' : 'TCGPlayer'}.
-                </Text>
+                {recentSales.length > 0 ? (
+                  <View>
+                    {/* Daily eBay raw-sold aggregates, newest first —
+                        real counts and outlier-adjusted average prices,
+                        refreshed daily upstream. */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: spacing[2] }}>
+                      <Text variant="caption" color={colors.onSurfaceMuted}>DATE</Text>
+                      <View style={{ flexDirection: 'row', gap: spacing[6] }}>
+                        <Text variant="caption" color={colors.onSurfaceMuted}>SOLD</Text>
+                        <Text variant="caption" color={colors.onSurfaceMuted} style={{ minWidth: 76, textAlign: 'right' }}>AVG PRICE</Text>
+                      </View>
+                    </View>
+                    {recentSales.map((s, i) => (
+                      <View
+                        key={s.date}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: spacing[2],
+                          borderTopWidth: i === 0 ? 0 : 1,
+                          borderTopColor: colors.outlineVariant,
+                        }}
+                      >
+                        <Text variant="bodySm" color={colors.onSurfaceVariant}>
+                          {new Date(s.date + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: spacing[6], alignItems: 'center' }}>
+                          <Text variant="bodySm" color={colors.onSurfaceVariant}>{s.count}</Text>
+                          <Text variant="labelLg" style={{ minWidth: 76, textAlign: 'right', fontVariant: ['tabular-nums'] }}>
+                            {formatMoney(s.avgPrice)}
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                    <Text variant="caption" color={colors.onSurfaceMuted} style={{ paddingTop: spacing[2] }}>
+                      Daily averages from ended eBay raw listings, adjusted for outliers.
+                    </Text>
+                  </View>
+                ) : (
+                  <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ lineHeight: 20 }}>
+                    No tracked sales for this card yet. Browse the latest {card.name} #{card.number} sales on eBay or TCGPlayer.
+                  </Text>
+                )}
                 <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
                   <Pressable
                     onPress={() => {
