@@ -34,8 +34,12 @@ export default async function handler(req: Request): Promise<Response> {
     | null;
   const token = body?.token;
   // Expo push tokens look like ExponentPushToken[xxxxxxxx]. Validate
-  // loosely so we never store junk.
-  if (typeof token !== 'string' || !token.startsWith('ExponentPushToken')) {
+  // loosely so we never store junk; cap length so junk can't bloat rows.
+  if (
+    typeof token !== 'string' ||
+    !token.startsWith('ExponentPushToken') ||
+    token.length > 512
+  ) {
     return json(400, { error: 'valid Expo push token required' });
   }
   const platform = body?.platform === 'android' ? 'android' : 'ios';

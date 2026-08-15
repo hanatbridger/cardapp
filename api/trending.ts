@@ -256,11 +256,23 @@ export default async function handler(req: Request): Promise<Response> {
     modeRaw === 'undervalued' || modeRaw === 'overvalued' ? modeRaw : 'movers';
 
   try {
-    const res = await fetch('https://mycollectrics.com/api/card_leaderboard', {
-      // UA so the upstream doesn't flag us as a generic bot. Their feed
-      // is public — no auth, no API key — so this is just etiquette.
-      headers: { 'user-agent': 'Mozilla/5.0 (CardPulse Trending Proxy)' },
-    });
+    // 6s hard timeout (same pattern as api/tcgplayer/price.ts) — a hung
+    // upstream must not pin the function open until the platform
+    // timeout. Abort rejects the fetch, landing in the catch below —
+    // the same graceful path as any other upstream failure.
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 6000);
+    let res: Response;
+    try {
+      res = await fetch('https://mycollectrics.com/api/card_leaderboard', {
+        // UA so the upstream doesn't flag us as a generic bot. Their feed
+        // is public — no auth, no API key — so this is just etiquette.
+        headers: { 'user-agent': 'Mozilla/5.0 (CardPulse Trending Proxy)' },
+        signal: ctl.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
     if (!res.ok) return json(502, { error: 'collectrics upstream', status: res.status });
 
     const data = await res.json();

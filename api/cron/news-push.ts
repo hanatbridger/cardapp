@@ -26,6 +26,12 @@ interface Article {
   publishedAt?: string;
 }
 
+// Per-message ticket from exp.host — one per message, in message order.
+interface ExpoTicket {
+  status?: string;
+  details?: { error?: string };
+}
+
 // Length-independent constant-time compare (same as snapshot-prices).
 function timingSafeEqual(a: string, b: string): boolean {
   const len = Math.max(a.length, b.length);
@@ -96,9 +102,12 @@ export default async function handler(req: Request): Promise<Response> {
   const { data: tokenRows } = await admin.from('push_tokens').select('token');
   const tokens = (tokenRows ?? []).map((r: { token: string }) => r.token);
 
-  let pushed = 0;
+  let sent = 0;
+  let failed = 0;
+  const staleTokens: string[] = [];
   for (let i = 0; i < tokens.length; i += 100) {
-    const batch = tokens.slice(i, i + 100).map((to) => ({
+    const batchTokens = tokens.slice(i, i + 100);
+    const batch = batchTokens.map((to) => ({
       to,
       sound: 'default',
       title: 'Pokémon card news',
@@ -111,10 +120,39 @@ export default async function handler(req: Request): Promise<Response> {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify(batch),
       });
-      if (res.ok) pushed += batch.length;
+      if (!res.ok) {
+        failed += batch.length;
+        continue;
+      }
+      const payload = (await res.json().catch(() => null)) as
+        | { data?: ExpoTicket[] }
+        | null;
+      const tickets = payload && Array.isArray(payload.data) ? payload.data : null;
+      if (!tickets) {
+        // 200 with an unparseable body — assume the service accepted it.
+        sent += batch.length;
+        continue;
+      }
+      for (let j = 0; j < batchTokens.length; j++) {
+        const ticket = tickets[j];
+        if (ticket?.status === 'ok') {
+          sent++;
+        } else {
+          failed++;
+          if (ticket?.details?.error === 'DeviceNotRegistered') {
+            staleTokens.push(batchTokens[j]);
+          }
+        }
+      }
     } catch {
-      // best-effort per batch
+      failed += batch.length;
     }
+  }
+
+  // Prune tokens Expo says are dead (uninstalled / revoked) so the
+  // fan-out doesn't grow unbounded and future runs stop paying for them.
+  if (staleTokens.length > 0) {
+    await admin.from('push_tokens').delete().in('token', staleTokens);
   }
 
   // 4. Record the story we just pushed so we don't repeat it.
@@ -122,8 +160,17 @@ export default async function handler(req: Request): Promise<Response> {
     .from('push_state')
     .upsert({ key: LAST_URL_KEY, value: top.url, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
-  return new Response(JSON.stringify({ pushed, tokens: tokens.length, story: top.title }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return new Response(
+    JSON.stringify({
+      pushed: sent,
+      failed,
+      removed: staleTokens.length,
+      tokens: tokens.length,
+      story: top.title,
+    }),
+    {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
 }

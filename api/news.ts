@@ -104,14 +104,21 @@ function json(status: number, body: unknown): Response {
 }
 
 function decodeEntities(s: string): string {
+  // &amp; decodes FIRST so double-encoded entities ("&amp;#39;") reveal
+  // the inner entity for the passes below. fromCodePoint (not
+  // fromCharCode) so astral codepoints survive; out-of-range values are
+  // left as-is because fromCodePoint throws on them.
   return s
+    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&amp;/g, '&');
+    .replace(/&#(\d+);/g, (m, n) => {
+      const cp = Number(n);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+    });
 }
 
 function pick(block: string, tag: string): string {
