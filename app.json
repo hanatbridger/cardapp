@@ -77,7 +77,13 @@
       ],
       "expo-web-browser",
       "./plugins/withModularHeaders.js",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CardPulse uses your photo library only to attach a screenshot to feedback you send us."
+        }
+      ]
     ],
     "extra": {
       "router": {},

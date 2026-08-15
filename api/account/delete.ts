@@ -76,6 +76,22 @@ export default async function handler(req: Request): Promise<Response> {
   }
   const userId = userResp.user.id;
 
+  // Best-effort purge of the user's feedback screenshots BEFORE the
+  // auth row goes away — storage objects have no FK to auth.users, so
+  // deleting the user alone would orphan them (feedback rows themselves
+  // cascade). Failure here must not block the deletion Apple requires.
+  try {
+    const shots = admin.storage.from('feedback-shots');
+    for (let page = 0; page < 10; page++) {
+      const { data: objs } = await shots.list(userId, { limit: 100 });
+      if (!objs || objs.length === 0) break;
+      await shots.remove(objs.map((o) => `${userId}/${o.name}`));
+      if (objs.length < 100) break;
+    }
+  } catch (e) {
+    console.error('[account/delete] shot purge failed (continuing):', e);
+  }
+
   // Hard-delete the auth user. shouldSoftDelete=false (the default)
   // removes the row from auth.users, which cascades through any
   // FK with ON DELETE CASCADE pointing at it. Tables without that

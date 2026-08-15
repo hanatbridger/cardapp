@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import Constants from 'expo-constants';
 import {
   IconCrown, IconShield, IconFileText, IconHelpCircle, IconLogout,
+  IconMessage2, IconInbox,
   IconChevronRight, IconDeviceMobile, IconStar, IconCoin,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -12,6 +13,7 @@ import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { currencyMeta, DEFAULT_CURRENCY } from '../../src/constants/currencies';
+import { isSuperadminEmail } from '../../src/services/admin-feedback';
 import { useUserStore } from '../../src/stores/user-store';
 
 interface SettingsRowProps {
@@ -260,6 +262,30 @@ function ProfileScreen() {
             value={`${currency} · ${currencyMeta(currency).symbol.trim()}`}
             onPress={() => setCurrencyPickerVisible(true)}
           />
+        </Card>
+
+        {/* Feedback */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
+          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
+            FEEDBACK
+          </Text>
+        </View>
+        <Card style={{ marginHorizontal: HORIZONTAL_PADDING, padding: 0, overflow: 'hidden' }}>
+          <SettingsRow
+            icon={<IconMessage2 size={18} color={colors.onSurfaceVariant} />}
+            label="Send Feedback"
+            onPress={() => router.push('/feedback')}
+          />
+          {isSuperadminEmail(profile.email) && (
+            <>
+              <SettingsDivider />
+              <SettingsRow
+                icon={<IconInbox size={18} color={colors.onSurfaceVariant} />}
+                label="Feedback Inbox"
+                onPress={() => router.push('/feedback-admin')}
+              />
+            </>
+          )}
         </Card>
 
         {/* Legal */}
