@@ -1,11 +1,12 @@
 import { Platform } from 'react-native';
 
 /**
- * Client for /api/card-stats — real per-card eBay market dynamics and
- * daily sold-price aggregates (collectrics-backed, CDN-cached 6h
- * server-side). Returns null on any failure: both consumers (Market
- * Dynamics card, Recent sales list) have honest fallbacks and a missing
- * section beats a spinner for below-the-fold content.
+ * Client for /api/card-stats — real per-card eBay market dynamics,
+ * daily sold-price aggregates, and PSA 10 graded prices/population
+ * (collectrics-backed, CDN-cached 6h server-side). Returns null on any
+ * failure: all consumers (Market Dynamics card, Recent sales list,
+ * PSA 10 tab) have honest fallbacks and a missing section beats a
+ * spinner for below-the-fold content.
  */
 
 // Same origin resolution as tcgplayer.ts: the Vercel function only
@@ -44,9 +45,32 @@ export interface LiveMarketDynamics {
   supplySaturation: number;
 }
 
+export interface Psa10PricePoint {
+  date: string;
+  price: number;
+}
+
+export interface Psa10Population {
+  psa10: number;
+  total: number;
+  /** Percent (60.7 = 60.7%) */
+  gemPct: number;
+}
+
+export interface Psa10Stats {
+  /** Latest PSA 10 sold price, USD */
+  latestPrice: number;
+  /** Day-over-day change, in percent (1.2 = +1.2%) */
+  percentChange: number;
+  /** Daily PSA 10 prices, oldest → newest */
+  history: Psa10PricePoint[];
+  pop: Psa10Population | null;
+}
+
 export interface CardStats {
   dynamics: LiveMarketDynamics | null;
   sales: DailySales[];
+  psa10: Psa10Stats | null;
   asOf: string | null;
 }
 
@@ -62,10 +86,17 @@ async function fetchFrom(
     });
     if (!res.ok) return null;
     const data = (await res.json()) as CardStats;
-    if (!data || (!data.dynamics && (!data.sales || data.sales.length === 0))) {
+    if (
+      !data ||
+      (!data.dynamics &&
+        !data.psa10 &&
+        (!data.sales || data.sales.length === 0))
+    ) {
       return null;
     }
-    return data;
+    // CDN-cached responses from before the psa10 field shipped omit it;
+    // normalize so consumers can rely on the declared shape.
+    return { ...data, psa10: data.psa10 ?? null };
   } catch {
     return null;
   } finally {

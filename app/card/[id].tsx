@@ -39,6 +39,21 @@ import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards
 // hold the 3 points the chart needs — it only ever showed the
 // "building history" placeholder.
 const TIME_RANGES = ['1W', '1M', '3M'];
+const RANGE_DAYS = [7, 30, 90];
+const DAY_MS = 86400000;
+
+// Shared by the raw and PSA 10 chart series. Falls back to the full
+// series when the window holds fewer than 2 points — a sparse chart
+// beats an empty one.
+function filterHistoryByRange<T extends { date: string }>(
+  series: T[] | undefined,
+  timeRangeIndex: number,
+): T[] {
+  if (!series || series.length === 0) return [];
+  const cutoff = Date.now() - RANGE_DAYS[timeRangeIndex] * DAY_MS;
+  const filtered = series.filter((p) => new Date(p.date).getTime() >= cutoff);
+  return filtered.length >= 2 ? filtered : series;
+}
 
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,10 +63,11 @@ function CardDetailScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const formatMoney = useMoney();
   const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
-  // Always open on Raw. PSA 10 is still a coming-soon panel, so landing
-  // there (as the old persisted defaultGrade preference made many users
-  // do) shows a dead tab and hides fundamentals/valuation until the user
-  // discovers the toggle. Raw is where the live data is.
+  // Always open on Raw. PSA 10 only has real data for collectrics-
+  // tracked cards, so landing there (as the old persisted defaultGrade
+  // preference made many users do) could show a dead tab and hide
+  // fundamentals/valuation until the user discovers the toggle. Raw is
+  // where the primary live data is.
   const [gradeIndex, setGradeIndex] = useState(() => GRADE_OPTIONS.indexOf('UNGRADED'));
   const [timeRangeIndex, setTimeRangeIndex] = useState(1); // default 1M
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -83,14 +99,6 @@ function CardDetailScreen() {
   } = useCardDetail(id ?? '');
   const selectedGrade = GRADE_OPTIONS[gradeIndex];
 
-  // Fire the coming-soon popup when the toggle transitions UNGRADED → PSA10.
-  useEffect(() => {
-    if (prevGradeRef.current !== 'PSA10' && selectedGrade === 'PSA10') {
-      setPsaModalVisible(true);
-    }
-    prevGradeRef.current = selectedGrade;
-  }, [selectedGrade]);
-
   // Real eBay prices with mock fallback — includes set name + number for exact matching
   const {
     data: price,
@@ -119,21 +127,44 @@ function CardDetailScreen() {
   // Other printings of this character for the Similar-cards rail.
   const { data: related } = useRelatedCards(card);
   const relatedCards = related ?? [];
-  // Real eBay market dynamics + daily sold aggregates (collectrics
-  // proxy). Null for unmapped cards and outages; sections fall back.
+  // Real eBay market dynamics + daily sold aggregates + PSA 10 graded
+  // prices (collectrics proxy). Null for unmapped cards and outages;
+  // sections fall back.
   const { data: cardStats } = useCardStats(card?.name, card?.number);
   const recentSales = cardStats?.sales ?? [];
+  const psa10 = cardStats?.psa10 ?? null;
+  // undefined = query still resolving; null = settled with no stats.
+  const statsSettled = cardStats !== undefined;
 
-  // Filter history by selected time range
-  const filteredHistory = useMemo(() => {
-    if (!history || history.length === 0) return [];
-    const now = Date.now();
-    const dayMs = 86400000;
-    const rangeDays = [7, 30, 90][timeRangeIndex];
-    const cutoff = now - rangeDays * dayMs;
-    const filtered = history.filter((p) => new Date(p.date).getTime() >= cutoff);
-    return filtered.length >= 2 ? filtered : history;
-  }, [history, timeRangeIndex]);
+  // Fire the coming-soon popup when the toggle transitions UNGRADED →
+  // PSA10 — but only for cards with no real graded data. While the
+  // stats query is still resolving we stay quiet (the inline panel
+  // covers the gap) rather than popping a sheet that real data may
+  // immediately contradict.
+  useEffect(() => {
+    // Don't consume the transition while stats are still resolving —
+    // advancing the ref here would permanently swallow the popup for
+    // no-data cards whose fetch settles after the flip.
+    if (selectedGrade === 'PSA10' && !statsSettled) return;
+    if (
+      prevGradeRef.current !== 'PSA10' &&
+      selectedGrade === 'PSA10' &&
+      !psa10
+    ) {
+      setPsaModalVisible(true);
+    }
+    prevGradeRef.current = selectedGrade;
+  }, [selectedGrade, statsSettled, psa10]);
+
+  // Filter raw + PSA 10 history by the selected time range
+  const filteredHistory = useMemo(
+    () => filterHistoryByRange(history, timeRangeIndex),
+    [history, timeRangeIndex],
+  );
+  const filteredPsaHistory = useMemo(
+    () => filterHistoryByRange(psa10?.history, timeRangeIndex),
+    [psa10, timeRangeIndex],
+  );
 
   // Bell reflects whether the *current grade tab* has an active alert.
   // A triggered alert is treated as inactive (filled bell only means
@@ -284,6 +315,14 @@ function CardDetailScreen() {
     }
   };
 
+  // The Price History card is shared between grade tabs — only the
+  // series (and its availability gate) swaps.
+  const chartHistory = selectedGrade === 'PSA10' ? filteredPsaHistory : filteredHistory;
+  const showChart =
+    selectedGrade === 'PSA10'
+      ? Boolean(psa10) && filteredPsaHistory.length > 2
+      : Boolean(price) && filteredHistory.length > 2;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
       <ScrollView
@@ -414,17 +453,31 @@ function CardDetailScreen() {
             }}
           />
 
-          {/* Price section + alert. PSA 10 is gated until the eBay
-              live proxy ships — show the slide-up coming-soon panel
-              instead of the price card / loading skeleton / empty
-              state. The toggle still works so the user can flip back
-              to Raw with one tap. */}
+          {/* Price section + alert. PSA 10 shows real graded prices
+              when the collectrics proxy tracks this card; untracked
+              cards keep the slide-up coming-soon panel. The toggle
+              still works so the user can flip back to Raw with one
+              tap. */}
           {selectedGrade === 'PSA10' ? (
-            <ComingSoonPanel
-              reanimateKey={selectedGrade}
-              title="PSA 10 prices — coming soon"
-              body="We’re shipping live raw prices first. Graded card tracking lights up after our eBay sales pipeline launches. Tap Raw above to see the live TCGPlayer Market Price."
-            />
+            psa10 ? (
+              <Card elevated>
+                <View style={{ gap: spacing[3] }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] }}>
+                    <Text variant="displaySm">{formatMoney(psa10.latestPrice)}</Text>
+                    <PriceChange percent={psa10.percentChange} size="md" />
+                  </View>
+                  <Text variant="caption" color={colors.onSurfaceMuted}>
+                    PSA 10 · eBay sold data
+                  </Text>
+                </View>
+              </Card>
+            ) : (
+              <ComingSoonPanel
+                reanimateKey={selectedGrade}
+                title="PSA 10 prices — coming soon"
+                body="We’re shipping live raw prices first. Graded card tracking lights up after our eBay sales pipeline launches. Tap Raw above to see the live TCGPlayer Market Price."
+              />
+            )
           ) : priceLoading ? (
             <Card elevated>
               <View style={{ gap: spacing[3] }}>
@@ -591,11 +644,11 @@ function CardDetailScreen() {
             </Card>
           )}
 
-          {/* Chart with time range toggle. Hidden on PSA 10 — the
-              ComingSoonPanel above already explains the gate, and the
-              chart would render mock graded history while the price
-              card says "coming soon" — inconsistent. */}
-          {selectedGrade !== 'PSA10' && filteredHistory && filteredHistory.length > 2 && price && (
+          {/* Chart with time range toggle. On PSA 10 it renders the
+              real graded sold-price series when the card is tracked;
+              untracked cards show no chart (the ComingSoonPanel above
+              already explains the gate). */}
+          {showChart && (
             <Card>
               <View style={{ gap: spacing[3] }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -624,7 +677,7 @@ function CardDetailScreen() {
                   </View>
                 </View>
                 <PriceChart
-                  data={filteredHistory}
+                  data={chartHistory}
                   height={200}
                   width={screenWidth - HORIZONTAL_PADDING * 2 - spacing[6] * 2}
                   interactive
@@ -634,15 +687,49 @@ function CardDetailScreen() {
             </Card>
           )}
 
+          {/* PSA Population — graded census for tracked cards on the
+              PSA 10 tab. Counts and gem rate come from the latest
+              history-psa snapshot in the collectrics proxy. */}
+          {selectedGrade === 'PSA10' && psa10?.pop && (
+            <Card>
+              <View style={{ gap: spacing[3] }}>
+                <Text variant="labelLg">PSA Population</Text>
+                <View style={{ flexDirection: 'row' }}>
+                  <View style={{ flex: 1, gap: spacing[1] }}>
+                    <Text variant="caption" color={colors.onSurfaceMuted}>PSA 10 POP</Text>
+                    <Text variant="headingSm" style={{ fontVariant: ['tabular-nums'] }}>
+                      {psa10.pop.psa10.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: spacing[1] }}>
+                    <Text variant="caption" color={colors.onSurfaceMuted}>TOTAL GRADED</Text>
+                    <Text variant="headingSm" style={{ fontVariant: ['tabular-nums'] }}>
+                      {psa10.pop.total.toLocaleString()}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, gap: spacing[1] }}>
+                    <Text variant="caption" color={colors.onSurfaceMuted}>GEM RATE</Text>
+                    <Text variant="headingSm" style={{ fontVariant: ['tabular-nums'] }}>
+                      {`${psa10.pop.gemPct.toFixed(1)}%`}
+                    </Text>
+                  </View>
+                </View>
+                <Text variant="caption" color={colors.onSurfaceMuted}>
+                  PSA-graded population for this card. Gem rate is the share of graded copies earning a 10.
+                </Text>
+              </View>
+            </Card>
+          )}
+
           {/* Price-derived sections — AI valuation, fundamentals,
               market dynamics. All hide on PSA 10 since their numbers
               would either be missing or, worse, mock data that
-              contradicts the "coming soon" panel above. They come
-              back automatically when PSA 10 launches. */}
+              contradicts the graded view above. They come back when
+              the user flips to Raw. */}
           {selectedGrade !== 'PSA10' && (
             <>
               {/* Prediction — AI valuation + market signals */}
-              <AIValuation card={card} marketPrice={price?.currentPrice} />
+              <AIValuation card={card} marketPrice={price?.currentPrice} liveDynamics={cardStats?.dynamics} />
 
               {/* Fundamentals — StockTwits-style data table */}
               <CardFundamentals card={card} marketPrice={price?.currentPrice} />
@@ -863,11 +950,12 @@ function CardDetailScreen() {
         </>
       )}
 
-      {/* PSA 10 coming-soon popup — fires every time the user flips
-          the segmented control to PSA 10. Lives at the screen root
-          (outside the loading-gated branch) so it can pop even on the
-          first render if the user lands on PSA 10 default. Persistent
-          backdrop tap dismisses; "Got it" returns the user to Raw. */}
+      {/* PSA 10 coming-soon popup — fires when the user flips the
+          segmented control to PSA 10 on a card WITHOUT tracked graded
+          data (tracked cards render the real price/chart instead).
+          Lives at the screen root (outside the loading-gated branch)
+          so it can pop even on the first render if the user lands on
+          PSA 10 default. Backdrop tap dismisses; "Got it" closes. */}
       <Modal
         visible={psaModalVisible}
         transparent

@@ -2,7 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchCardStats } from '../services/card-stats';
 
 /**
- * Real eBay market stats for the card detail screen. Upstream data
+ * Real eBay market stats for the card detail screen — dynamics, daily
+ * sold aggregates, and PSA 10 graded prices/population. Upstream data
  * refreshes daily and the proxy caches 6h at the CDN, so a long
  * staleTime is honest — refetching more often returns identical bytes.
  * fetchCardStats resolves null (never throws) for unmapped cards and

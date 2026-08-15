@@ -13,7 +13,8 @@
 //   1. GET /api/search/cards?q={name} {number} → collectrics card id
 //      (their ids are internal; name+number search is the only bridge
 //      from Pokemon TCG API ids).
-//   2. GET /api/card/{id} → trim to dynamics + daily sold aggregates.
+//   2. GET /api/card/{id} → trim to dynamics + daily sold aggregates
+//      + PSA 10 graded price series/population.
 
 export const config = { runtime: 'edge' };
 
@@ -38,9 +39,21 @@ interface Dynamics {
   supplySaturation: number;
 }
 
+interface Psa10Stats {
+  /** Latest PSA 10 sold price, USD */
+  latestPrice: number;
+  /** Day-over-day change, in percent (1.2 = +1.2%) */
+  percentChange: number;
+  /** Daily PSA 10 prices, oldest → newest */
+  history: { date: string; price: number }[];
+  /** Latest PSA population snapshot; gemPct in percent */
+  pop: { psa10: number; total: number; gemPct: number } | null;
+}
+
 interface StatsResponse {
   dynamics: Dynamics | null;
   sales: DailySales[];
+  psa10: Psa10Stats | null;
   asOf: string | null;
 }
 
@@ -181,7 +194,73 @@ function buildStats(card: any): StatsResponse {
       avgPrice: r['ended-avg-raw-price-adj'] ?? r['ended-avg-raw-price'],
     }));
 
-  return { dynamics, sales, asOf: d7?.['as-of'] ?? null };
+  return { dynamics, sales, psa10: buildPsa10(card), asOf: d7?.['as-of'] ?? null };
+}
+
+function buildPsa10(card: any): Psa10Stats | null {
+  const rows: any[] = Array.isArray(card?.history) ? card.history : [];
+  const history = rows
+    .filter(
+      (r) =>
+        r?.date != null &&
+        typeof r?.['psa-10-price'] === 'number' &&
+        isFinite(r['psa-10-price']),
+    )
+    .map((r) => ({ date: String(r.date), price: r['psa-10-price'] as number }))
+    // Upstream is already ascending; sort defensively since the chart
+    // assumes oldest → newest.
+    .sort((a, b) => a.date.localeCompare(b.date));
+  if (history.length === 0) return null;
+
+  const pm10 = card?.collectrics?.['pricing-movement']?.['psa-10'];
+  const movementLatest = pm10?.['latest-price'];
+  const latestPrice =
+    typeof movementLatest === 'number' && isFinite(movementLatest)
+      ? movementLatest
+      : history[history.length - 1].price;
+
+  // Upstream dod-change-pct is a fraction (0.012 = 1.2%).
+  const dodPct = pm10?.['dod-change-pct'];
+  let percentChange: number | null =
+    typeof dodPct === 'number' && isFinite(dodPct) ? dodPct * 100 : null;
+  if (percentChange === null && history.length >= 2) {
+    const prev = history[history.length - 2].price;
+    percentChange = prev !== 0 ? ((latestPrice - prev) / prev) * 100 : 0;
+  }
+
+  const popRows: any[] = (Array.isArray(card?.['history-psa'])
+    ? [...card['history-psa']]
+    : []
+  ).sort((a, b) => String(a?.date ?? '').localeCompare(String(b?.date ?? '')));
+  const lastPop = popRows[popRows.length - 1];
+  const pop10 = lastPop?.['10-base'];
+  const popTotal = lastPop?.['total-base'];
+  let pop: Psa10Stats['pop'] = null;
+  if (
+    typeof pop10 === 'number' &&
+    isFinite(pop10) &&
+    typeof popTotal === 'number' &&
+    isFinite(popTotal)
+  ) {
+    // gem-pct is a fraction (0.607 = 60.7%); derive from counts if absent.
+    const gemFrac = lastPop?.['gem-pct'];
+    const gemPct =
+      typeof gemFrac === 'number' && isFinite(gemFrac)
+        ? gemFrac * 100
+        : popTotal > 0
+          ? (pop10 / popTotal) * 100
+          : 0;
+    // One decimal is all the UI shows; also strips float noise
+    // (0.28 * 100 = 28.000000000000004).
+    pop = { psa10: pop10, total: popTotal, gemPct: Math.round(gemPct * 10) / 10 };
+  }
+
+  return {
+    latestPrice,
+    percentChange: percentChange ?? 0,
+    history,
+    pop,
+  };
 }
 
 export default async function handler(req: Request): Promise<Response> {
