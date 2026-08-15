@@ -95,9 +95,9 @@ const ACCOUNT_API_ORIGIN = (() => {
   // Mirror src/services/tcgplayer.ts — call the deployed Vercel
   // origin from native + dev-web; use same-origin in prod-web.
   if (Platform.OS !== 'web') {
-    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
   }
-  if (__DEV__) return 'https://strange-saha-livid.vercel.app';
+  if (__DEV__) return 'https://strange-saha.vercel.app';
   return '';
 })();
 

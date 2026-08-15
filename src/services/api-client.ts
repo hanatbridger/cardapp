@@ -6,7 +6,7 @@ const DEV_BASE_URL = Platform.select({
   default: 'http://localhost:3001',
 });
 
-const PROD_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+const PROD_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
 
 export const API_BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
 

@@ -54,7 +54,7 @@ interface UserStore {
 // was fine on iOS because the auth gate replaced it before any
 // render, but the web build skips the auth gate for dev preview
 // purposes and leaked the dev's name + email to anyone visiting
-// strange-saha-livid.vercel.app.
+// strange-saha.vercel.app.
 const DEFAULT_PROFILE: UserProfile = {
   displayName: '',
   username: '',

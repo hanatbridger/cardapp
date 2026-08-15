@@ -64,7 +64,7 @@ export default async function handler(req: Request): Promise<Response> {
   // article list, silent "no article" exit, zero pushes ever sent (the
   // June 14 manual test via the public domain was the only success).
   const origin =
-    process.env.PUBLIC_ORIGIN ?? 'https://strange-saha-livid.vercel.app';
+    process.env.PUBLIC_ORIGIN ?? 'https://strange-saha.vercel.app';
   let articles: Article[] = [];
   let newsStatus = 0;
   try {

@@ -17,7 +17,7 @@ import * as Notifications from 'expo-notifications';
  */
 
 const API_ORIGIN =
-  process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+  process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
 
 // Remember the last token we successfully registered so we don't POST on
 // every launch — only when it's new or changed.

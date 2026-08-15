@@ -120,7 +120,7 @@ function AuthGate() {
 
   useEffect(() => {
     // Skip auth/onboarding gates entirely on web. The web build is
-    // public at strange-saha-livid.vercel.app and serves the legal
+    // public at strange-saha.vercel.app and serves the legal
     // routes /privacy, /terms, and /help that App Store review +
     // real users need to reach without signing in. Pre-launch the
     // dev profile leaked because DEFAULT_PROFILE was hardcoded with

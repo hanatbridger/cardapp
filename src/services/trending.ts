@@ -10,9 +10,9 @@ import { fetchWithTimeout } from './api-client';
 
 const PROXY_ORIGIN = (() => {
   if (Platform.OS !== 'web') {
-    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
   }
-  if (__DEV__) return 'https://strange-saha-livid.vercel.app';
+  if (__DEV__) return 'https://strange-saha.vercel.app';
   return '';
 })();
 

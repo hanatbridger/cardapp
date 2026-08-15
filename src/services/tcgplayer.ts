@@ -36,12 +36,12 @@ import type { CardPrice, PriceHistory } from '../types/card';
 // override URL is set via EXPO_PUBLIC_API_URL.
 const PROXY_ORIGIN = (() => {
   if (Platform.OS !== 'web') {
-    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha-livid.vercel.app';
+    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
   }
   // Web in __DEV__ (expo start --web) → call the deployed function
   // cross-origin. Edge function returns Access-Control-Allow-Origin: *
   // so the browser allows it. Production web → relative same-origin.
-  if (__DEV__) return 'https://strange-saha-livid.vercel.app';
+  if (__DEV__) return 'https://strange-saha.vercel.app';
   return '';
 })();
 
