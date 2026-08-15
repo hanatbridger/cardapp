@@ -19,6 +19,13 @@ const PROXY_ORIGIN = (() => {
   return '';
 })();
 
+// Dev-web fallback: a local `vercel dev`-style server on :3001 (same port
+// api-client.ts uses) serves api/ functions that haven't deployed yet.
+// Tried only when the deployed origin fails, so it costs nothing once
+// the endpoint is live in production.
+const DEV_LOCAL_ORIGIN =
+  __DEV__ && Platform.OS === 'web' ? 'http://localhost:3001' : null;
+
 export interface DailySales {
   date: string;
   count: number;
@@ -43,15 +50,14 @@ export interface CardStats {
   asOf: string | null;
 }
 
-export async function fetchCardStats(
-  cardName: string,
-  cardNumber: string,
+async function fetchFrom(
+  origin: string,
+  params: URLSearchParams,
 ): Promise<CardStats | null> {
-  const params = new URLSearchParams({ name: cardName, number: cardNumber });
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 10000);
   try {
-    const res = await fetch(`${PROXY_ORIGIN}/api/card-stats?${params}`, {
+    const res = await fetch(`${origin}/api/card-stats?${params}`, {
       signal: ctl.signal,
     });
     if (!res.ok) return null;
@@ -65,4 +71,15 @@ export async function fetchCardStats(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchCardStats(
+  cardName: string,
+  cardNumber: string,
+): Promise<CardStats | null> {
+  const params = new URLSearchParams({ name: cardName, number: cardNumber });
+  const primary = await fetchFrom(PROXY_ORIGIN, params);
+  if (primary) return primary;
+  if (DEV_LOCAL_ORIGIN) return fetchFrom(DEV_LOCAL_ORIGIN, params);
+  return null;
 }
