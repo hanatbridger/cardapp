@@ -160,7 +160,7 @@ function FeedbackScreen() {
                   </Pressable>
                 </View>
               ) : (
-                <Button variant="outlined" icon={<IconPhoto size={18} color={colors.primary} />} onPress={attach}>
+                <Button variant="outlined" fullWidth icon={<IconPhoto size={18} color={colors.primary} />} onPress={attach}>
                   Attach screenshot
                 </Button>
               )}
