@@ -28,7 +28,7 @@
 //                                 injects this into the Authorization
 //                                 header on each cron invocation.
 
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 export const config = { runtime: 'edge' };
 
@@ -63,11 +63,159 @@ interface SnapshotRow {
   source: 'collectrics';
 }
 
+interface AlertTargetRow {
+  id: string;
+  push_token: string;
+  card_id: string;
+  card_name: string;
+  grade: string;
+  target_price: number | string;
+  direction: 'above' | 'below';
+}
+
+// Per-message ticket from exp.host — one per message, in message order.
+interface ExpoTicket {
+  status?: string;
+  details?: { error?: string };
+}
+
 function extractProductId(url: string): string | null {
   // Same regex as api/trending.ts — image URL format
   // https://tcgplayer-cdn.tcgplayer.com/product/{productId}_in_1000x1000.jpg
   const m = url.match(/\/product\/(\d+)_/);
   return m ? m[1] : null;
+}
+
+// Server-side price-alert sweep, riding inside this cron because Vercel
+// Hobby caps us at 2 cron jobs. Honest limits: it runs ONCE daily at the
+// cron hour and only covers cards present in the collectrics leaderboard
+// just ingested; the in-app checker (use-alert-checker) remains the
+// real-time path while the app is open. Snapshot prices are RAW, so only
+// UNGRADED targets can match — graded targets are skipped untouched.
+async function checkAlerts(
+  // Schema-less client — same loose typing the rest of the file uses.
+  admin: SupabaseClient<any, any, any>,
+  snapshots: SnapshotRow[],
+): Promise<{ checked: number; fired: number }> {
+  const { data: targetRows, error } = await admin
+    .from('alert_targets')
+    .select('id, push_token, card_id, card_name, grade, target_price, direction')
+    .is('triggered_at', null);
+  if (error) throw new Error(`alert_targets load failed: ${error.message}`);
+  const targets = (targetRows ?? []) as unknown as AlertTargetRow[];
+  if (targets.length === 0) return { checked: 0, fired: 0 };
+
+  const ungraded = targets.filter((t) => t.grade === 'UNGRADED');
+
+  // Latest ingested price per product. Each sparkline series ends at (or
+  // near) today, so the newest point is today's raw price.
+  const latestByProduct = new Map<string, { date: string; price: number }>();
+  for (const s of snapshots) {
+    const cur = latestByProduct.get(s.product_id);
+    if (!cur || s.snapshot_date > cur.date) {
+      latestByProduct.set(s.product_id, {
+        date: s.snapshot_date,
+        price: s.raw_price,
+      });
+    }
+  }
+
+  // card_id → product_id mapping lives in price_snapshots, stamped
+  // lazily by api/tcgplayer/history.ts when a chart is first opened.
+  // One lookup per distinct alerted card, small parallel chunks — alert
+  // volume is tiny (free tier caps at 3 active alerts per user).
+  const cardIds = [...new Set(ungraded.map((t) => t.card_id))];
+  const productByCard = new Map<string, string>();
+  const LOOKUP_CHUNK = 20;
+  for (let i = 0; i < cardIds.length; i += LOOKUP_CHUNK) {
+    await Promise.all(
+      cardIds.slice(i, i + LOOKUP_CHUNK).map(async (cardId) => {
+        const { data } = await admin
+          .from('price_snapshots')
+          .select('product_id')
+          .eq('card_id', cardId)
+          .limit(1);
+        const pid = (data as { product_id?: string }[] | null)?.[0]?.product_id;
+        if (typeof pid === 'string') productByCard.set(cardId, pid);
+      }),
+    );
+  }
+
+  // A target whose card has no mapping yet (chart never opened) or no
+  // fresh price simply waits, un-triggered, for a future run.
+  const fired: { target: AlertTargetRow; price: number }[] = [];
+  for (const t of ungraded) {
+    const pid = productByCard.get(t.card_id);
+    if (!pid) continue;
+    const latest = latestByProduct.get(pid);
+    if (!latest) continue;
+    const targetPrice = Number(t.target_price);
+    if (!Number.isFinite(targetPrice) || targetPrice <= 0) continue;
+    const hit =
+      t.direction === 'below'
+        ? latest.price <= targetPrice
+        : latest.price >= targetPrice;
+    if (hit) fired.push({ target: t, price: latest.price });
+  }
+  if (fired.length === 0) return { checked: targets.length, fired: 0 };
+
+  // Fan out Expo pushes (batched ≤100) — same ticket handling as
+  // api/cron/news-push.ts. Copy mirrors formatAlertMessage in
+  // src/services/alert-checker.ts.
+  const firedOkIds: string[] = [];
+  const staleTokens: string[] = [];
+  for (let i = 0; i < fired.length; i += 100) {
+    const batch = fired.slice(i, i + 100);
+    const messages = batch.map(({ target, price }) => ({
+      to: target.push_token,
+      sound: 'default',
+      title: `${target.card_name} hit your target`,
+      body: `Raw is now ${target.direction} $${Number(target.target_price).toFixed(2)} — currently $${price.toFixed(2)}.`,
+      data: { type: 'alert', cardId: target.card_id },
+    }));
+    try {
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(messages),
+      });
+      if (!res.ok) continue; // whole batch failed — rows stay armed for tomorrow
+      const payload = (await res.json().catch(() => null)) as
+        | { data?: ExpoTicket[] }
+        | null;
+      const tickets = payload && Array.isArray(payload.data) ? payload.data : null;
+      if (!tickets) {
+        // 200 with an unparseable body — assume the service accepted it.
+        for (const { target } of batch) firedOkIds.push(target.id);
+        continue;
+      }
+      for (let j = 0; j < batch.length; j++) {
+        const ticket = tickets[j];
+        if (ticket?.status === 'ok') {
+          firedOkIds.push(batch[j].target.id);
+        } else if (ticket?.details?.error === 'DeviceNotRegistered') {
+          staleTokens.push(batch[j].target.push_token);
+        }
+        // Other ticket errors: row stays armed and retries next run.
+      }
+    } catch {
+      // Batch send failed — rows stay armed.
+    }
+  }
+
+  if (firedOkIds.length > 0) {
+    await admin
+      .from('alert_targets')
+      .update({ triggered_at: new Date().toISOString() })
+      .in('id', firedOkIds);
+  }
+  // Prune dead tokens from the news fan-out table AND drop alert targets
+  // that can never deliver (uninstalled / revoked device).
+  if (staleTokens.length > 0) {
+    await admin.from('push_tokens').delete().in('token', staleTokens);
+    await admin.from('alert_targets').delete().in('push_token', staleTokens);
+  }
+  return { checked: targets.length, fired: firedOkIds.length };
 }
 
 // Length-independent constant-time string compare — avoids leaking
@@ -225,12 +373,27 @@ export default async function handler(req: Request): Promise<Response> {
     processed += chunk.length;
   }
 
+  // 4. Server-side alert sweep against the prices just ingested.
+  // Wrapped: a failure here must never fail the snapshot response;
+  // -1 signals "step errored" to whoever reads the cron logs.
+  let alertsChecked = -1;
+  let alertsFired = -1;
+  try {
+    const result = await checkAlerts(admin, snapshots);
+    alertsChecked = result.checked;
+    alertsFired = result.fired;
+  } catch (err) {
+    console.error('[snapshot-prices] alert check failed:', err);
+  }
+
   return new Response(
     JSON.stringify({
       run_date: today,
       cards: rows.length,
       snapshot_rows: snapshots.length,
       processed,
+      alertsChecked,
+      alertsFired,
     }),
     { status: 200, headers: { 'Content-Type': 'application/json' } },
   );

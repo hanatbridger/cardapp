@@ -5,6 +5,11 @@ import type { GradeType } from '../constants/grades';
 // One-way import edge (alerts-store → user-store) for the premium
 // read; user-store imports neither store, so no cycle.
 import { useUserStore } from './user-store';
+// Best-effort server mirror (Supabase alert_targets) so the daily cron
+// can push while the app is closed. Every call below is fire-and-forget
+// — the helpers never throw and no-op without a session/push token, so
+// store actions stay synchronous and offline-safe.
+import { syncAlertTarget, removeAlertTarget } from '../services/alert-sync';
 
 // Free tier keeps up to this many ACTIVE (un-triggered) alerts;
 // Premium is uncapped. A triggered alert frees its slot until reset.
@@ -138,27 +143,57 @@ export const useAlertsStore = create<AlertsStore>()(
             ? alerts.map((a) => (a.id === anyExisting.id ? entry : a))
             : [...alerts, entry],
         });
+        void syncAlertTarget({
+          cardId: entry.cardId,
+          cardName: entry.cardName,
+          grade: entry.grade,
+          type: entry.type,
+          targetPrice: entry.targetPrice,
+        }).catch(() => {});
         return { ok: true, replaced: Boolean(activeExisting) };
       },
 
-      removeAlert: (id) =>
+      removeAlert: (id) => {
+        const removed = get().alerts.find((a) => a.id === id);
         set((state) => ({
           alerts: state.alerts.filter((a) => a.id !== id),
-        })),
+        }));
+        if (removed) {
+          void removeAlertTarget(removed.cardId, removed.grade).catch(() => {});
+        }
+      },
 
-      markTriggered: (id) =>
+      markTriggered: (id) => {
+        const spent = get().alerts.find((a) => a.id === id);
         set((state) => ({
           alerts: state.alerts.map((a) =>
             a.id === id ? { ...a, triggered: true } : a,
           ),
-        })),
+        }));
+        // Spent locally — clear the server row so the daily cron can't
+        // double-push an alert the in-app checker already fired.
+        if (spent) {
+          void removeAlertTarget(spent.cardId, spent.grade).catch(() => {});
+        }
+      },
 
-      resetAlertTriggered: (id) =>
+      resetAlertTriggered: (id) => {
         set((state) => ({
           alerts: state.alerts.map((a) =>
             a.id === id ? { ...a, triggered: false } : a,
           ),
-        })),
+        }));
+        const rearmed = get().alerts.find((a) => a.id === id);
+        if (rearmed) {
+          void syncAlertTarget({
+            cardId: rearmed.cardId,
+            cardName: rearmed.cardName,
+            grade: rearmed.grade,
+            type: rearmed.type,
+            targetPrice: rearmed.targetPrice,
+          }).catch(() => {});
+        }
+      },
 
       recordTriggered: (alert, triggeredPrice) => {
         // Idempotency guard: if a concurrent check already flipped this
@@ -185,6 +220,9 @@ export const useAlertsStore = create<AlertsStore>()(
             a.id === alert.id ? { ...a, triggered: true } : a,
           ),
         }));
+        // Spent — clear the server row so the daily cron can't push a
+        // duplicate for an alert that already fired in-app.
+        void removeAlertTarget(alert.cardId, alert.grade).catch(() => {});
         return entry;
       },
 

@@ -23,6 +23,21 @@ const API_ORIGIN =
 // every launch — only when it's new or changed.
 const REGISTERED_TOKEN_KEY = 'cardpulse-push-registered-token';
 
+/**
+ * The Expo push token this device has already registered with the
+ * backend, or null if registration hasn't happened (web, simulator,
+ * permission not granted yet). Read-only — registration stays owned by
+ * registerForPushNotifications.
+ */
+export async function getRegisteredPushToken(): Promise<string | null> {
+  if (Platform.OS === 'web') return null;
+  try {
+    return await AsyncStorage.getItem(REGISTERED_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
 export async function registerForPushNotifications(): Promise<void> {
   if (Platform.OS === 'web') return;
   try {
