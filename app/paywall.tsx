@@ -74,6 +74,21 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
   },
 ];
 
+// Alert.alert is a silent no-op on react-native-web — route through
+// window.alert there (same pattern as profile.tsx / edit-profile.tsx).
+function notify(title: string, message: string, onDismiss?: () => void) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+    onDismiss?.();
+  } else {
+    Alert.alert(
+      title,
+      message,
+      onDismiss ? [{ text: 'Got it', onPress: onDismiss }] : undefined,
+    );
+  }
+}
+
 function PaywallScreen() {
   const { colors } = useTheme();
   const setPremium = useUserStore((s) => s.setPremium);
@@ -91,15 +106,26 @@ function PaywallScreen() {
     else router.replace('/(tabs)');
   };
 
+  // Match by identifier ($rc_monthly/$rc_annual are identifier values,
+  // NOT packageType — packageType is the MONTHLY/ANNUAL enum), then by
+  // packageType, then positional only when neither matched.
+  const packageForPlan = (plan: PlanId) => {
+    const packages = offerings?.availablePackages;
+    if (!packages?.length) return undefined;
+    const identifier = plan === 'monthly' ? '$rc_monthly' : '$rc_annual';
+    const type = plan === 'monthly' ? 'MONTHLY' : 'ANNUAL';
+    return (
+      packages.find((p: any) => p.identifier === identifier) ??
+      packages.find((p: any) => p.packageType === type) ??
+      packages[plan === 'monthly' ? 0 : 1]
+    );
+  };
+
   const purchase = async () => {
-    // Find the selected package from RevenueCat offerings
-    const packageId = selected === 'monthly' ? '$rc_monthly' : '$rc_annual';
-    const pkg = offerings?.availablePackages?.find(
-      (p: any) => p.packageType === packageId,
-    ) ?? offerings?.availablePackages?.[selected === 'monthly' ? 0 : 1];
+    const pkg = packageForPlan(selected);
 
     if (!pkg && Platform.OS !== 'web') {
-      Alert.alert('Error', 'Subscription products are not available yet. Please try again later.');
+      notify('Error', 'Subscription products are not available yet. Please try again later.');
       return;
     }
 
@@ -117,7 +143,7 @@ function PaywallScreen() {
           setPremium(true);
         } else {
           setPurchasing(false);
-          Alert.alert(
+          notify(
             'Get Premium in the app',
             'CardPulse Premium is purchased in the iOS app. Download CardPulse and subscribe there — your premium unlocks across your devices.',
           );
@@ -129,14 +155,14 @@ function PaywallScreen() {
         else { setPurchasing(false); return; }
       }
       setPurchasing(false);
-      Alert.alert(
+      notify(
         'Welcome to Premium',
         'Your watchlist is now unlimited and price alerts are unlocked on every card.',
-        [{ text: 'Got it', onPress: close }],
+        close,
       );
     } catch (e: any) {
       setPurchasing(false);
-      Alert.alert('Purchase Failed', e.message || 'Something went wrong. Please try again.');
+      notify('Purchase Failed', e.message || 'Something went wrong. Please try again.');
     }
   };
 
@@ -147,16 +173,16 @@ function PaywallScreen() {
       setPurchasing(false);
       if (success) {
         setPremium(true);
-        Alert.alert('Premium Restored', 'Welcome back! Your premium subscription has been restored.');
+        notify('Premium Restored', 'Welcome back! Your premium subscription has been restored.');
       } else {
-        Alert.alert(
+        notify(
           'No Subscription Found',
           "We didn't find an active CardPulse subscription. If you subscribed on another device, sign in with the same Apple ID and try again.",
         );
       }
     } catch {
       setPurchasing(false);
-      Alert.alert('Restore Failed', 'Could not restore purchases. Please try again.');
+      notify('Restore Failed', 'Could not restore purchases. Please try again.');
     }
   };
 
@@ -311,7 +337,11 @@ function PaywallScreen() {
                   )}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text variant="headingSm">{plan.price}</Text>
+                  {/* Store-localized price when offerings have loaded;
+                      USD literal is only the loading fallback. */}
+                  <Text variant="headingSm">
+                    {packageForPlan(plan.id)?.product?.priceString ?? plan.price}
+                  </Text>
                   <Text variant="caption" color={colors.onSurfaceVariant}>
                     {plan.period}
                   </Text>
