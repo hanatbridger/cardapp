@@ -722,7 +722,11 @@ function CardDetailScreen() {
                 data={relatedCards}
                 keyExtractor={(item) => item.id}
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ gap: spacing[3] }}
+                // Full bleed: cancel the section's horizontal padding so
+                // cards scroll under the screen edges; inset the content
+                // so the first card still aligns with the page grid.
+                style={{ marginHorizontal: -HORIZONTAL_PADDING }}
+                contentContainerStyle={{ gap: spacing[3], paddingHorizontal: HORIZONTAL_PADDING }}
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => router.push(`/card/${item.id}`)}
