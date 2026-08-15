@@ -115,6 +115,9 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
   // bridge call, so the JS thread stays idle.
   const frameCallback = useFrameCallback(() => {
     'worklet';
+    // No items → singleSetWidth is 0 and the wrap condition below would
+    // fire every frame; nothing to scroll anyway.
+    if (singleSetWidth === 0) return;
     if (isPaused.value) return;
     scrollOffset.value += SCROLL_SPEED;
     // Wrap back to the first set when we've crossed into the third —
@@ -130,6 +133,14 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
   useEffect(() => {
     scrollOffset.value = singleSetWidth;
   }, [singleSetWidth, scrollOffset]);
+
+  // Clear the resume timer on unmount — otherwise it fires after the
+  // component is gone and writes to the shared value.
+  useEffect(() => {
+    return () => {
+      if (pauseTimeout.current) clearTimeout(pauseTimeout.current);
+    };
+  }, []);
 
   // Run the frame callback only while the home screen is focused.
   // When the user navigates to another tab or detail screen, we

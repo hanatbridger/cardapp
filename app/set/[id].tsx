@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, ScrollView, Pressable, ActivityIndicator, Image, Dimensions } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator, Image, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { Image as ExpoImage } from 'expo-image';
@@ -32,16 +32,16 @@ const RARITIES = [
 const CARD_ASPECT = 0.72;
 const COLS = 2;
 const COL_GAP = 12;
-const SCREEN_W = Dimensions.get('window').width;
 // Cap grid width on web/tablets so cards don't go absurdly large
 const MAX_GRID_W = 560;
-const GRID_W = Math.min(SCREEN_W, MAX_GRID_W);
-const GRID_INSET = (SCREEN_W - GRID_W) / 2;
-const CARD_W = (GRID_W - HORIZONTAL_PADDING * 2 - COL_GAP * (COLS - 1)) / COLS;
 
 function SetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
+  const { width: screenWidth } = useWindowDimensions();
+  const GRID_W = Math.min(screenWidth, MAX_GRID_W);
+  const GRID_INSET = (screenWidth - GRID_W) / 2;
+  const CARD_W = (GRID_W - HORIZONTAL_PADDING * 2 - COL_GAP * (COLS - 1)) / COLS;
   const [rarity, setRarity] = useState<string | undefined>(undefined);
   const { scrollHandler, headerAnimatedStyle, headerHeight } = useCollapsingHeader();
 

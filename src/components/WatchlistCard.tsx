@@ -46,17 +46,13 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   const { colors, isDark } = useTheme();
   const formatMoney = useMoney();
 
-  // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
-  // from every watchlist surface until the eBay live proxy ships.
-  // The home tab also filters them out at the FlatList data prop, but
-  // this guarantees no PSA 10 row leaks through any other caller (or
-  // a stale deploy where the upstream filter wasn't yet live).
-  if (grade === 'PSA10') return null;
-
   // Fetch live price — shares React Query cache with the detail screen,
   // so the same card always shows the same number across the app.
+  // Empty cardName disables the query for PSA10 rows (rendered null
+  // below): the hook must still be CALLED for rules-of-hooks, but a
+  // never-rendered row shouldn't pay for a price fetch.
   const { data: livePrice } = useCardPrice({
-    cardName,
+    cardName: grade === 'PSA10' ? '' : cardName,
     grade,
     cardId,
     setName,
@@ -64,6 +60,16 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     language,
   });
   const price = livePrice ?? fallbackPrice;
+
+  // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
+  // from every watchlist surface until the eBay live proxy ships.
+  // The home tab also filters them out at the FlatList data prop, but
+  // this guarantees no PSA 10 row leaks through any other caller (or
+  // a stale deploy where the upstream filter wasn't yet live).
+  // NOTE: kept BELOW all hooks (same pattern as PriceChart) — returning
+  // earlier would skip useCardPrice and violate the Rules of Hooks if
+  // `grade` changes while mounted.
+  if (grade === 'PSA10') return null;
 
   // AI valuation
   const score = getCardScore(cardId);

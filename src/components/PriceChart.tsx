@@ -44,7 +44,6 @@ export function PriceChart({
   const { colors } = useTheme();
   const [activePoint, setActivePoint] = useState<TouchInfo | null>(null);
   const containerRef = useRef<View>(null);
-  const layoutRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
 
   // NOTE: the `data.length < 2` early return lives AFTER all hooks below.
   // Returning here would skip the four useCallback hooks and violate the
@@ -53,9 +52,14 @@ export function PriceChart({
   // NaN/empty values for short data — they're never rendered because the
   // guard returns null before the JSX.
 
-  // Chart area dimensions (excluding labels)
-  const chartHeight = interactive ? totalHeight - LABEL_HEIGHT : totalHeight;
-  const chartWidth = interactive ? totalWidth - PRICE_LABEL_WIDTH : totalWidth;
+  // Chart area dimensions (excluding labels). Clamped: callers derive
+  // width from window/layout measurements that can be 0 before first
+  // layout on web, going negative after padding subtraction — SVG
+  // rejects negative width/height attributes.
+  const safeHeight = Math.max(0, totalHeight);
+  const safeWidth = Math.max(0, totalWidth);
+  const chartHeight = Math.max(0, interactive ? safeHeight - LABEL_HEIGHT : safeHeight);
+  const chartWidth = Math.max(0, interactive ? safeWidth - PRICE_LABEL_WIDTH : safeWidth);
 
   const prices = data.map((d) => d.price);
   const minPrice = Math.min(...prices);
@@ -109,14 +113,17 @@ export function PriceChart({
   );
 
   const getRelativeX = useCallback((evt: any): number => {
+    const nativeEvt = evt.nativeEvent || evt;
     if (Platform.OS === 'web') {
-      const nativeEvt = evt.nativeEvent || evt;
       if (nativeEvt.offsetX !== undefined) return nativeEvt.offsetX;
       if (nativeEvt.clientX !== undefined) {
-        return nativeEvt.clientX - layoutRef.current.x;
+        // clientX is viewport-relative; the onLayout x is parent-relative
+        // and drifts with scroll/nesting — use the live bounding rect.
+        const node = containerRef.current as any;
+        const rect = node?.getBoundingClientRect?.();
+        return rect ? nativeEvt.clientX - rect.left : nativeEvt.clientX;
       }
     }
-    const nativeEvt = evt.nativeEvent || evt;
     return nativeEvt.locationX ?? 0;
   }, []);
 
@@ -142,8 +149,8 @@ export function PriceChart({
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const svgHeight = interactive ? totalHeight : totalHeight;
-  const svgWidth = totalWidth;
+  const svgHeight = safeHeight;
+  const svgWidth = safeWidth;
 
   const webProps = Platform.OS === 'web' && interactive
     ? {
@@ -185,7 +192,6 @@ export function PriceChart({
 
       <View
         ref={containerRef}
-        onLayout={(e) => { layoutRef.current = e.nativeEvent.layout; }}
         onStartShouldSetResponder={() => interactive}
         onMoveShouldSetResponder={() => interactive}
         onResponderGrant={handleInteraction}

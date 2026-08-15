@@ -312,7 +312,9 @@ function SealedDetailScreen() {
               variant={isWatched ? 'tonal' : 'filled'}
               icon={
                 isWatched ? (
-                  <IconBookmarkFilled size={16} color={colors.onPrimary} />
+                  // Match the tonal variant's text color — onPrimary is
+                  // invisible on primaryContainer in dark mode.
+                  <IconBookmarkFilled size={16} color={colors.onPrimaryContainer} />
                 ) : (
                   <IconBookmark size={16} color={colors.onPrimary} />
                 )

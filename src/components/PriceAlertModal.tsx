@@ -79,7 +79,7 @@ export function PriceAlertModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
@@ -133,7 +133,9 @@ export function PriceAlertModal({
 
             {/* Price input */}
             <View style={{ gap: spacing[1] }}>
-              <Text variant="labelLg">Target Price</Text>
+              {/* Alerts are stored and matched in USD regardless of the
+                  user's display currency — label it so the unit is clear. */}
+              <Text variant="labelLg">Target Price (USD)</Text>
               <View
                 style={{
                   flexDirection: 'row',

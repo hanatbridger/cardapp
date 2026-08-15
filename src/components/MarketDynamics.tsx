@@ -189,6 +189,9 @@ export function MarketDynamics({ cardId }: MarketDynamicsProps) {
           >
             <Text variant="caption" color={colors.primary}>7d avg</Text>
           </View>
+          {/* Metrics are seeded, not live eBay data — same disclosure
+              convention as app/sealed/[id].tsx. */}
+          <Badge variant="neutral">Sample data</Badge>
         </View>
 
         {/* 3-stat summary row */}
