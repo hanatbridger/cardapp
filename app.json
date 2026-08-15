@@ -19,7 +19,7 @@
       "supportsTablet": false,
       "icon": {
         "light": "./assets/icon.png",
-        "dark": "./assets/icon-dark.png",
+        "dark": "./assets/icon.png",
         "tinted": "./assets/icon-tinted.png"
       },
       "config": {
@@ -46,7 +46,7 @@
       "package": "com.getcardpulse.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#EDF0FF"
+        "backgroundColor": "#4B5EFC"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
