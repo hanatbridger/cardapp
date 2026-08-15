@@ -141,6 +141,32 @@ export async function searchCards(
   };
 }
 
+/**
+ * Similar-cards lookup — exact-word name match (NO trailing wildcard) plus
+ * a `select` field projection. Both matter: on high-volume names
+ * ("Charizard", 108 printings) the API 500s when asked to serialize full
+ * card payloads, but the same query with select=id,name,images,set,number
+ * returns 200. Word match still hits decorated names ("Mega Charizard Y
+ * ex"), which is exactly what the rail wants.
+ */
+export async function getSimilarCards(
+  name: string,
+  pageSize: number = 12,
+): Promise<PokemonCard[]> {
+  const params = new URLSearchParams({
+    q: `name:"${escapeLucene(name)}"`,
+    pageSize: String(pageSize),
+    orderBy: '-set.releaseDate',
+    select: 'id,name,images,set,number',
+  });
+  const response = await fetchWithTimeout(`${BASE_URL}/cards?${params}`);
+  if (!response.ok) {
+    throw new Error(`Pokemon TCG API error: ${response.status}`);
+  }
+  const data: PokemonTcgResponse = await response.json();
+  return (data.data || []).map(mapCard);
+}
+
 export interface PokemonSet {
   id: string;
   name: string;

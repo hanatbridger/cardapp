@@ -1,5 +1,7 @@
 import React from 'react';
-import { View } from 'react-native';
+import { View, Pressable } from 'react-native';
+import { router } from 'expo-router';
+import { IconChevronRight } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Card } from './Card';
 import { useTheme } from '../theme/ThemeProvider';
@@ -125,14 +127,31 @@ export function CardFundamentals({ card, marketPrice }: CardFundamentalsProps) {
     );
   }
 
-  // Artist
+  // Artist — tappable: routes to the artist page listing everything
+  // they've illustrated (same destination as Explore ▸ Artists).
   if (card.artist) {
+    const artist = card.artist;
     rows.push(
-      <FundamentalRow
+      <Pressable
         key="artist"
-        label="Artist"
-        value={card.artist}
-      />,
+        onPress={() => router.push(`/artist/${encodeURIComponent(artist)}`)}
+        accessibilityRole="button"
+        accessibilityLabel={`See all cards illustrated by ${artist}`}
+        hitSlop={4}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          paddingVertical: spacing[3],
+          opacity: pressed ? 0.6 : 1,
+        })}
+      >
+        <Text variant="bodySm" color={colors.onSurfaceVariant}>Artist</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}>
+          <Text variant="bodySm" color={colors.primary}>{artist}</Text>
+          <IconChevronRight size={14} color={colors.primary} />
+        </View>
+      </Pressable>,
     );
   }
 

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, ScrollView, Dimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal } from 'react-native';
+import { View, ScrollView, FlatList, Dimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -30,28 +30,28 @@ import { HORIZONTAL_PADDING, LARGE_CARD_BORDER_RADIUS } from '../../src/constant
 import { cardShareUrl } from '../../src/constants/links';
 // Card data/valuation handled internally by AIValuation component
 import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
-import { useWatchlistStore, useUserStore } from '../../src/stores';
+import { useWatchlistStore } from '../../src/stores';
 import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
-import { useCardDetail, useCardPrice, usePriceHistory, useMoney } from '../../src/hooks';
+import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards } from '../../src/hooks';
 
 const screenWidth = Dimensions.get('window').width;
-const TIME_RANGES = ['1D', '1W', '1M', '3M'];
+// No 1D: history is one snapshot per day, so a 1-day window can never
+// hold the 3 points the chart needs — it only ever showed the
+// "building history" placeholder.
+const TIME_RANGES = ['1W', '1M', '3M'];
 
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const formatMoney = useMoney();
   const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
-  // Default grade comes from user preferences and is persisted across
-  // sessions — pick whatever the user last viewed so they don't have to
-  // re-tap PSA 10 / Raw on every card.
-  const defaultGrade = useUserStore((s) => s.preferences.defaultGrade);
-  const updatePreference = useUserStore((s) => s.updatePreference);
-  const [gradeIndex, setGradeIndex] = useState(() =>
-    Math.max(0, GRADE_OPTIONS.indexOf(defaultGrade)),
-  );
-  const [timeRangeIndex, setTimeRangeIndex] = useState(2);
+  // Always open on Raw. PSA 10 is still a coming-soon panel, so landing
+  // there (as the old persisted defaultGrade preference made many users
+  // do) shows a dead tab and hides fundamentals/valuation until the user
+  // discovers the toggle. Raw is where the live data is.
+  const [gradeIndex, setGradeIndex] = useState(() => GRADE_OPTIONS.indexOf('UNGRADED'));
+  const [timeRangeIndex, setTimeRangeIndex] = useState(1); // default 1M
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [watchlistFullVisible, setWatchlistFullVisible] = useState(false);
   // Pops a coming-soon overlay every time the user flips TO PSA 10.
@@ -114,13 +114,16 @@ function CardDetailScreen() {
     cardNumber: card?.number,
     language: card?.language,
   });
+  // Other printings of this character for the Similar-cards rail.
+  const { data: related } = useRelatedCards(card);
+  const relatedCards = related ?? [];
 
   // Filter history by selected time range
   const filteredHistory = useMemo(() => {
     if (!history || history.length === 0) return [];
     const now = Date.now();
     const dayMs = 86400000;
-    const rangeDays = [1, 7, 30, 90][timeRangeIndex];
+    const rangeDays = [7, 30, 90][timeRangeIndex];
     const cutoff = now - rangeDays * dayMs;
     const filtered = history.filter((p) => new Date(p.date).getTime() >= cutoff);
     return filtered.length >= 2 ? filtered : history;
@@ -391,10 +394,10 @@ function CardDetailScreen() {
             options={GRADE_OPTIONS.map((g) => GRADES[g].shortLabel)}
             selected={gradeIndex}
             onSelect={(i) => {
+              // Session-only: every card opens on Raw (see gradeIndex
+              // init) — persisting the toggle used to strand users on
+              // the PSA 10 coming-soon tab by default.
               setGradeIndex(i);
-              // Persist so the next card the user opens defaults to the
-              // same grade tab — saves a tap on every navigation.
-              updatePreference('defaultGrade', GRADE_OPTIONS[i]);
             }}
           />
 
@@ -697,6 +700,49 @@ function CardDetailScreen() {
             </Card>
           )}
 
+          {/* Similar cards — other printings of the same character, newest
+              first. Catalog data, so it shows on every grade tab. Hidden
+              entirely (no header, no skeleton) when the lookup finds
+              nothing or hasn't resolved, so the screen never ends on an
+              empty section. */}
+          {relatedCards.length > 0 && (
+            <View style={{ gap: spacing[3] }}>
+              <Text variant="overline" color={colors.onSurfaceVariant}>SIMILAR CARDS</Text>
+              <FlatList
+                horizontal
+                data={relatedCards}
+                keyExtractor={(item) => item.id}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: spacing[3] }}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => router.push(`/card/${item.id}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${item.name}, ${item.set.name}`}
+                    style={({ pressed }) => ({ width: 120, opacity: pressed ? 0.7 : 1 })}
+                  >
+                    <Image
+                      source={{ uri: item.images.small }}
+                      style={{
+                        width: 120,
+                        height: 120 / 0.72,
+                        borderRadius: radius.md,
+                        backgroundColor: colors.surfaceVariant,
+                      }}
+                      contentFit="cover"
+                    />
+                    <View style={{ marginTop: spacing[2], gap: spacing['0.5'] }}>
+                      <Text variant="labelSm" numberOfLines={1}>{item.name}</Text>
+                      <Text variant="caption" color={colors.onSurfaceMuted} numberOfLines={1}>
+                        {item.set.name}
+                      </Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+            </View>
+          )}
+
         </View>
       </ScrollView>
 
@@ -848,7 +894,6 @@ function CardDetailScreen() {
                   // most useful next action since PSA 10 is empty.
                   const ungradedIdx = GRADE_OPTIONS.indexOf('UNGRADED');
                   setGradeIndex(ungradedIdx);
-                  updatePreference('defaultGrade', 'UNGRADED');
                   setPsaModalVisible(false);
                 }}
               >
