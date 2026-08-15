@@ -57,11 +57,19 @@ export default async function handler(req: Request): Promise<Response> {
     return new Response(JSON.stringify({ error: 'Server misconfigured' }), { status: 500 });
   }
 
-  // 1. Newest article from our own news aggregator.
-  const origin = new URL(req.url).origin;
+  // 1. Newest article from our own news aggregator. MUST go through the
+  // public production domain: scheduled invocations arrive on the
+  // deployment-internal URL, and deriving origin from req.url there made
+  // this self-fetch hit Vercel's deployment-protection auth page — empty
+  // article list, silent "no article" exit, zero pushes ever sent (the
+  // June 14 manual test via the public domain was the only success).
+  const origin =
+    process.env.PUBLIC_ORIGIN ?? 'https://strange-saha-livid.vercel.app';
   let articles: Article[] = [];
+  let newsStatus = 0;
   try {
     const res = await fetch(`${origin}/api/news?limit=20`);
+    newsStatus = res.status;
     if (res.ok) {
       const data = (await res.json()) as { articles?: Article[] };
       articles = Array.isArray(data.articles) ? data.articles : [];
@@ -75,7 +83,10 @@ export default async function handler(req: Request): Promise<Response> {
     return (Number.isFinite(tb) ? tb : 0) - (Number.isFinite(ta) ? ta : 0);
   })[0];
   if (!top?.url) {
-    return new Response(JSON.stringify({ pushed: 0, note: 'no article' }), {
+    // Surface WHY the list was empty — a silent 'no article' hid a 401
+    // from deployment protection for two months.
+    console.error('[news-push] no article; /api/news status', newsStatus);
+    return new Response(JSON.stringify({ pushed: 0, note: 'no article', newsStatus }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });
