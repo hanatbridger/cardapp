@@ -191,6 +191,18 @@ export const useUserStore = create<UserStore>()(
     {
       name: 'cardpulse-user',
       storage: createJSONStorage(() => AsyncStorage),
+      // Deep-merge preferences: the default shallow merge would replace
+      // the whole nested object with the persisted (older-shaped) one,
+      // so preference keys added in later releases would rehydrate as
+      // undefined on existing installs.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<UserStore>;
+        return {
+          ...current,
+          ...p,
+          preferences: { ...current.preferences, ...p.preferences },
+        };
+      },
     },
   ),
 );

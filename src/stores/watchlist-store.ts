@@ -203,6 +203,17 @@ export const useWatchlistStore = create<WatchlistStore>()(
       name: 'cardpulse-watchlist',
       storage: createJSONStorage(() => AsyncStorage),
       version: 2,
+      // maxFreeItems is a code constant, not user state. It used to be
+      // persisted, which froze the cap at whatever value shipped when
+      // the blob was written — a future cap change would never reach
+      // existing installs. Exclude it going forward AND strip it from
+      // old blobs on merge so the code value is always authoritative.
+      partialize: (state) => ({ items: state.items }),
+      merge: (persisted, current) => {
+        const { maxFreeItems: _stale, ...rest } =
+          (persisted ?? {}) as Partial<WatchlistStore>;
+        return { ...current, ...rest };
+      },
       // v1 → v2: legacy items had no `kind` discriminator — every entry
       // was a card. Tag them so the discriminated union narrows cleanly.
       migrate: (persisted: any, version: number) => {

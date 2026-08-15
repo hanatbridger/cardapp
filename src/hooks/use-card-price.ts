@@ -33,7 +33,11 @@ interface UseCardPriceOptions {
   language?: 'EN' | 'JP';
   /** TCGPlayer market price (raw) from Pokemon TCG API */
   tcgPlayerPrice?: number;
-  /** TCGPlayer mid price — used to compute % change vs market */
+  /**
+   * TCGPlayer mid price. Accepted but intentionally NOT used for
+   * percentChange: market-vs-mid is a static listing spread, not daily
+   * movement, and rendering it as change showed permanent gains/losses.
+   */
   tcgPlayerMidPrice?: number;
 }
 
@@ -63,7 +67,7 @@ function buildPrice(
 }
 
 export function useCardPrice(opts: UseCardPriceOptions) {
-  const { cardName, grade, cardId, setName, cardNumber, language, tcgPlayerPrice, tcgPlayerMidPrice } = opts;
+  const { cardName, grade, cardId, setName, cardNumber, language, tcgPlayerPrice } = opts;
   const watchlistItems = useWatchlistStore((s) => s.items);
 
   return useQuery<CardPrice | null>({
@@ -72,9 +76,11 @@ export function useCardPrice(opts: UseCardPriceOptions) {
       // === RAW / UNGRADED — TCGPlayer ONLY ===
       if (grade === 'UNGRADED') {
         // 1. Pokemon TCG API's bundled tcgPlayerPrice (already fetched
-        //    with the card payload — zero round-trips).
+        //    with the card payload — zero round-trips). No previousPrice:
+        //    a single snapshot has no history, so percentChange stays 0
+        //    (neutral) rather than faking movement from the mid spread.
         if (tcgPlayerPrice && tcgPlayerPrice > 0) {
-          return buildPrice(cardName, grade, tcgPlayerPrice, 'tcgplayer', tcgPlayerMidPrice);
+          return buildPrice(cardName, grade, tcgPlayerPrice, 'tcgplayer');
         }
 
         // 2. TCGPlayer server proxy / mock — full sales stats.
