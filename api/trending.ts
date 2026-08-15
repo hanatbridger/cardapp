@@ -211,7 +211,15 @@ async function resolveCardId(
       const res = await fetch(
         `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(query)}&pageSize=1&select=id`,
         {
-          headers: { 'user-agent': 'CardPulse Trending Resolver' },
+          headers: {
+            'user-agent': 'CardPulse Trending Resolver',
+            // Keyless pokemontcg.io is the throttled tier — under load it
+            // times out inside the 3s budget and rows ship unresolved,
+            // sending users to a search fallback instead of the card.
+            ...(process.env.EXPO_PUBLIC_POKEMONTCG_API_KEY
+              ? { 'X-Api-Key': process.env.EXPO_PUBLIC_POKEMONTCG_API_KEY }
+              : {}),
+          },
           signal: ctl.signal,
         },
       );

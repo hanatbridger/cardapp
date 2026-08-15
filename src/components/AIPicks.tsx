@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { View, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown, IconBrain } from '@tabler/icons-react-native';
@@ -7,7 +7,33 @@ import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { useMoney } from '../hooks/use-money';
+import { searchCards } from '../services/pokemon-tcg';
 import type { CardScore } from '../services/price-prediction';
+
+/**
+ * Resolve an unresolved pick ("Manectric #89") to a Pokemon TCG card id
+ * on tap so every row lands on the card detail screen. Name search plus
+ * a number filter; the "#89" suffix must be stripped first — a "#"
+ * inside the Lucene name term matches nothing (which is also why the
+ * old search-tab fallback landed on an empty screen).
+ */
+async function resolvePickCardId(query: string): Promise<string | null> {
+  const m = /^(.*?)\s*#\s*(\w+)$/.exec(query.trim());
+  const name = (m ? m[1] : query).trim();
+  const number = m ? m[2] : null;
+  if (name.length < 2) return null;
+  try {
+    const { cards } = await searchCards(name, {}, 1, 30);
+    if (cards.length === 0) return null;
+    if (number) {
+      const hit = cards.find((c) => c.number.replace(/^0+/, '') === number.replace(/^0+/, ''));
+      if (hit) return hit.id;
+    }
+    return cards[0].id;
+  } catch {
+    return null;
+  }
+}
 
 export interface AIPickItem {
   cardId: string;
@@ -39,16 +65,32 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
   const isUnder = type === 'undervalued';
   const accentColor = isUnder ? colors.success : colors.danger;
   const Icon = isUnder ? IconTrendingUp : IconTrendingDown;
+  const [resolving, setResolving] = useState(false);
+
+  const open = async () => {
+    if (!item.searchQuery) {
+      router.push(`/card/${item.cardId}`);
+      return;
+    }
+    // Server-unresolved pick: find the card now so the user still lands
+    // on the detail screen. Only if resolution fails too does the tap
+    // degrade to the search tab with the query pre-filled.
+    if (resolving) return;
+    setResolving(true);
+    const id = await resolvePickCardId(item.searchQuery);
+    setResolving(false);
+    if (id) {
+      router.push(`/card/${id}`);
+    } else {
+      router.push(
+        `/(tabs)/search?focus=1&from=home&q=${encodeURIComponent(item.searchQuery)}`,
+      );
+    }
+  };
 
   return (
     <Pressable
-      onPress={() =>
-        item.searchQuery
-          ? router.push(
-              `/(tabs)/search?focus=1&from=home&q=${encodeURIComponent(item.searchQuery)}`,
-            )
-          : router.push(`/card/${item.cardId}`)
-      }
+      onPress={open}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
@@ -69,12 +111,16 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
       </View>
       <View style={{ alignItems: 'flex-end', gap: spacing['0.5'] }}>
         <Text variant="labelLg">{formatMoney(item.marketPrice)}</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing['0.5'] }}>
-          <Icon size={12} color={accentColor} />
-          <Text variant="labelSm" color={accentColor}>
-            {isUnder ? '+' : ''}{item.gapPercent.toFixed(1)}%
-          </Text>
-        </View>
+        {resolving ? (
+          <ActivityIndicator size="small" color={colors.onSurfaceMuted} />
+        ) : (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing['0.5'] }}>
+            <Icon size={12} color={accentColor} />
+            <Text variant="labelSm" color={accentColor}>
+              {isUnder ? '+' : ''}{item.gapPercent.toFixed(1)}%
+            </Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
