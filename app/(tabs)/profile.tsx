@@ -103,7 +103,6 @@ function ProfileScreen() {
 
   // Server delete must succeed before we navigate away — a failed
   // delete presented as success is an Apple 5.1.1(v) violation.
-  // Mirrors app/settings.tsx.
   const performDeleteAccount = async () => {
     try {
       await deleteAccount();

@@ -26,6 +26,7 @@ import { withAlpha } from '../../src/utils/withAlpha';
 import { formatRelativeTime } from '../../src/utils/format';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { SEALED_TYPE_LABEL } from '../../src/mocks/sealed';
+import { isSealedPriceLive } from '../../src/services/tcgplayer';
 import { useSealedProduct, useSealedPrice, useMoney } from '../../src/hooks';
 import { useWatchlistStore } from '../../src/stores';
 
@@ -202,16 +203,16 @@ function SealedDetailScreen() {
           </View>
 
           {/* Market Price card — TCGPlayer Market Price + delta vs MSRP.
-              When live data isn't wired yet (USE_LIVE_TCGPLAYER === false)
-              we render seeded numbers and flag them as Sample data in the
-              badge so the user knows not to trust the decimal places. */}
+              While the sealed endpoint isn't wired (isSealedPriceLive()
+              false) we render seeded numbers and flag them as Sample data
+              in the badge so the user knows not to trust the decimals. */}
           <Card padding={spacing[5]}>
             <View style={{ gap: spacing[3] }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
                 <Text variant="overline" color={colors.onSurfaceVariant}>
                   TCGPLAYER MARKET
                 </Text>
-                <Badge variant="neutral">Sample data</Badge>
+                {isSealedPriceLive() ? null : <Badge variant="neutral">Sample data</Badge>}
               </View>
 
               {priceQuery.isLoading ? (

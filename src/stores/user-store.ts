@@ -160,10 +160,10 @@ export const useUserStore = create<UserStore>()(
           recentSearches: [],
           // Leave hasCompletedOnboarding alone. Resetting it makes
           // AuthGate force-replace to /onboarding (it prioritizes the
-          // onboarding gate), overriding settings' router.replace to
-          // /login — so a user who just deleted their account would be
-          // dumped back into the 3-slide carousel instead of the login
-          // screen. signOut() doesn't touch this flag and lands right.
+          // onboarding gate), overriding the profile screen's
+          // router.replace to /login — so a user who just deleted their
+          // account would be dumped back into the 3-slide carousel
+          // instead of the login screen.
           isAuthenticated: false,
           isPremium: false,
         });

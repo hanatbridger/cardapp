@@ -53,6 +53,11 @@ const LIVE = {
   sealedHistory: false,   // /api/sealed/history        — TODO
 };
 
+/** Whether sealed pricing comes from the live endpoint (vs seeded mocks). */
+export function isSealedPriceLive(): boolean {
+  return LIVE.sealedPrice;
+}
+
 interface TcgPlayerPriceResponse {
   productId: string;
   currentPrice: number;

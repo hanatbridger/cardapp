@@ -118,6 +118,10 @@ function decodeEntities(s: string): string {
     .replace(/&#(\d+);/g, (m, n) => {
       const cp = Number(n);
       return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
+    })
+    .replace(/&#[xX]([0-9a-fA-F]+);/g, (m, n) => {
+      const cp = parseInt(n, 16);
+      return cp <= 0x10ffff ? String.fromCodePoint(cp) : m;
     });
 }
 

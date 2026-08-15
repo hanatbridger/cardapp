@@ -121,6 +121,40 @@ function PaywallScreen() {
     );
   };
 
+  // Real store prices drive the annual hint + save badge once offerings
+  // load. The PLANS literals are the fallback: always while offerings
+  // are null, and per-field when the loaded packages lack a usable
+  // price/currency (the visible prices fall back to the same literals
+  // then, so the chrome stays consistent).
+  const annualPlan = PLANS.find((p) => p.id === 'annual')!;
+  let annualHint = annualPlan.hint;
+  let annualBadge = annualPlan.badge;
+  if (offerings) {
+    const annual = packageForPlan('annual')?.product;
+    const monthly = packageForPlan('monthly')?.product;
+    if (typeof annual?.price === 'number' && annual.currencyCode) {
+      try {
+        const perMonth = new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: annual.currencyCode,
+        }).format(annual.price / 12);
+        annualHint = `Just ${perMonth}/mo`;
+      } catch {
+        // Unknown currency code — keep the USD literal.
+      }
+    }
+    if (
+      typeof annual?.price === 'number' &&
+      typeof monthly?.price === 'number' &&
+      monthly.price > 0
+    ) {
+      const pct = Math.round((1 - annual.price / (monthly.price * 12)) * 100);
+      // Hide the badge on implausible numbers (mispriced test products,
+      // annual >= 12x monthly) rather than advertise a bogus discount.
+      annualBadge = pct >= 5 && pct <= 90 ? `Save ${pct}%` : undefined;
+    }
+  }
+
   const purchase = async () => {
     const pkg = packageForPlan(selected);
 
@@ -281,6 +315,8 @@ function PaywallScreen() {
         <View style={{ gap: spacing[3] }}>
           {PLANS.map((plan) => {
             const isSelected = plan.id === selected;
+            const badge = plan.id === 'annual' ? annualBadge : plan.badge;
+            const hint = plan.id === 'annual' ? annualHint : plan.hint;
             return (
               <Pressable
                 key={plan.id}
@@ -315,7 +351,7 @@ function PaywallScreen() {
                 <View style={{ flex: 1, gap: spacing[0.5] }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
                     <Text variant="labelLg">{plan.label}</Text>
-                    {plan.badge && (
+                    {badge && (
                       <View
                         style={{
                           paddingHorizontal: spacing[2],
@@ -325,14 +361,14 @@ function PaywallScreen() {
                         }}
                       >
                         <Text variant="labelSm" color={colors.onPrimary}>
-                          {plan.badge}
+                          {badge}
                         </Text>
                       </View>
                     )}
                   </View>
-                  {plan.hint && (
+                  {hint && (
                     <Text variant="caption" color={colors.onSurfaceVariant}>
-                      {plan.hint}
+                      {hint}
                     </Text>
                   )}
                 </View>

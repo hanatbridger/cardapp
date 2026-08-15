@@ -12,9 +12,22 @@ import { getValuation, type Valuation } from '../services/price-prediction';
 import { useMoney } from '../hooks/use-money';
 import type { PokemonCard } from '../types/card';
 
+export interface LiveMarketDynamics {
+  activeListings7d: number;
+  activeListings30d: number;
+  newPerDay7d: number;
+  newPerDay30d: number;
+  soldPerDay7d: number;
+  soldPerDay30d: number;
+  demandPressure: number;
+  supplySaturation: number;
+}
+
 interface AIValuationProps {
   card: PokemonCard;
   marketPrice?: number;
+  /** Real eBay dynamics from the caller; absent/null falls back to seeded mocks. */
+  liveDynamics?: LiveMarketDynamics | null;
 }
 
 type MarketSignal = 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell';
@@ -73,12 +86,12 @@ function computeMarketSignal(
   return { signal: 'hold', label: 'Hold', reason };
 }
 
-export function AIValuation({ card, marketPrice }: AIValuationProps) {
+export function AIValuation({ card, marketPrice, liveDynamics }: AIValuationProps) {
   const { colors } = useTheme();
   const formatMoney = useMoney();
 
   const score = getCardScore(card.id);
-  const dynamics = getMarketDynamics(card.id);
+  const dynamics = liveDynamics ?? getMarketDynamics(card.id);
 
   // Compute valuation if we have score + market price
   let valuation: Valuation | null = null;
