@@ -53,8 +53,14 @@ const LIVE = {
   sealedHistory: false,   // /api/sealed/history        — TODO
 };
 
-/** Whether sealed pricing comes from the live endpoint (vs seeded mocks). */
-export function isSealedPriceLive(): boolean {
+/**
+ * Whether sealed pricing for a given product comes from a live endpoint
+ * (vs seeded mocks). `cx-` ids are collectrics-backed via
+ * /api/sealed-stats (see sealed-live.ts) and are always live; catalog
+ * ids stay on the global TCGPlayer-proxy flag until that route ships.
+ */
+export function isSealedPriceLive(productId?: string): boolean {
+  if (productId?.startsWith('cx-')) return true;
   return LIVE.sealedPrice;
 }
 

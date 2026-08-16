@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, ScrollView, Pressable, Linking } from 'react-native';
+import { View, ScrollView, Pressable, Linking, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Image } from 'expo-image';
@@ -17,6 +17,7 @@ import {
   Button,
   Badge,
   PriceChange,
+  PriceChart,
   ScreenBackground,
   Skeleton,
   withErrorBoundary,
@@ -27,7 +28,7 @@ import { formatRelativeTime } from '../../src/utils/format';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { SEALED_TYPE_LABEL } from '../../src/mocks/sealed';
 import { isSealedPriceLive } from '../../src/services/tcgplayer';
-import { useSealedProduct, useSealedPrice, useMoney } from '../../src/hooks';
+import { useSealedProduct, useSealedPrice, useSealedPriceHistory, useMoney } from '../../src/hooks';
 import { useWatchlistStore } from '../../src/stores';
 
 function SealedDetailScreen() {
@@ -37,6 +38,9 @@ function SealedDetailScreen() {
   const productQuery = useSealedProduct(id);
   const product = productQuery.data ?? null;
   const priceQuery = useSealedPrice(id, product?.tcgplayerProductId);
+  const historyQuery = useSealedPriceHistory(id, product?.tcgplayerProductId);
+  const history = historyQuery.data ?? [];
+  const { width: screenWidth } = useWindowDimensions();
   const price = priceQuery.data ?? null;
 
   const { items, addItem, removeItem } = useWatchlistStore();
@@ -202,17 +206,17 @@ function SealedDetailScreen() {
             ) : null}
           </View>
 
-          {/* Market Price card — TCGPlayer Market Price + delta vs MSRP.
-              While the sealed endpoint isn't wired (isSealedPriceLive()
-              false) we render seeded numbers and flag them as Sample data
-              in the badge so the user knows not to trust the decimals. */}
+          {/* Market Price card — current price + delta vs MSRP. `cx-`
+              (collectrics) items are always live; catalog items render
+              seeded numbers flagged as Sample data until their proxy
+              ships — isSealedPriceLive(id) resolves per item. */}
           <Card padding={spacing[5]}>
             <View style={{ gap: spacing[3] }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
                 <Text variant="overline" color={colors.onSurfaceVariant}>
-                  TCGPLAYER MARKET
+                  {product.id.startsWith('cx-') ? 'MARKET PRICE' : 'TCGPLAYER MARKET'}
                 </Text>
-                {isSealedPriceLive() ? null : <Badge variant="neutral">Sample data</Badge>}
+                {isSealedPriceLive(product.id) ? null : <Badge variant="neutral">Sample data</Badge>}
               </View>
 
               {priceQuery.isLoading ? (
@@ -233,14 +237,18 @@ function SealedDetailScreen() {
                 </Text>
               )}
 
-              {price ? (
+              {/* Live cx- items have no MSRP or per-sale counts — hide
+                  those cells rather than render zeros. */}
+              {price && (product.msrp > 0 || price.salesCount > 0) ? (
                 <View style={{ flexDirection: 'row', gap: spacing[6] }}>
-                  <View style={{ flex: 1, gap: spacing['0.5'] }}>
-                    <Text variant="caption" color={colors.onSurfaceVariant}>MSRP</Text>
-                    <Text variant="bodyMd" style={{ fontVariant: ['tabular-nums'] as any }}>
-                      {formatMoney(product.msrp)}
-                    </Text>
-                  </View>
+                  {product.msrp > 0 ? (
+                    <View style={{ flex: 1, gap: spacing['0.5'] }}>
+                      <Text variant="caption" color={colors.onSurfaceVariant}>MSRP</Text>
+                      <Text variant="bodyMd" style={{ fontVariant: ['tabular-nums'] as any }}>
+                        {formatMoney(product.msrp)}
+                      </Text>
+                    </View>
+                  ) : null}
                   {vsMsrp !== null ? (
                     <View style={{ flex: 1, gap: spacing['0.5'] }}>
                       <Text variant="caption" color={colors.onSurfaceVariant}>vs MSRP</Text>
@@ -253,12 +261,14 @@ function SealedDetailScreen() {
                       </Text>
                     </View>
                   ) : null}
-                  <View style={{ flex: 1, gap: spacing['0.5'] }}>
-                    <Text variant="caption" color={colors.onSurfaceVariant}>Sales (14d)</Text>
-                    <Text variant="bodyMd" style={{ fontVariant: ['tabular-nums'] as any }}>
-                      {price.salesCount}
-                    </Text>
-                  </View>
+                  {price.salesCount > 0 ? (
+                    <View style={{ flex: 1, gap: spacing['0.5'] }}>
+                      <Text variant="caption" color={colors.onSurfaceVariant}>Sales (14d)</Text>
+                      <Text variant="bodyMd" style={{ fontVariant: ['tabular-nums'] as any }}>
+                        {price.salesCount}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               ) : null}
 
@@ -303,6 +313,23 @@ function SealedDetailScreen() {
               </View>
             </Card>
           ) : null}
+
+          {/* Price history — live collectrics items carry ~200 daily
+              closes; mock items may have shorter series. Hidden below 3
+              points (the chart minimum) so mocks without history don't
+              render an empty card. */}
+          {history.length >= 3 && (
+            <Card padding={spacing[5]}>
+              <View style={{ gap: spacing[3] }}>
+                <Text variant="overline" color={colors.onSurfaceVariant}>PRICE HISTORY</Text>
+                <PriceChart
+                  data={history}
+                  width={screenWidth - HORIZONTAL_PADDING * 2 - spacing[5] * 2}
+                  height={180}
+                />
+              </View>
+            </Card>
+          )}
 
           {/* Primary action row — Watch + Open on TCGPlayer. Keeping both
               buttons visible (not behind a sheet) because sealed buyers
