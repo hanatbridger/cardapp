@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { searchJapaneseCards } from '../services/tcgdex';
+import { searchJapaneseCatalog } from '../services/jp-catalog';
 
 /**
  * Japanese card search (tcgdex). Keyed under 'cards' so the detail
@@ -9,7 +9,7 @@ import { searchJapaneseCards } from '../services/tcgdex';
 export function useJapaneseSearch(query: string) {
   return useQuery({
     queryKey: ['cards', 'jp-search', query],
-    queryFn: () => searchJapaneseCards(query),
+    queryFn: () => searchJapaneseCatalog(query),
     enabled: query.length >= 2,
     staleTime: 10 * 60 * 1000,
   });

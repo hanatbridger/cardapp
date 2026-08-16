@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { getCard } from '../services/pokemon-tcg';
 import { getJapaneseCard } from '../services/tcgdex';
+import { getJapaneseProduct } from '../services/jp-catalog';
 import { MOCK_CARDS } from '../mocks/cards';
 import { queryClient } from '../lib/query-client';
 import type { PokemonCard } from '../types/card';
@@ -43,6 +44,11 @@ export function useCardDetail(cardId: string) {
     queryKey: ['cards', cardId],
     queryFn: async () => {
       // Japanese cards (tcgdex) — id is 'jp-{tcgdexId}'
+      if (cardId.startsWith('jptp-')) {
+        const card = await getJapaneseProduct(cardId.slice(5));
+        if (!card) throw new Error('Card not found');
+        return card;
+      }
       if (cardId.startsWith('jp-')) {
         const jpCard = await getJapaneseCard(cardId.slice(3));
         if (!jpCard) throw new Error('Card not found');

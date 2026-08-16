@@ -164,8 +164,11 @@ export async function fetchRawCardPriceHistory(
   tcgplayerProductId?: string,
 ): Promise<PriceHistory> {
   if (LIVE.rawHistory) {
-    const param = tcgplayerProductId
-      ? `productId=${encodeURIComponent(tcgplayerProductId)}`
+    // Japanese catalog ids carry the TCGPlayer productId directly.
+    const jpPid = cardId.startsWith('jptp-') ? cardId.slice(5) : null;
+    const pid = tcgplayerProductId ?? jpPid;
+    const param = pid
+      ? `productId=${encodeURIComponent(pid)}`
       : `id=${encodeURIComponent(cardId)}`;
     const data = await getJson<TcgPlayerHistoryResponse>(
       `/api/tcgplayer/history?${param}`,
