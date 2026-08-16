@@ -72,17 +72,15 @@ function mapListRow(raw: TcgdexListRow): PokemonCard {
     number: raw.localId || '',
     language: 'JP',
     images: {
-      small: `${raw.image}/low.webp`,
-      large: `${raw.image}/high.webp`,
+      small: raw.image ? `${raw.image}/low.webp` : '',
+      large: raw.image ? `${raw.image}/high.webp` : '',
     },
   };
 }
 
 /**
  * Japanese card search via tcgdex. Accepts English species names
- * (translated through ja-names.json) or raw Japanese text. Rows without
- * an image asset are dropped — they render as broken tiles and are
- * mostly ancient unscanned promos.
+ * (translated through ja-names.json) or raw Japanese text.
  */
 export async function searchJapaneseCards(query: string): Promise<PokemonCard[]> {
   const q = toJapaneseQuery(query);
@@ -97,7 +95,11 @@ export async function searchJapaneseCards(query: string): Promise<PokemonCard[]>
 
   const rows: TcgdexListRow[] = await response.json();
   if (!Array.isArray(rows)) return [];
-  return rows.filter((r) => r && typeof r.image === 'string' && r.image).map(mapListRow);
+  // Keep imageless rows: tcgdex lacks scans for many vintage and promo
+  // JP cards, and dropping them hid two-thirds of the catalog (e.g. 10
+  // of 15 Latias printings, including the JP Gold Star). Rows without
+  // art render name/set over the placeholder background.
+  return rows.filter((r) => r && r.id && r.name).map(mapListRow);
 }
 
 /**
