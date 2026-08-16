@@ -167,6 +167,64 @@ export default async function handler(req: Request): Promise<Response> {
     return json(500, { error: 'DB query failed' });
   }
 
+  // 3b. Self-enrollment: cards outside the collectrics leaderboard
+  // (vintage, promos) never get snapshot rows from the cron, so their
+  // charts said "history is building" forever. Instead, every chart
+  // view where today's row is missing fetches the live TCGPlayer
+  // market price and writes one snapshot — history builds daily for
+  // exactly the cards people actually look at. The price comes from
+  // TCGPlayer, not the caller, so no request can poison the series;
+  // the CDN's 1h cache bounds this to at most a few writes per day.
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = snapshots ?? [];
+  const hasToday = rows.some((s: SnapshotRow) => s.snapshot_date === today);
+  const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!hasToday && SERVICE_ROLE_KEY) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 4000);
+      const detRes = await fetch(
+        `https://mp-search-api.tcgplayer.com/v1/product/${productId}/details`,
+        { headers: { 'user-agent': 'CardPulse History Enroll' }, signal: ctl.signal },
+      );
+      clearTimeout(timer);
+      if (detRes.ok) {
+        const det = await detRes.json();
+        const marketPrice = Number(det?.marketPrice);
+        if (Number.isFinite(marketPrice) && marketPrice > 0) {
+          const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          // card_id only when the mapping is trusted (resolved via the
+          // Pokemon TCG API path or already present on prior rows).
+          const knownCardId =
+            confirmedViaApi || rows.some((s: SnapshotRow) => s.card_id === cardId)
+              ? cardId
+              : null;
+          await admin.from('price_snapshots').upsert(
+            {
+              product_id: productId,
+              card_id: knownCardId,
+              snapshot_date: today,
+              raw_price: marketPrice,
+              source: 'tcgplayer',
+            },
+            { onConflict: 'product_id,snapshot_date,source', ignoreDuplicates: true },
+          );
+          rows.push({
+            product_id: productId,
+            card_id: knownCardId,
+            snapshot_date: today,
+            raw_price: marketPrice,
+          } as SnapshotRow);
+        }
+      }
+    } catch {
+      // Enrollment is best-effort — the chart still renders whatever
+      // history exists.
+    }
+  }
+
   // 4. Opportunistic backfill: stamp the cardId onto this product's
   // null-card_id rows so future lookups skip the Pokemon TCG API
   // round-trip. ONLY when the mapping was confirmed by the trusted API
@@ -201,7 +259,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   return json(200, {
-    history: (snapshots ?? []).map((s: SnapshotRow) => ({
+    history: rows.map((s: SnapshotRow) => ({
       date: s.snapshot_date,
       price: Number(s.raw_price),
     })),

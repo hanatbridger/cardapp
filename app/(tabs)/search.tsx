@@ -90,17 +90,11 @@ function SearchScreen() {
   const sealedSearch = useSealedSearch(mode === 'cards' ? query : '');
   const sealedResults = sealedSearch.data ?? [];
 
-  // Japanese catalog (tcgdex) — searched when the user signals JP intent
-  // ("pikachu jp", "japanese") or when the English catalog comes up
-  // near-empty, so JP-exclusive promos surface without doubling every
-  // ordinary search. English species names are translated via the
-  // bundled EN→JA map inside the service.
-  const jpIntent = /\b(jp|japanese)\b/i.test(query);
-  const jpEnabled =
-    mode === 'cards' &&
-    query.length >= 2 &&
-    (jpIntent || (cardSearch.isSuccess && (cardSearch.data?.cards.length ?? 0) < 3));
-  const jpSearch = useJapaneseSearch(jpEnabled ? query : '');
+  // Japanese catalog (tcgdex) — runs alongside every card search, since
+  // collectors won't type Japanese names: the bundled EN→JA species map
+  // translates the query inside the service. Results render in their
+  // own section below the English catalog.
+  const jpSearch = useJapaneseSearch(mode === 'cards' && query.length >= 2 ? query : '');
   const jpResults = jpSearch.data ?? [];
 
   // Set search (enabled always — shows recent sets on empty query)
