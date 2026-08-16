@@ -106,12 +106,35 @@ export interface CardSearchFilters {
   setId?: string;
 }
 
-export async function searchCards(
+// Every field mapCard reads. Projecting drops the heavy attack/ability/
+// legalities blobs, which is what lets big result pages (100 cards)
+// serialize without tripping the API's load-shed 500s.
+const CARD_SELECT =
+  'id,name,supertype,subtypes,hp,types,set,number,rarity,artist,images,tcgplayer';
+
+/**
+ * Query aliases for card variants whose printed name doesn't contain the
+ * words collectors search by. "latias gold star" matches nothing (the
+ * card is named "Latias ★"), so the phrase becomes a rarity filter.
+ */
+function applyQueryAliases(
   query: string,
-  filters: CardSearchFilters = {},
+  filters: CardSearchFilters,
+): { query: string; filters: CardSearchFilters } {
+  const m = /^(.*?)\s+(gold\s*star|goldstar)\s*$/i.exec(query.trim());
+  if (m && !filters.rarity) {
+    return { query: m[1], filters: { ...filters, rarity: 'Rare Holo Star' } };
+  }
+  return { query, filters };
+}
+
+export async function searchCards(
+  rawQuery: string,
+  rawFilters: CardSearchFilters = {},
   page: number = 1,
-  pageSize: number = 20,
+  pageSize: number = 100,
 ): Promise<{ cards: PokemonCard[]; totalCount: number }> {
+  const { query, filters } = applyQueryAliases(rawQuery, rawFilters);
   // Build Lucene query supported by the Pokemon TCG API
   const parts: string[] = [];
   if (query && query.length >= 2) parts.push(`name:"${escapeLucene(query)}*"`);
@@ -124,11 +147,11 @@ export async function searchCards(
   if (parts.length === 0) return { cards: [], totalCount: 0 };
 
   // Set detail screens render every card in the set under the "All"
-  // filter, so when we're scoped to a single setId we ask the
-  // Pokemon TCG API for up to 250 cards in one shot (their max
-  // pageSize). Default 20 leaks through to set view as "only 20
-  // cards visible" — keep 20 for everything else (text search,
-  // rarity-only filters) so result lists stay snappy.
+  // filter, so when we're scoped to a single setId we ask for the
+  // API's max 250 in one shot. Text search gets 100 (with the select
+  // projection above this stays fast): the old 20-row page sorted
+  // newest-first silently hid every vintage printing — a 2005 Gold
+  // Star ranks ~30th behind modern reprints and never rendered.
   const effectivePageSize = filters.setId ? 250 : pageSize;
 
   const params = new URLSearchParams({
@@ -136,6 +159,7 @@ export async function searchCards(
     page: String(page),
     pageSize: String(effectivePageSize),
     orderBy: filters.setId ? 'number' : '-set.releaseDate',
+    select: CARD_SELECT,
   });
 
   const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
