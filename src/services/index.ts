@@ -1,6 +1,7 @@
 export { apiFetch, API_BASE_URL } from './api-client';
 export { fetchCardPrice, fetchPriceHistory } from './ebay-proxy';
 export { searchCards, getCard, searchSets, getSet, searchArtists, getCardsByArtist } from './pokemon-tcg';
+export { searchJapaneseCards, getJapaneseCard } from './tcgdex';
 export { fetchSealedPrice, fetchSealedPriceHistory } from './tcgplayer';
 export { fetchCardStats } from './card-stats';
 export type { CardStats, LiveMarketDynamics, DailySales } from './card-stats';

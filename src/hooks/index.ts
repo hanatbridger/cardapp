@@ -1,5 +1,6 @@
 export { useCardSearch, useSetSearch, useSet, useArtistSearch, useArtistCards, useRelatedCards } from './use-card-search';
 export { useCardDetail } from './use-card-detail';
+export { useJapaneseSearch } from './use-jp-search';
 export { useCardPrice } from './use-card-price';
 export { useBatchPrices } from './use-batch-prices';
 export type { BatchPriceEntry, BatchPrices } from './use-batch-prices';

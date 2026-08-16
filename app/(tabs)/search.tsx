@@ -20,7 +20,7 @@ import {
 import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useUserStore } from '../../src/stores';
-import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useCollapsingHeader, useTrending } from '../../src/hooks';
+import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useJapaneseSearch, useCollapsingHeader, useTrending } from '../../src/hooks';
 import { MOCK_PRICES, TRENDING_ARTISTS } from '../../src/mocks';
 import { CARD_SCORES } from '../../src/data/card-scores';
 import { getValuation } from '../../src/services/price-prediction';
@@ -89,6 +89,19 @@ function SearchScreen() {
   // typing the set name into the same box they search singles with.
   const sealedSearch = useSealedSearch(mode === 'cards' ? query : '');
   const sealedResults = sealedSearch.data ?? [];
+
+  // Japanese catalog (tcgdex) — searched when the user signals JP intent
+  // ("pikachu jp", "japanese") or when the English catalog comes up
+  // near-empty, so JP-exclusive promos surface without doubling every
+  // ordinary search. English species names are translated via the
+  // bundled EN→JA map inside the service.
+  const jpIntent = /\b(jp|japanese)\b/i.test(query);
+  const jpEnabled =
+    mode === 'cards' &&
+    query.length >= 2 &&
+    (jpIntent || (cardSearch.isSuccess && (cardSearch.data?.cards.length ?? 0) < 3));
+  const jpSearch = useJapaneseSearch(jpEnabled ? query : '');
+  const jpResults = jpSearch.data ?? [];
 
   // Set search (enabled always — shows recent sets on empty query)
   const setSearch = useSetSearch(mode === 'sets' ? query : '');
@@ -322,6 +335,7 @@ function SearchScreen() {
           results={cardResults}
           totalCount={cardSearch.data?.totalCount ?? 0}
           sealedResults={sealedResults}
+          jpResults={jpResults}
           query={query}
           onCardPress={handleCardPress}
           onSealedPress={handleSealedPress}
@@ -520,6 +534,7 @@ function CardResults({
   results,
   totalCount,
   sealedResults,
+  jpResults,
   query,
   onCardPress,
   onSealedPress,
@@ -531,6 +546,7 @@ function CardResults({
   results: PokemonCard[];
   totalCount: number;
   sealedResults: SealedProduct[];
+  jpResults: PokemonCard[];
   query: string;
   onCardPress: (card: PokemonCard) => void;
   onSealedPress: (product: SealedProduct) => void;
@@ -561,6 +577,10 @@ function CardResults({
   if (sealedResults.length > 0) {
     feed.push({ kind: 'section', id: 'sec-sealed', label: 'Sealed Products', count: sealedResults.length });
     sealedResults.forEach((p) => feed.push({ kind: 'sealed', id: `sealed-${p.id}`, product: p }));
+  }
+  if (jpResults.length > 0) {
+    feed.push({ kind: 'section', id: 'sec-jp', label: 'Japanese Cards', count: jpResults.length });
+    jpResults.forEach((c) => feed.push({ kind: 'card', id: `card-${c.id}`, card: c }));
   }
 
   return (
