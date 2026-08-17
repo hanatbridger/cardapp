@@ -1,5 +1,4 @@
 import type { PriceAlert } from '../stores/alerts-store';
-import { getPrice } from '../mocks/prices';
 import { fetchRawCardPrice } from './tcgplayer';
 import { queryClient } from '../lib/query-client';
 import type { CardPrice } from '../types/card';
@@ -15,21 +14,20 @@ export interface AlertEvaluation {
  * card+grade. Returns null when no price is available (we can't
  * decide either way; the alert lives to fire another cycle).
  *
- * Price source-of-truth split mirrors `useCardPrice`:
+ * Price sources:
  *   UNGRADED → live TCGPlayer Market Price via /api/tcgplayer/price,
  *              falling back to the mocked single only if the live
  *              proxy errors (so a transient network blip doesn't
  *              silently drop an alert).
- *   PSA10    → mocked single (eBay sold-listing pricing isn't wired
- *              to alerts yet; gated with the same "Soon" badge in
- *              the rest of the app).
+ *   PSA10    → no feed. Evaluates to null rather than to a mock, so a
+ *              graded alert can never fire off a fabricated price.
+ *              Creation is gated on the same grade in card/[id].tsx.
  *
- * Why this is async now: the previous implementation read from
- * `getPrice()` mocks synchronously, which meant Premium users got
- * "alerts" that fired off seeded fake prices — either spuriously
- * (mock crossed target on first run) or never (mock never moved).
- * Live-price evaluation here makes the Premium subscription's
- * core feature actually work.
+ * Why this is async: the original implementation read `getPrice()`
+ * mocks synchronously for every grade, so Premium users got "alerts"
+ * that fired off seeded fake prices — spuriously when the mock already
+ * crossed the target, never when it didn't move. Live evaluation makes
+ * the paid feature actually work on raw cards.
  */
 export async function evaluateAlert(
   alert: PriceAlert,
@@ -66,9 +64,17 @@ export async function evaluateAlert(
       // survives to the next cycle instead of being mis-evaluated.
     }
   } else {
-    // PSA10 path — mocked until eBay sold-listings pricing ships.
-    const mock = getPrice(alert.cardId, alert.grade);
-    currentPrice = mock?.currentPrice;
+    // PSA10: there is no graded price feed wired to alerts. This used to
+    // read a seeded mock, which is strictly worse than not firing — a
+    // graded alert would trigger off a fake number and push a
+    // notification quoting a price the card never traded at. The daily
+    // server sweep skips graded targets for the same reason, so nothing
+    // else would have caught it either.
+    //
+    // Returning null means "no opinion": the alert survives untouched
+    // and starts working the day a real graded feed is connected. Alert
+    // creation is gated on the same grade, so nothing new lands here.
+    return null;
   }
 
   if (typeof currentPrice !== 'number' || !isFinite(currentPrice)) {

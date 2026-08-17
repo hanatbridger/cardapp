@@ -227,6 +227,18 @@ function CardDetailScreen() {
   // Editing/removing an EXISTING alert is always allowed; only a NEW
   // alert beyond MAX_FREE_ALERTS on the free tier triggers the upsell.
   const openAlertModal = () => {
+    // Graded alerts have no price feed behind them — neither the live
+    // checker nor the daily server sweep can evaluate a PSA 10 target.
+    // Offering the modal here produced alerts that silently never fired
+    // (or worse, fired off seeded mock prices). Say so instead of
+    // taking the tap.
+    if (selectedGrade === 'PSA10' && !existingAlert) {
+      Alert.alert(
+        'Raw alerts only',
+        'Price alerts run on raw, ungraded prices. Switch to the Raw tab to set one for this card.',
+      );
+      return;
+    }
     if (existingAlert || useAlertsStore.getState().canAddAlert()) {
       setAlertModalVisible(true);
       return;
