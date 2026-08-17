@@ -6,7 +6,7 @@ import {
   View,
   StyleSheet,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { Haptics } from '../utils/haptics';
 import { useTheme } from '../theme/ThemeProvider';
 import { Text } from './Text';
 import { spacing, radius } from '../theme/tokens';
@@ -103,6 +103,9 @@ export function Button({
         style as any,
       ]}
       {...props}
+      // Haptic on the COMPLETED press, not press-in: a touch that turns
+      // into a scroll gesture is cancelled, and buzzing for it makes
+      // every list feel like it misfires.
       onPress={(e) => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         props.onPress?.(e);

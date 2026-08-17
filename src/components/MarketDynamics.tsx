@@ -7,9 +7,17 @@ import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
 import { getMarketDynamics, type MarketDynamicsData } from '../data/ebay-market-dynamics';
+import type { LiveMarketDynamics } from '../services/card-stats';
 
 interface MarketDynamicsProps {
   cardId: string;
+  /**
+   * Real collectrics-backed metrics from useCardStats. When present the
+   * section renders live data with no Sample badge; when absent it falls
+   * back to the seeded dataset (still badged) for the handful of
+   * showcase cards, and hides entirely for everything else.
+   */
+  live?: LiveMarketDynamics | null;
 }
 
 /** Format a percentage change with sign */
@@ -167,9 +175,11 @@ function GaugeSection({
   );
 }
 
-export function MarketDynamics({ cardId }: MarketDynamicsProps) {
+export function MarketDynamics({ cardId, live }: MarketDynamicsProps) {
   const { colors } = useTheme();
-  const dynamics = getMarketDynamics(cardId);
+  const isLive = Boolean(live);
+  const dynamics: MarketDynamicsData | LiveMarketDynamics | undefined =
+    live ?? getMarketDynamics(cardId);
 
   if (!dynamics) return null;
 
@@ -189,6 +199,9 @@ export function MarketDynamics({ cardId }: MarketDynamicsProps) {
           >
             <Text variant="caption" color={colors.primary}>7d avg</Text>
           </View>
+          {/* Seeded fallback keeps the disclosure badge (same
+              convention as app/sealed/[id].tsx); live data drops it. */}
+          {!isLive && <Badge variant="neutral">Sample data</Badge>}
         </View>
 
         {/* 3-stat summary row */}

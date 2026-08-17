@@ -18,14 +18,17 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "RCT_USE_PREBUILT_RNCORE": "0"
+      }
     }
   },
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "",
-        "appleTeamId": ""
+        "ascAppId": "6762569336",
+        "appleTeamId": "C4T4SU9AZS"
       }
     }
   }

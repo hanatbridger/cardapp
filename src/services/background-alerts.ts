@@ -2,8 +2,10 @@ import { Platform } from 'react-native';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import { useAlertsStore } from '../stores/alerts-store';
+import { useUserStore } from '../stores/user-store';
 import { findAlertsToTrigger, formatAlertMessage } from './alert-checker';
 import { presentLocalNotification } from './notifications';
+import { maybeNotifyDailyNews } from './news-notify';
 
 export const PRICE_ALERT_TASK = 'cardpulse-price-alert-check';
 
@@ -19,18 +21,32 @@ export function defineBackgroundAlertTask() {
 
   TaskManager.defineTask(PRICE_ALERT_TASK, async () => {
     try {
-      // Hydrate the persisted store before reading. Zustand's persist
+      // Hydrate the persisted stores before reading. Zustand's persist
       // middleware exposes rehydrate() so background runs see fresh data.
       await useAlertsStore.persist.rehydrate();
-      const { alerts, recordTriggered } = useAlertsStore.getState();
+      await useUserStore.persist.rehydrate();
 
-      const toFire = findAlertsToTrigger(alerts);
-      if (toFire.length === 0) {
+      // Honor the notifications preference here too. The foreground
+      // checker gates on it (use-alert-checker.ts); without the same
+      // gate the OS-woken background task would keep posting banners
+      // after the user turned notifications off in settings.
+      if (!useUserStore.getState().preferences.notificationsEnabled) {
         return BackgroundFetch.BackgroundFetchResult.NoData;
       }
 
+      const { alerts, recordTriggered } = useAlertsStore.getState();
+
+      // findAlertsToTrigger now fetches live prices in parallel —
+      // awaitable, but still capped by the per-fetch timeout in
+      // fetchRawCardPrice so the whole background task stays under
+      // the OS's 30s budget even with a full Premium-tier watchlist.
+      const toFire = await findAlertsToTrigger(alerts);
+
+      let firedAny = false;
       for (const evaluation of toFire) {
         const entry = recordTriggered(evaluation.alert, evaluation.currentPrice);
+        // null = already recorded by a concurrent (e.g. foreground) check.
+        if (!entry) continue;
         const { title, body } = formatAlertMessage(
           evaluation.alert,
           evaluation.currentPrice,
@@ -39,9 +55,18 @@ export function defineBackgroundAlertTask() {
           cardId: entry.cardId,
           triggeredAlertId: entry.id,
         });
+        firedAny = true;
       }
 
-      return BackgroundFetch.BackgroundFetchResult.NewData;
+      // Daily news push — at most one per calendar day, only on a new top
+      // story. Self-gates, so it's safe to run on every wake. Runs even
+      // when no alerts fired (we no longer early-return on an empty
+      // alert set), so the news ping doesn't depend on having alerts.
+      const newsNotified = await maybeNotifyDailyNews();
+
+      return firedAny || newsNotified
+        ? BackgroundFetch.BackgroundFetchResult.NewData
+        : BackgroundFetch.BackgroundFetchResult.NoData;
     } catch (e) {
       // eslint-disable-next-line no-console
       console.warn('[background-alerts] task failed', e);

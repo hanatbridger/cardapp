@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Pressable } from 'react-native';
+import { View } from 'react-native';
+import { Touchable } from './Touchable';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
@@ -9,10 +10,11 @@ import { PriceChange } from './PriceChange';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { CARD_BORDER_RADIUS } from '../constants/layout';
-import { formatPrice } from '../utils/format';
+import { useMoney } from '../hooks/use-money';
 import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getValuation } from '../services/price-prediction';
+import { useCardPrice } from '../hooks/use-card-price';
 import type { GradeType } from '../constants/grades';
 import type { CardPrice } from '../types/card';
 
@@ -21,9 +23,21 @@ interface WatchlistCardProps {
   cardName: string;
   cardImageUrl: string;
   setName: string;
+  /** Card number within set — needed to query the right eBay listings */
+  setNumber?: string;
   grade: GradeType;
   rarity?: string;
-  price?: CardPrice;
+  language?: 'EN' | 'JP';
+  /** Fallback price (mock / last-known) shown while live price loads or if it fails */
+  fallbackPrice?: CardPrice;
+  /**
+   * Batched live price supplied by the parent (useBatchPrices). When
+   * PROVIDED (even as null), the internal per-row useCardPrice query is
+   * disabled — the parent owns fetching. null means the batch had no
+   * price for this card; render fallbackPrice. Omit the prop entirely
+   * to keep the legacy per-row fetch.
+   */
+  livePrice?: { currentPrice: number; percentChange: number } | null;
 }
 
 export const WatchlistCard = React.memo(function WatchlistCard({
@@ -31,11 +45,60 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   cardName,
   cardImageUrl,
   setName,
+  setNumber,
   grade,
   rarity,
-  price,
+  language,
+  fallbackPrice,
+  livePrice,
 }: WatchlistCardProps) {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const formatMoney = useMoney();
+
+  // Fetch live price — shares React Query cache with the detail screen,
+  // so the same card always shows the same number across the app.
+  // Empty cardName disables the query for PSA10 rows (rendered null
+  // below): the hook must still be CALLED for rules-of-hooks, but a
+  // never-rendered row shouldn't pay for a price fetch. The same trick
+  // disables it when the parent supplies a batched livePrice — the
+  // batch endpoint already fetched this card, no per-row round-trip.
+  const hasBatchedPrice = livePrice !== undefined;
+  const { data: internalPrice } = useCardPrice({
+    cardName: grade === 'PSA10' || hasBatchedPrice ? '' : cardName,
+    grade,
+    cardId,
+    setName,
+    cardNumber: setNumber,
+    language,
+  });
+  const price: CardPrice | undefined = hasBatchedPrice
+    ? livePrice
+      ? {
+          cardName,
+          grade,
+          currentPrice: livePrice.currentPrice,
+          previousPrice: livePrice.currentPrice,
+          percentChange: livePrice.percentChange,
+          lastSaleDate: '',
+          lastSalePrice: livePrice.currentPrice,
+          averagePrice: livePrice.currentPrice,
+          highPrice: livePrice.currentPrice,
+          lowPrice: livePrice.currentPrice,
+          salesCount: 0,
+          source: 'tcgplayer',
+        }
+      : fallbackPrice
+    : internalPrice ?? fallbackPrice;
+
+  // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
+  // from every watchlist surface until the eBay live proxy ships.
+  // The home tab also filters them out at the FlatList data prop, but
+  // this guarantees no PSA 10 row leaks through any other caller (or
+  // a stale deploy where the upstream filter wasn't yet live).
+  // NOTE: kept BELOW all hooks (same pattern as PriceChart) — returning
+  // earlier would skip useCardPrice and violate the Rules of Hooks if
+  // `grade` changes while mounted.
+  if (grade === 'PSA10') return null;
 
   // AI valuation
   const score = getCardScore(cardId);
@@ -49,19 +112,37 @@ export const WatchlistCard = React.memo(function WatchlistCard({
     }
   }
 
+  // Touchable = RectButton on native, Pressable on web (see
+  // components/Touchable.tsx). Native needs gesture-handler here, not
+  // RN's TouchableOpacity / Pressable.
+  // Reason: this row is wrapped by ReanimatedSwipeable (in app/(tabs)/
+  // index.tsx via SwipeToDelete), which uses gesture-handler's Tap +
+  // Pan gestures. RN's Touchable system and gesture-handler's gesture
+  // system don't coordinate — on cold launch, gesture-handler's
+  // internal Tap can capture the touch before TouchableOpacity sees
+  // it, silently swallowing the press. RectButton lives in the same
+  // gesture system as the swipe and yields properly to it. This was
+  // the root cause that previous symptom-level fixes (removing fade-
+  // in wrapper, swapping Pressable for TouchableOpacity, migrating
+  // TrendingCarousel to UI-thread Reanimated) never addressed.
   return (
-    <Pressable
+    <Touchable
       onPress={() => router.push(`/card/${cardId}`)}
-      style={({ pressed }) => ({
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${cardName}`}
+      style={{
         flexDirection: 'row',
         padding: spacing[3],
-        backgroundColor: pressed ? colors.surfaceVariant : colors.surface,
+        // Light mode: surfaceVariant (the Trending tiles' light grey) —
+        // on the white canvas, `surface` cards disappeared into the bg.
+        // Dark mode: keep `surface` as before.
+        backgroundColor: isDark ? colors.surface : colors.surfaceVariant,
         borderRadius: CARD_BORDER_RADIUS,
         borderWidth: 1,
         borderColor: colors.outline,
         gap: spacing[3],
         alignItems: 'center',
-      })}
+      }}
     >
       <Image
         source={{ uri: cardImageUrl }}
@@ -107,7 +188,7 @@ export const WatchlistCard = React.memo(function WatchlistCard({
         {price ? (
           <>
             <Text variant="headingSm">
-              {formatPrice(price.currentPrice)}
+              {formatMoney(price.currentPrice)}
             </Text>
             <PriceChange percent={price.percentChange} size="sm" />
           </>
@@ -115,6 +196,6 @@ export const WatchlistCard = React.memo(function WatchlistCard({
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>
         )}
       </View>
-    </Pressable>
+    </Touchable>
   );
 });

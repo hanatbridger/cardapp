@@ -7,7 +7,6 @@ import {
   IconSparkles,
   IconInfinity,
   IconBellRinging,
-  IconBookmarks,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import {
@@ -37,7 +36,16 @@ interface Plan {
   hint?: string;
 }
 
+// Monthly first so users see the lower-commitment option up top —
+// annual sits below as the upsell with the Save 50% badge doing the
+// heavy lifting on conversion.
 const PLANS: Plan[] = [
+  {
+    id: 'monthly',
+    label: 'Monthly',
+    price: '$4.99',
+    period: '/month',
+  },
   {
     id: 'annual',
     label: 'Annual',
@@ -45,12 +53,6 @@ const PLANS: Plan[] = [
     period: '/year',
     badge: 'Save 50%',
     hint: 'Just $2.50/mo',
-  },
-  {
-    id: 'monthly',
-    label: 'Monthly',
-    price: '$4.99',
-    period: '/month',
   },
 ];
 
@@ -66,22 +68,32 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
     body: 'Track every card you care about — no 5-card cap.',
   },
   {
-    icon: IconBookmarks,
-    title: 'Every grade, every card',
-    body: 'Add the same card at multiple grades (Raw, PSA 9, PSA 10) without using up your free slots.',
-  },
-  {
     icon: IconBellRinging,
-    title: 'Price alerts',
-    body: 'Get pushed the moment any card crosses the price you set — raw or graded.',
+    title: 'Unlimited price alerts',
+    body: 'Free keeps 3 active alerts. Premium removes the cap — track every threshold, raw or graded.',
   },
 ];
+
+// Alert.alert is a silent no-op on react-native-web — route through
+// window.alert there (same pattern as profile.tsx / edit-profile.tsx).
+function notify(title: string, message: string, onDismiss?: () => void) {
+  if (Platform.OS === 'web') {
+    window.alert(`${title}\n\n${message}`);
+    onDismiss?.();
+  } else {
+    Alert.alert(
+      title,
+      message,
+      onDismiss ? [{ text: 'Got it', onPress: onDismiss }] : undefined,
+    );
+  }
+}
 
 function PaywallScreen() {
   const { colors } = useTheme();
   const setPremium = useUserStore((s) => s.setPremium);
   const isPremium = useUserStore((s) => s.isPremium);
-  const [selected, setSelected] = useState<PlanId>('annual');
+  const [selected, setSelected] = useState<PlanId>('monthly');
   const [purchasing, setPurchasing] = useState(false);
   const [offerings, setOfferings] = useState<any>(null);
 
@@ -94,38 +106,97 @@ function PaywallScreen() {
     else router.replace('/(tabs)');
   };
 
+  // Match by identifier ($rc_monthly/$rc_annual are identifier values,
+  // NOT packageType — packageType is the MONTHLY/ANNUAL enum), then by
+  // packageType, then positional only when neither matched.
+  const packageForPlan = (plan: PlanId) => {
+    const packages = offerings?.availablePackages;
+    if (!packages?.length) return undefined;
+    const identifier = plan === 'monthly' ? '$rc_monthly' : '$rc_annual';
+    const type = plan === 'monthly' ? 'MONTHLY' : 'ANNUAL';
+    return (
+      packages.find((p: any) => p.identifier === identifier) ??
+      packages.find((p: any) => p.packageType === type) ??
+      packages[plan === 'monthly' ? 0 : 1]
+    );
+  };
+
+  // Real store prices drive the annual hint + save badge once offerings
+  // load. The PLANS literals are the fallback: always while offerings
+  // are null, and per-field when the loaded packages lack a usable
+  // price/currency (the visible prices fall back to the same literals
+  // then, so the chrome stays consistent).
+  const annualPlan = PLANS.find((p) => p.id === 'annual')!;
+  let annualHint = annualPlan.hint;
+  let annualBadge = annualPlan.badge;
+  if (offerings) {
+    const annual = packageForPlan('annual')?.product;
+    const monthly = packageForPlan('monthly')?.product;
+    if (typeof annual?.price === 'number' && annual.currencyCode) {
+      try {
+        const perMonth = new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: annual.currencyCode,
+        }).format(annual.price / 12);
+        annualHint = `Just ${perMonth}/mo`;
+      } catch {
+        // Unknown currency code — keep the USD literal.
+      }
+    }
+    if (
+      typeof annual?.price === 'number' &&
+      typeof monthly?.price === 'number' &&
+      monthly.price > 0
+    ) {
+      const pct = Math.round((1 - annual.price / (monthly.price * 12)) * 100);
+      // Hide the badge on implausible numbers (mispriced test products,
+      // annual >= 12x monthly) rather than advertise a bogus discount.
+      annualBadge = pct >= 5 && pct <= 90 ? `Save ${pct}%` : undefined;
+    }
+  }
+
   const purchase = async () => {
-    // Find the selected package from RevenueCat offerings
-    const packageId = selectedPlan === 'monthly' ? '$rc_monthly' : '$rc_annual';
-    const pkg = offerings?.availablePackages?.find(
-      (p: any) => p.packageType === packageId,
-    ) ?? offerings?.availablePackages?.[selectedPlan === 'monthly' ? 0 : 1];
+    const pkg = packageForPlan(selected);
 
     if (!pkg && Platform.OS !== 'web') {
-      Alert.alert('Error', 'Subscription products are not available yet. Please try again later.');
+      notify('Error', 'Subscription products are not available yet. Please try again later.');
       return;
     }
 
     setPurchasing(true);
     try {
       if (Platform.OS === 'web') {
-        // Web fallback — simulate for dev/preview
-        await new Promise((r) => setTimeout(r, 600));
-        setPremium(true);
+        // There is no web checkout — RevenueCat/IAP is native-only. The
+        // deployed web build (__DEV__ === false) must NOT grant premium:
+        // it's public and skips the auth gate, so simulating a purchase
+        // would let any anonymous visitor unlock premium for free. Keep
+        // the simulate-grant for local dev/preview only; in production
+        // web, point the user to the app where premium is actually sold.
+        if (__DEV__) {
+          await new Promise((r) => setTimeout(r, 600));
+          setPremium(true);
+        } else {
+          setPurchasing(false);
+          notify(
+            'Get Premium in the app',
+            'CardPulse Premium is purchased in the iOS app. Download CardPulse and subscribe there — your premium unlocks across your devices.',
+          );
+          return;
+        }
       } else {
         const success = await purchasePackage(pkg);
         if (success) setPremium(true);
         else { setPurchasing(false); return; }
       }
       setPurchasing(false);
-      Alert.alert(
+      notify(
         'Welcome to Premium',
         'Your watchlist is now unlimited and price alerts are unlocked on every card.',
-        [{ text: 'Got it', onPress: close }],
+        close,
       );
     } catch (e: any) {
       setPurchasing(false);
-      Alert.alert('Purchase Failed', e.message || 'Something went wrong. Please try again.');
+      notify('Purchase Failed', e.message || 'Something went wrong. Please try again.');
     }
   };
 
@@ -136,16 +207,16 @@ function PaywallScreen() {
       setPurchasing(false);
       if (success) {
         setPremium(true);
-        Alert.alert('Premium Restored', 'Welcome back! Your premium subscription has been restored.');
+        notify('Premium Restored', 'Welcome back! Your premium subscription has been restored.');
       } else {
-        Alert.alert(
+        notify(
           'No Subscription Found',
           "We didn't find an active CardPulse subscription. If you subscribed on another device, sign in with the same Apple ID and try again.",
         );
       }
     } catch {
       setPurchasing(false);
-      Alert.alert('Restore Failed', 'Could not restore purchases. Please try again.');
+      notify('Restore Failed', 'Could not restore purchases. Please try again.');
     }
   };
 
@@ -244,6 +315,8 @@ function PaywallScreen() {
         <View style={{ gap: spacing[3] }}>
           {PLANS.map((plan) => {
             const isSelected = plan.id === selected;
+            const badge = plan.id === 'annual' ? annualBadge : plan.badge;
+            const hint = plan.id === 'annual' ? annualHint : plan.hint;
             return (
               <Pressable
                 key={plan.id}
@@ -278,7 +351,7 @@ function PaywallScreen() {
                 <View style={{ flex: 1, gap: spacing[0.5] }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
                     <Text variant="labelLg">{plan.label}</Text>
-                    {plan.badge && (
+                    {badge && (
                       <View
                         style={{
                           paddingHorizontal: spacing[2],
@@ -288,19 +361,23 @@ function PaywallScreen() {
                         }}
                       >
                         <Text variant="labelSm" color={colors.onPrimary}>
-                          {plan.badge}
+                          {badge}
                         </Text>
                       </View>
                     )}
                   </View>
-                  {plan.hint && (
+                  {hint && (
                     <Text variant="caption" color={colors.onSurfaceVariant}>
-                      {plan.hint}
+                      {hint}
                     </Text>
                   )}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  <Text variant="headingSm">{plan.price}</Text>
+                  {/* Store-localized price when offerings have loaded;
+                      USD literal is only the loading fallback. */}
+                  <Text variant="headingSm">
+                    {packageForPlan(plan.id)?.product?.priceString ?? plan.price}
+                  </Text>
                   <Text variant="caption" color={colors.onSurfaceVariant}>
                     {plan.period}
                   </Text>

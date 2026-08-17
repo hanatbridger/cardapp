@@ -1,3 +1,9 @@
 export { apiFetch, API_BASE_URL } from './api-client';
 export { fetchCardPrice, fetchPriceHistory } from './ebay-proxy';
-export { searchCards, getCard } from './pokemon-tcg';
+export { searchCards, getCard, searchSets, getSet, searchArtists, getCardsByArtist } from './pokemon-tcg';
+export { searchJapaneseCards, getJapaneseCard } from './tcgdex';
+export { searchJapaneseCatalog, getJapaneseProduct } from './jp-catalog';
+export { fetchSealedPrice, fetchSealedPriceHistory } from './tcgplayer';
+export { fetchCardStats } from './card-stats';
+export type { CardStats, LiveMarketDynamics, DailySales } from './card-stats';
+export type { SealedPriceHistoryPoint } from './tcgplayer';

@@ -23,7 +23,7 @@ export function WatchlistFullModal({ visible, onClose, currentCount, maxCount }:
       <Pressable
         style={{
           flex: 1,
-          backgroundColor: withAlpha(colors.onSurface, 0.6),
+          backgroundColor: withAlpha(colors.scrim, 0.6),
           alignItems: 'center',
           justifyContent: 'center',
           padding: spacing[5],

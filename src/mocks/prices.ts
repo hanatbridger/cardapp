@@ -19,14 +19,21 @@ function key(cardId: string, grade: GradeType): string {
 }
 
 /**
- * Mock prices calibrated against real eBay sold listings (April 2026)
- * Sources: eBay sold listings, PriceCharting, TCGPlayer market price
+ * Seeded prices for the demo dataset, April 2026. Sources are split by
+ * grade and MUST stay split — see `src/hooks/use-card-price.ts`:
  *
- * These will be replaced by live eBay API data once the Application Growth Check is approved.
+ *   UNGRADED → TCGPlayer Market Price (rolling 14-day raw/NM)
+ *   PSA10    → eBay sold listings (median of last 30 days)
+ *               + PriceCharting cross-check
+ *
+ * Per-card comments below cite the actual reference value used to
+ * calibrate the mock. When the live proxies ship, the hook layer swaps
+ * these out transparently — same shape, same React Query keys, no
+ * consumer changes.
  */
 const PRICE_DATA: Record<string, CardPrice> = {
   // ── Charizard ex 199 — 151 SIR ──────────────────────────
-  // PriceCharting PSA 10: ~$1,560. Raw: ~$350-400
+  // PSA 10 (eBay/PriceCharting): ~$1,560. Raw (TCGPlayer Market): ~$350-400
   [key('sv3pt5-199', 'PSA10')]: {
     cardName: 'Charizard ex', grade: 'PSA10',
     currentPrice: 1560.0, previousPrice: 1500.0, percentChange: 4.0,
@@ -41,7 +48,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Pikachu ex 238 — Surging Sparks SIR ─────────────────
-  // eBay sold PSA 10: $1,100 (Apr 5 2026). Raw: ~$200-280
+  // PSA 10 (eBay sold, Apr 5 2026): $1,100. Raw (TCGPlayer Market): ~$200-280
   [key('sv8-238', 'PSA10')]: {
     cardName: 'Pikachu ex', grade: 'PSA10',
     currentPrice: 1100.0, previousPrice: 1050.0, percentChange: 4.76,
@@ -56,7 +63,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Mew ex 205 — 151 Hyper Rare (Gold) ──────────────────
-  // eBay sold PSA 10: ~$200-220 (Mar 2026). Raw: ~$70-95
+  // PSA 10 (eBay sold, Mar 2026): ~$200-220. Raw (TCGPlayer Market): ~$70-95
   [key('sv3pt5-205', 'PSA10')]: {
     cardName: 'Mew ex', grade: 'PSA10',
     currentPrice: 210.0, previousPrice: 197.0, percentChange: 6.6,
@@ -71,7 +78,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Miraidon ex 244 — SV Base SIR ──────────────────────
-  // eBay sold: PSA 10 ~$120-160, Raw ~$40-60
+  // PSA 10 (eBay sold): ~$120-160. Raw (TCGPlayer Market): ~$40-60
   [key('sv1-244', 'PSA10')]: {
     cardName: 'Miraidon ex', grade: 'PSA10',
     currentPrice: 140.0, previousPrice: 155.0, percentChange: -9.68,
@@ -86,7 +93,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Umbreon ex 161 — Prismatic Evolutions SIR ──────────
-  // eBay sold PSA 10: ~$950-1,000 (Mar 2026). Raw: ~$1,200-1,500
+  // PSA 10 (eBay sold, Mar 2026): ~$950-1,000. Raw (TCGPlayer Market): ~$1,200-1,500
   [key('sv8pt5-161', 'PSA10')]: {
     cardName: 'Umbreon ex', grade: 'PSA10',
     currentPrice: 1000.0, previousPrice: 950.0, percentChange: 5.26,
@@ -101,7 +108,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Eevee 133 — 151 Common ─────────────────────────────
-  // eBay sold: PSA 10 ~$25-35, Raw ~$1-3
+  // PSA 10 (eBay sold): ~$25-35. Raw (TCGPlayer Market): ~$1-3
   [key('sv3pt5-133', 'PSA10')]: {
     cardName: 'Eevee', grade: 'PSA10',
     currentPrice: 28.0, previousPrice: 26.0, percentChange: 7.69,
@@ -116,7 +123,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Alakazam ex 201 — 151 SIR ──────────────────────────
-  // eBay sold: PSA 10 ~$120-160, Raw ~$35-55
+  // PSA 10 (eBay sold): ~$120-160. Raw (TCGPlayer Market): ~$35-55
   [key('sv3pt5-201', 'PSA10')]: {
     cardName: 'Alakazam ex', grade: 'PSA10',
     currentPrice: 135.0, previousPrice: 145.0, percentChange: -6.90,
@@ -131,7 +138,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Gardevoir ex 233 — Paldean Fates SIR ───────────────
-  // eBay sold: PSA 10 ~$150-200, Raw ~$50-75
+  // PSA 10 (eBay sold): ~$150-200. Raw (TCGPlayer Market): ~$50-75
   [key('sv4pt5-233', 'PSA10')]: {
     cardName: 'Gardevoir ex', grade: 'PSA10',
     currentPrice: 175.0, previousPrice: 160.0, percentChange: 9.38,
@@ -146,7 +153,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Iono 269 — Paldea Evolved SIR ─────────────────────
-  // eBay sold PSA 10: ~$160-204 (Feb 2026). Raw: ~$55-75
+  // PSA 10 (eBay sold, Feb 2026): ~$160-204. Raw (TCGPlayer Market): ~$55-75
   [key('sv2-269', 'PSA10')]: {
     cardName: 'Iono', grade: 'PSA10',
     currentPrice: 200.0, previousPrice: 185.0, percentChange: 8.11,
@@ -161,7 +168,7 @@ const PRICE_DATA: Record<string, CardPrice> = {
   },
 
   // ── Gardevoir ex 245 — SV Base SIR ────────────────────
-  // eBay sold: PSA 10 ~$200-280, Raw ~$70-100
+  // PSA 10 (eBay sold): ~$200-280. Raw (TCGPlayer Market): ~$70-100
   [key('sv1-245', 'PSA10')]: {
     cardName: 'Gardevoir ex', grade: 'PSA10',
     currentPrice: 240.0, previousPrice: 255.0, percentChange: -5.88,

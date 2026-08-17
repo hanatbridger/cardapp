@@ -1,34 +1,54 @@
-import React, { useRef, useEffect, useCallback } from 'react';
-import { View, FlatList, Pressable } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { View, Pressable } from 'react-native';
+import Animated, {
+  scrollTo,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  useFrameCallback,
+  useReducedMotion,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Text } from './Text';
 import { PriceChange } from './PriceChange';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
-import type { PokemonCard } from '../types/card';
-import type { CardPrice } from '../types/card';
-
-interface TrendingItem {
-  card: PokemonCard;
-  price?: CardPrice;
-}
+import type { TrendingTile } from '../services/trending';
 
 interface TrendingCarouselProps {
-  items: TrendingItem[];
+  items: TrendingTile[];
 }
 
-const ITEM_WIDTH = 140;
+const ITEM_WIDTH = 200;
 const ITEM_GAP = 8;
-const SCROLL_SPEED = 0.5; // pixels per frame
-const FRAME_INTERVAL = 16; // ~60fps
+const SCROLL_SPEED = 0.5; // pixels per frame at 60fps
 
-function TrendingCard({ card, price }: TrendingItem) {
+// Memoized: the carousel lives in the home screen's ListHeaderComponent,
+// so every home re-render would otherwise re-render all 3x tiles.
+const TrendingCard = React.memo(function TrendingCard({
+  cardId,
+  name,
+  setName,
+  imageUrl,
+  percentChange,
+}: TrendingTile) {
   const { colors } = useTheme();
 
   return (
     <Pressable
-      onPress={() => router.push(`/card/${card.id}`)}
+      // Prefer direct routing to /card/{cardId} when the server was
+      // able to resolve the Pokemon TCG cardId for this tile. When
+      // resolution missed (rare card, API timeout), fall back to
+      // dropping the user into Search with the card name pre-filled
+      // so they can pick the canonical record manually.
+      onPress={() =>
+        cardId
+          ? router.push(`/card/${cardId}`)
+          : router.push(
+              `/(tabs)/search?focus=1&from=home&q=${encodeURIComponent(name)}`,
+            )
+      }
       style={{
         width: ITEM_WIDTH,
         flexDirection: 'row',
@@ -40,92 +60,157 @@ function TrendingCard({ card, price }: TrendingItem) {
       }}
     >
       <Image
-        source={{ uri: card.images.small }}
+        source={{ uri: imageUrl }}
         style={{ width: 36, height: 50, borderRadius: radius.sm }}
         contentFit="cover"
       />
       <View style={{ flex: 1, gap: spacing['0.5'] }}>
         <Text variant="labelMd" numberOfLines={1}>
-          {card.name}
+          {name}
         </Text>
-        {price && (
-          <PriceChange percent={price.percentChange} size="sm" showIcon={true} />
-        )}
+        <Text variant="caption" color={colors.onSurfaceMuted} numberOfLines={1}>
+          {setName}
+        </Text>
+        <PriceChange percent={percentChange} size="sm" showIcon />
       </View>
     </Pressable>
   );
-}
+});
 
-export function TrendingCarousel({ items }: TrendingCarouselProps) {
-  const flatListRef = useRef<FlatList>(null);
-  const scrollOffset = useRef(0);
-  const isPaused = useRef(false);
+/**
+ * Auto-scrolling trending ticker.
+ *
+ * Why this is built with Reanimated rather than setInterval:
+ *
+ * The previous implementation used `setInterval(animate, 16ms)` and
+ * called `flatListRef.current?.scrollToOffset(...)` from the JS
+ * thread on every tick. That JS-thread work competed with the
+ * gesture recognizer of the outer FlatList that hosts this carousel
+ * (the home-screen watchlist), and intermittently dropped touches
+ * on watchlist rows — making just-added cards feel un-tappable.
+ *
+ * Two earlier attempts to band-aid the symptom (removing the row
+ * fade-in animation; switching the row from Pressable to
+ * TouchableOpacity) didn't fix it because the root cause is JS
+ * thread contention, not the renderer choice.
+ *
+ * The fix below moves the entire animation to the UI thread:
+ *   - useFrameCallback runs the tick as a worklet (UI thread)
+ *   - scrollTo is a Reanimated worklet that scrolls natively
+ *   - useSharedValue holds state across thread boundaries
+ *
+ * The JS thread is now never woken by this carousel's animation,
+ * so it stays free to handle touches on sibling components.
+ *
+ * User scroll integration: useAnimatedScrollHandler captures the
+ * native scroll offset into the shared value while the user is
+ * dragging (isPaused = true), so resuming auto-scroll picks up
+ * from wherever the user let go rather than snapping back.
+ */
+export const TrendingCarousel = React.memo(function TrendingCarousel({
+  items,
+}: TrendingCarouselProps) {
+  const animatedRef = useAnimatedRef<Animated.FlatList<TrendingTile>>();
+  const scrollOffset = useSharedValue(0);
+  const isPaused = useSharedValue(false);
   const pauseTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const reduceMotion = useReducedMotion();
 
-  // Triple the data for seamless infinite loop
-  const tripleData = [...items, ...items, ...items];
+  // Triple the data for seamless infinite loop. We start in the middle
+  // set so the user can scroll either direction without immediately
+  // hitting an edge.
+  const tripleData = useMemo(() => [...items, ...items, ...items], [items]);
   const singleSetWidth = items.length * (ITEM_WIDTH + ITEM_GAP);
 
-  const animate = useCallback(() => {
-    if (isPaused.current) return;
-
-    scrollOffset.current += SCROLL_SPEED;
-
-    // When we've scrolled past the second set, silently jump back to the first set
-    if (scrollOffset.current >= singleSetWidth * 2) {
-      scrollOffset.current -= singleSetWidth;
-      flatListRef.current?.scrollToOffset({
-        offset: scrollOffset.current,
-        animated: false,
-      });
-    } else {
-      flatListRef.current?.scrollToOffset({
-        offset: scrollOffset.current,
-        animated: false,
-      });
+  // Drive the auto-scroll on the UI thread. The frame callback runs
+  // once per frame (~60fps) and schedules a native scrollTo with no
+  // bridge call, so the JS thread stays idle.
+  const frameCallback = useFrameCallback(() => {
+    'worklet';
+    // No items → singleSetWidth is 0 and the wrap condition below would
+    // fire every frame; nothing to scroll anyway.
+    if (singleSetWidth === 0) return;
+    if (isPaused.value) return;
+    scrollOffset.value += SCROLL_SPEED;
+    // Wrap back to the first set when we've crossed into the third —
+    // produces the seamless infinite-loop visual.
+    if (scrollOffset.value >= singleSetWidth * 2) {
+      scrollOffset.value -= singleSetWidth;
     }
-  }, [singleSetWidth]);
+    scrollTo(animatedRef, scrollOffset.value, 0, false);
+  }, false); // start inactive — useFocusEffect activates it below
 
+  // Initial position: start scrolled to the middle set so users can
+  // swipe in either direction without immediately reaching an edge.
   useEffect(() => {
-    // Start scrolled to the middle set so we can scroll both directions
-    const initialOffset = singleSetWidth;
-    scrollOffset.current = initialOffset;
-    flatListRef.current?.scrollToOffset({ offset: initialOffset, animated: false });
+    scrollOffset.value = singleSetWidth;
+  }, [singleSetWidth, scrollOffset]);
 
-    const interval = setInterval(animate, FRAME_INTERVAL);
-    return () => clearInterval(interval);
-  }, [animate, singleSetWidth]);
+  // Clear the resume timer on unmount — otherwise it fires after the
+  // component is gone and writes to the shared value.
+  useEffect(() => {
+    return () => {
+      if (pauseTimeout.current) clearTimeout(pauseTimeout.current);
+    };
+  }, []);
+
+  // Run the frame callback only while the home screen is focused.
+  // When the user navigates to another tab or detail screen, we
+  // pause; on return we resume. This also means the callback isn't
+  // fighting other screens' work for UI-thread frames.
+  //
+  // Reduce Motion: a raw frame callback bypasses the ReduceMotion
+  // machinery that withRepeat/withTiming honor automatically, so the
+  // gate is explicit here. The rail stays manually scrollable.
+  useFocusEffect(
+    useCallback(() => {
+      if (reduceMotion) return;
+      frameCallback.setActive(true);
+      return () => frameCallback.setActive(false);
+    }, [frameCallback, reduceMotion]),
+  );
+
+  // While the user is mid-drag we mirror their native scroll offset
+  // into the shared value so resuming auto-scroll continues from
+  // their position instead of snapping back.
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      'worklet';
+      if (isPaused.value) {
+        scrollOffset.value = e.contentOffset.x;
+      }
+    },
+  });
 
   const handleTouchStart = () => {
-    isPaused.current = true;
+    isPaused.value = true;
     if (pauseTimeout.current) clearTimeout(pauseTimeout.current);
   };
 
   const handleTouchEnd = () => {
     pauseTimeout.current = setTimeout(() => {
-      isPaused.current = false;
+      isPaused.value = false;
     }, 3000);
   };
 
-  const handleScroll = (e: any) => {
-    // Sync offset when user manually scrolls
-    if (isPaused.current) {
-      scrollOffset.current = e.nativeEvent.contentOffset.x;
-    }
-  };
+  const renderItem = useCallback(
+    ({ item }: { item: TrendingTile }) => <TrendingCard {...item} />,
+    [],
+  );
 
   return (
-    <FlatList
-      ref={flatListRef}
+    <Animated.FlatList
+      ref={animatedRef}
       data={tripleData}
-      keyExtractor={(item, index) => `${item.card.id}-${index}`}
-      renderItem={({ item }) => <TrendingCard {...item} />}
+      keyExtractor={(item, index) => `${item.productId}-${index}`}
+      renderItem={renderItem}
       horizontal
       showsHorizontalScrollIndicator={false}
+      removeClippedSubviews
       contentContainerStyle={{ gap: ITEM_GAP, paddingHorizontal: spacing[4] }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      onScroll={handleScroll}
+      onScroll={scrollHandler}
       scrollEventThrottle={16}
       getItemLayout={(_, index) => ({
         length: ITEM_WIDTH + ITEM_GAP,
@@ -134,4 +219,4 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
       })}
     />
   );
-}
+});

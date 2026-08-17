@@ -2,7 +2,7 @@
   "expo": {
     "name": "CardPulse",
     "slug": "CardPulse",
-    "version": "1.0.0",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "cardpulse",
@@ -11,12 +11,17 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0D1117"
+      "backgroundColor": "#5739FF"
     },
     "ios": {
       "bundleIdentifier": "com.getcardpulse.app",
-      "buildNumber": "1",
-      "supportsTablet": true,
+      "buildNumber": "2",
+      "supportsTablet": false,
+      "icon": {
+        "light": "./assets/icon.png",
+        "dark": "./assets/icon.png",
+        "tinted": "./assets/icon-tinted.png"
+      },
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -30,23 +35,30 @@
         "NSPrivacyAccessedAPITypes": [
           {
             "NSPrivacyAccessedAPIType": "NSPrivacyAccessedAPICategoryUserDefaults",
-            "NSPrivacyAccessedAPITypeReasons": ["CA92.1"]
+            "NSPrivacyAccessedAPITypeReasons": [
+              "CA92.1"
+            ]
           }
         ]
       }
     },
     "android": {
+      "package": "com.getcardpulse.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#5739FF"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.POST_NOTIFICATIONS"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "privacy": "https://dist-amber-theta-56.vercel.app/privacy",
+    "privacy": "https://strange-saha.vercel.app/privacy",
     "plugins": [
       "expo-router",
       "expo-apple-authentication",
@@ -56,7 +68,29 @@
           "color": "#4B5EFC"
         }
       ],
-      "@sentry/react-native"
-    ]
+      "@sentry/react-native",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.864170396383-4da514g9biulc0374haev0khj9iing07"
+        }
+      ],
+      "expo-web-browser",
+      "./plugins/withModularHeaders.js",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CardPulse uses your photo library only to attach a screenshot to feedback you send us."
+        }
+      ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2aae8829-2a01-4d59-8e95-7219841e27a0"
+      }
+    },
+    "owner": "hanwongz"
   }
 }

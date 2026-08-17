@@ -1,15 +1,19 @@
-import React from 'react';
-import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, ScrollView, Pressable, Alert, Platform, Linking } from 'react-native';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
 import {
   IconCrown, IconShield, IconFileText, IconHelpCircle, IconLogout,
-  IconChevronRight, IconDeviceMobile, IconStar,
+  IconMessage2, IconInbox,
+  IconChevronRight, IconDeviceMobile, IconStar, IconCoin,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
-import { Text, Card, Button, ScreenBackground, withErrorBoundary } from '../../src/components';
+import { Text, Card, Button, ScreenBackground, SegmentedControl, CurrencyPickerModal, withErrorBoundary } from '../../src/components';
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { currencyMeta, DEFAULT_CURRENCY } from '../../src/constants/currencies';
+import { isSuperadminEmail } from '../../src/services/admin-feedback';
 import { useUserStore } from '../../src/stores/user-store';
 
 interface SettingsRowProps {
@@ -72,9 +76,17 @@ function SettingsDivider() {
   return <View style={{ height: 1, backgroundColor: colors.outlineVariant, marginHorizontal: spacing[4] }} />;
 }
 
+const THEME_OPTIONS = ['System', 'Light', 'Dark'] as const;
+const THEME_VALUES = ['system', 'light', 'dark'] as const;
+
 function ProfileScreen() {
   const { colors } = useTheme();
   const { profile, signOut, deleteAccount, isPremium } = useUserStore();
+  const themePreference = useUserStore((s) => s.preferences.theme);
+  const currency = useUserStore((s) => s.preferences.currency ?? DEFAULT_CURRENCY);
+  const updatePreference = useUserStore((s) => s.updatePreference);
+  const [currencyPickerVisible, setCurrencyPickerVisible] = useState(false);
+  const selectedThemeIndex = Math.max(0, THEME_VALUES.indexOf(themePreference));
 
   const handleSignOut = () => {
     if (Platform.OS === 'web') {
@@ -89,11 +101,28 @@ function ProfileScreen() {
     }
   };
 
+  // Server delete must succeed before we navigate away — a failed
+  // delete presented as success is an Apple 5.1.1(v) violation.
+  const performDeleteAccount = async () => {
+    try {
+      await deleteAccount();
+      router.replace('/(auth)/login');
+    } catch (e: any) {
+      const msg =
+        e?.message ??
+        'Something went wrong. Please try again, or email privacy@cardpulse.app for help.';
+      if (Platform.OS === 'web') {
+        window.alert(`Could not delete account\n\n${msg}`);
+      } else {
+        Alert.alert('Could not delete account', msg);
+      }
+    }
+  };
+
   const handleDeleteAccount = () => {
     if (Platform.OS === 'web') {
       if (window.confirm('Are you sure? This will permanently delete your account and all data. This cannot be undone.')) {
-        deleteAccount();
-        router.replace('/(auth)/login');
+        performDeleteAccount();
       }
     } else {
       Alert.alert(
@@ -105,8 +134,7 @@ function ProfileScreen() {
             text: 'Delete Account',
             style: 'destructive',
             onPress: () => {
-              deleteAccount();
-              router.replace('/(auth)/login');
+              performDeleteAccount();
             },
           },
         ],
@@ -114,17 +142,13 @@ function ProfileScreen() {
     }
   };
 
-  // TODO(launch): once CardPulse is live in the App Store / Play Store,
-  // wire this to the real listing. Best path is `expo-store-review`'s
-  // `requestReview()` for the native in-app prompt, falling back to
-  // `Linking.openURL` for a deep link to the listing. Until then this
-  // button is hidden — the placeholder URL `id6740000000` would 404 and
-  // looked broken to anyone who tapped it.
+  // Live App Store listing (CardPulse: Card Tracker). ?action=write-review
+  // drops the user straight onto the review sheet instead of the listing,
+  // which is what a "Rate" button promises.
   const handleRate = () => {
-    Alert.alert(
-      'Thanks!',
-      "CardPulse isn't on the App Store yet. We'll prompt you to rate the app once it's live.",
-    );
+    Linking.openURL(
+      'https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336?action=write-review',
+    ).catch(() => {});
   };
 
   return (
@@ -204,6 +228,65 @@ function ProfileScreen() {
           </View>
         )}
 
+        {/* Appearance — lets users pin the app to light or dark, or
+            follow the OS. Writes to `preferences.theme`; the
+            ThemeProvider subscribes and rebinds every themed component
+            on change. */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
+          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
+            APPEARANCE
+          </Text>
+        </View>
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING }}>
+          <SegmentedControl
+            options={[...THEME_OPTIONS]}
+            selected={selectedThemeIndex}
+            onSelect={(i) => updatePreference('theme', THEME_VALUES[i])}
+          />
+        </View>
+
+        {/* Currency — prices are sourced in USD and converted to the
+            chosen currency via useMoney(). The row opens a searchable tray
+            of every currency; selecting one writes preferences.currency
+            and every price across the app re-renders. */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
+          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
+            CURRENCY
+          </Text>
+        </View>
+        <Card style={{ marginHorizontal: HORIZONTAL_PADDING, padding: 0, overflow: 'hidden' }}>
+          <SettingsRow
+            icon={<IconCoin size={18} color={colors.onSurfaceVariant} />}
+            label="Display currency"
+            value={`${currency} · ${currencyMeta(currency).symbol.trim()}`}
+            onPress={() => setCurrencyPickerVisible(true)}
+          />
+        </Card>
+
+        {/* Feedback */}
+        <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
+          <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
+            FEEDBACK
+          </Text>
+        </View>
+        <Card style={{ marginHorizontal: HORIZONTAL_PADDING, padding: 0, overflow: 'hidden' }}>
+          <SettingsRow
+            icon={<IconMessage2 size={18} color={colors.onSurfaceVariant} />}
+            label="Send Feedback"
+            onPress={() => router.push('/feedback')}
+          />
+          {isSuperadminEmail(profile.email) && (
+            <>
+              <SettingsDivider />
+              <SettingsRow
+                icon={<IconInbox size={18} color={colors.onSurfaceVariant} />}
+                label="Feedback Inbox"
+                onPress={() => router.push('/feedback-admin')}
+              />
+            </>
+          )}
+        </Card>
+
         {/* Legal */}
         <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginTop: spacing[5], marginBottom: spacing[3] }}>
           <Text variant="labelLg" color={colors.onSurfaceVariant} style={{ paddingLeft: spacing[4] }}>
@@ -240,7 +323,14 @@ function ProfileScreen() {
           <SettingsRow
             icon={<IconDeviceMobile size={18} color={colors.onSurfaceVariant} />}
             label="App Version"
-            value="1.0.0"
+            // Read from expo-constants instead of hardcoding. Falls back to
+            // the bundled app.json version, and ultimately to a literal so
+            // the row is never blank if both are unavailable on web.
+            value={
+              Constants.expoConfig?.version ??
+              (Constants.manifest as { version?: string } | null)?.version ??
+              '1.0'
+            }
           />
           <SettingsDivider />
           <SettingsRow
@@ -273,6 +363,13 @@ function ProfileScreen() {
 
         <View style={{ height: spacing[4] }} />
       </ScrollView>
+
+      <CurrencyPickerModal
+        visible={currencyPickerVisible}
+        selected={currency}
+        onSelect={(code) => updatePreference('currency', code)}
+        onClose={() => setCurrencyPickerVisible(false)}
+      />
     </ScreenBackground>
   );
 }

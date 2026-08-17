@@ -1,6 +1,27 @@
 import type { PokemonCard } from '../types/card';
+import { fetchWithTimeout } from './api-client';
 
 const BASE_URL = 'https://api.pokemontcg.io/v2';
+
+// Keyless clients get pokemontcg.io's throttled tier (slow responses,
+// load-shed 500s under pressure). A key from dev.pokemontcg.io lifts the
+// rate limit substantially; requests work without one, just worse.
+const API_KEY = process.env.EXPO_PUBLIC_POKEMONTCG_API_KEY;
+
+function tcgFetch(url: string) {
+  return fetchWithTimeout(url, API_KEY ? { headers: { 'X-Api-Key': API_KEY } } : {});
+}
+
+/**
+ * Escape Lucene special characters in user-supplied search text before
+ * interpolating it into a quoted query term. Without this, a query
+ * containing a double-quote or backslash breaks out of the quoted term
+ * (changing the query's meaning) or produces a malformed query the API
+ * rejects with 400 — surfacing as an empty results screen.
+ */
+function escapeLucene(s: string): string {
+  return s.replace(/([\\"])/g, '\\$1');
+}
 
 interface PokemonTcgResponse {
   data: any[];
@@ -56,43 +77,274 @@ function extractTcgPrice(tcgplayer: any, field: 'market' | 'mid' = 'market'): nu
   return undefined;
 }
 
-/** Japanese sets in the Pokemon TCG API use specific prefixes */
+/** Whether a set is Japanese-exclusive (drives EN/JP price routing). */
 function isJapaneseSet(setId: string, setName: string): boolean {
-  // Japanese set IDs typically start with these prefixes
-  const jpPrefixes = ['sv', 'sm', 'xy', 'bw', 'dp', 'ex', 'ecard'];
   const jpIndicators = ['Japanese', 'Japan', 'プロモ', 'ジャパン'];
 
-  // Check set name for Japanese indicators
+  // Name is the reliable signal — explicit Japanese markers.
   if (jpIndicators.some((ind) => setName.includes(ind))) return true;
 
-  // Japanese-only sets have specific IDs (e.g., svF, svG, sm11a, etc.)
-  // Sets ending with lowercase letters (a, b, c) after numbers are typically JP-exclusive
-  if (/\d+[a-z]$/.test(setId)) return true;
-
-  // Check for common JP-only set ID patterns
+  // Explicit allowlist of known JP-exclusive set ids. We deliberately do
+  // NOT infer language from id suffix shape (the old /\d+[a-z]$/ test):
+  // that also matched English sets/promos whose id ends in a lowercase
+  // letter, mistagging them language:'JP' and sending the wrong-market
+  // language param to the eBay/TCGPlayer proxies, pulling JP prices for
+  // an English card. The shared 'sv'/'sm'/'xy' prefixes are likewise
+  // English too, so a prefix list can't classify language on its own.
   const jpOnlySets = ['svF', 'svG', 'svH', 'sm11a', 'sm11b', 'sm12a'];
   if (jpOnlySets.some((s) => setId.startsWith(s))) return true;
 
   return false;
 }
 
+export interface CardSearchFilters {
+  /** 'Pokémon' | 'Trainer' | 'Energy' or undefined for all */
+  supertype?: string;
+  /** Exact rarity string or undefined for all */
+  rarity?: string;
+  /** Restrict to cards in this set id */
+  setId?: string;
+}
+
+// Every field mapCard reads. Projecting drops the heavy attack/ability/
+// legalities blobs, which is what lets big result pages (100 cards)
+// serialize without tripping the API's load-shed 500s.
+const CARD_SELECT =
+  'id,name,supertype,subtypes,hp,types,set,number,rarity,artist,images,tcgplayer';
+
+/**
+ * Query aliases for card variants whose printed name doesn't contain the
+ * words collectors search by. "latias gold star" matches nothing (the
+ * card is named "Latias ★"), so the phrase becomes a rarity filter.
+ */
+function applyQueryAliases(
+  query: string,
+  filters: CardSearchFilters,
+): { query: string; filters: CardSearchFilters } {
+  const m = /^(.*?)\s+(gold\s*star|goldstar)\s*$/i.exec(query.trim());
+  if (m && !filters.rarity) {
+    return { query: m[1], filters: { ...filters, rarity: 'Rare Holo Star' } };
+  }
+  return { query, filters };
+}
+
 export async function searchCards(
+  rawQuery: string,
+  rawFilters: CardSearchFilters = {},
+  page: number = 1,
+  pageSize: number = 100,
+): Promise<{ cards: PokemonCard[]; totalCount: number }> {
+  const { query, filters } = applyQueryAliases(rawQuery, rawFilters);
+  // Build Lucene query supported by the Pokemon TCG API
+  const parts: string[] = [];
+  if (query && query.length >= 2) parts.push(`name:"${escapeLucene(query)}*"`);
+  if (filters.supertype) parts.push(`supertype:"${filters.supertype}"`);
+  if (filters.rarity) parts.push(`rarity:"${filters.rarity}"`);
+  if (filters.setId) parts.push(`set.id:${filters.setId}`);
+
+  // If we only have a set filter (no text query), the API still accepts that.
+  // If we have nothing, return an empty result set.
+  if (parts.length === 0) return { cards: [], totalCount: 0 };
+
+  // Set detail screens render every card in the set under the "All"
+  // filter, so when we're scoped to a single setId we ask for the
+  // API's max 250 in one shot. Text search gets 100 (with the select
+  // projection above this stays fast): the old 20-row page sorted
+  // newest-first silently hid every vintage printing — a 2005 Gold
+  // Star ranks ~30th behind modern reprints and never rendered.
+  const effectivePageSize = filters.setId ? 250 : pageSize;
+
+  const params = new URLSearchParams({
+    q: parts.join(' '),
+    page: String(page),
+    pageSize: String(effectivePageSize),
+    orderBy: filters.setId ? 'number' : '-set.releaseDate',
+    select: CARD_SELECT,
+  });
+
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  if (!response.ok) {
+    throw new Error(`Pokemon TCG API error: ${response.status}`);
+  }
+
+  const data: PokemonTcgResponse = await response.json();
+  return {
+    cards: (data.data || []).map(mapCard),
+    totalCount: data.totalCount || 0,
+  };
+}
+
+/**
+ * Similar-cards lookup — exact-word name match (NO trailing wildcard) plus
+ * a `select` field projection. Both matter: on high-volume names
+ * ("Charizard", 108 printings) the API 500s when asked to serialize full
+ * card payloads, but the same query with select=id,name,images,set,number
+ * returns 200. Word match still hits decorated names ("Mega Charizard Y
+ * ex"), which is exactly what the rail wants.
+ */
+export async function getSimilarCards(
+  name: string,
+  pageSize: number = 12,
+): Promise<PokemonCard[]> {
+  const params = new URLSearchParams({
+    q: `name:"${escapeLucene(name)}"`,
+    pageSize: String(pageSize),
+    orderBy: '-set.releaseDate',
+    select: 'id,name,images,set,number',
+  });
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  if (!response.ok) {
+    throw new Error(`Pokemon TCG API error: ${response.status}`);
+  }
+  const data: PokemonTcgResponse = await response.json();
+  return (data.data || []).map(mapCard);
+}
+
+export interface PokemonSet {
+  id: string;
+  name: string;
+  series: string;
+  printedTotal: number;
+  total: number;
+  releaseDate: string;
+  images: { symbol: string; logo: string };
+}
+
+function mapSet(raw: any): PokemonSet {
+  return {
+    id: raw.id,
+    name: raw.name || '',
+    series: raw.series || '',
+    printedTotal: raw.printedTotal || 0,
+    total: raw.total || 0,
+    releaseDate: raw.releaseDate || '',
+    images: {
+      symbol: raw.images?.symbol || '',
+      logo: raw.images?.logo || '',
+    },
+  };
+}
+
+export async function searchSets(
   query: string,
   page: number = 1,
-  pageSize: number = 20,
-): Promise<{ cards: PokemonCard[]; totalCount: number }> {
-  // Search by name, supporting partial matches
-  // Also searches Japanese card names via the API's built-in localization
-  const q = `name:"${query}*"`;
+  pageSize: number = 40,
+): Promise<{ sets: PokemonSet[]; totalCount: number }> {
   const params = new URLSearchParams({
-    q,
+    page: String(page),
+    pageSize: String(pageSize),
+    orderBy: '-releaseDate',
+  });
+  if (query && query.length >= 2) {
+    params.set('q', `name:"${escapeLucene(query)}*"`);
+  }
+
+  const response = await tcgFetch(`${BASE_URL}/sets?${params}`);
+  if (!response.ok) {
+    throw new Error(`Pokemon TCG API error: ${response.status}`);
+  }
+
+  const data: PokemonTcgResponse = await response.json();
+  return {
+    sets: (data.data || []).map(mapSet),
+    totalCount: data.totalCount || 0,
+  };
+}
+
+export async function getSet(id: string): Promise<PokemonSet | null> {
+  const response = await tcgFetch(`${BASE_URL}/sets/${id}`);
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`Pokemon TCG API error: ${response.status}`);
+  }
+  const data = await response.json();
+  return data.data ? mapSet(data.data) : null;
+}
+
+export interface ArtistResult {
+  /** Artist's display name (exact casing from the API) */
+  name: string;
+  /** How many cards we've surfaced for this artist (capped by pageSize, not a true total) */
+  cardCount: number;
+  /** Up to 3 sample cards used to render the preview thumbnails */
+  samples: PokemonCard[];
+}
+
+/**
+ * There is no `/artists` endpoint on the Pokémon TCG API — artists are a
+ * field on cards. So we query cards that match `artist:"query*"`, group
+ * them by artist name, and return a lightweight per-artist summary.
+ *
+ * Grouping happens client-side because the API doesn't support
+ * DISTINCT/GROUP BY. Caveat: `cardCount` reflects the first page only
+ * (pageSize 100 is plenty to rank by popularity without a second round
+ * trip). If an artist has > 100 cards matching, the list is still
+ * correct — only the count is low.
+ */
+export async function searchArtists(
+  query: string,
+  pageSize: number = 100,
+): Promise<{ artists: ArtistResult[]; totalCount: number }> {
+  if (!query || query.length < 2) return { artists: [], totalCount: 0 };
+
+  const params = new URLSearchParams({
+    q: `artist:"${escapeLucene(query)}*"`,
+    page: '1',
+    pageSize: String(pageSize),
+    // Newest first so each artist's sample thumbnails feel current.
+    orderBy: '-set.releaseDate',
+  });
+
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  if (!response.ok) {
+    throw new Error(`Pokemon TCG API error: ${response.status}`);
+  }
+
+  const data: PokemonTcgResponse = await response.json();
+  const cards = (data.data || []).map(mapCard);
+
+  // Group by exact artist name. The API preserves casing (e.g. "miki kudo"
+  // vs "Miki Kudo") so we key on the raw string to avoid collapsing
+  // distinct credits — users care about the exact name printed on the card.
+  const byArtist = new Map<string, ArtistResult>();
+  for (const card of cards) {
+    const name = card.artist?.trim();
+    if (!name) continue;
+    const existing = byArtist.get(name);
+    if (existing) {
+      existing.cardCount += 1;
+      if (existing.samples.length < 3) existing.samples.push(card);
+    } else {
+      byArtist.set(name, { name, cardCount: 1, samples: [card] });
+    }
+  }
+
+  // Sort by prolificness — most cards first, then alpha tie-breaker.
+  const artists = Array.from(byArtist.values()).sort((a, b) =>
+    b.cardCount - a.cardCount || a.name.localeCompare(b.name),
+  );
+
+  return { artists, totalCount: artists.length };
+}
+
+/**
+ * All cards attributed to a specific artist. Used by the artist detail
+ * screen. Exact-match on the artist field — no wildcards — so "miki kudo"
+ * doesn't accidentally pull "miki kudoh".
+ */
+export async function getCardsByArtist(
+  artist: string,
+  page: number = 1,
+  pageSize: number = 60,
+): Promise<{ cards: PokemonCard[]; totalCount: number }> {
+  const params = new URLSearchParams({
+    q: `artist:"${escapeLucene(artist)}"`,
     page: String(page),
     pageSize: String(pageSize),
     orderBy: '-set.releaseDate',
-    // Include all regions (Japanese sets are in the database)
   });
 
-  const response = await fetch(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -105,7 +357,7 @@ export async function searchCards(
 }
 
 export async function getCard(id: string): Promise<PokemonCard | null> {
-  const response = await fetch(`${BASE_URL}/cards/${id}`);
+  const response = await tcgFetch(`${BASE_URL}/cards/${id}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);

@@ -3,9 +3,17 @@
  * - Under $1: show 2 decimals ($0.75)
  * - $1-$999: show 2 decimals ($51.19)
  * - $1,000+: show no decimals with comma ($1,100)
+ *
+ * Prices arrive from remote payloads where the `number` type isn't
+ * enforced at runtime, so guard the boundary: null/undefined/NaN/Infinity
+ * degrade to a dash instead of rendering "$NaN" or throwing mid-render.
  */
 export function formatPrice(price: number): string {
-  if (price >= 1000) {
+  if (price == null || !Number.isFinite(price)) return '--';
+  // Branch on the rounded value so a price like 999.999 (which toFixed
+  // would round up to "1000.00") takes the comma branch, not the
+  // two-decimal one.
+  if (Math.round(price * 100) / 100 >= 1000) {
     return `$${Math.round(price).toLocaleString('en-US')}`;
   }
   return `$${price.toFixed(2)}`;

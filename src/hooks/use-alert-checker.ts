@@ -6,6 +6,9 @@ import { findAlertsToTrigger, formatAlertMessage } from '../services/alert-check
 import { presentLocalNotification } from '../services/notifications';
 
 const FOREGROUND_INTERVAL_MS = 60 * 1000; // 1 minute while app is open
+// First run deferred so per-alert price fetches don't race cold-start
+// network (image prefetch, initial queries).
+const FIRST_RUN_DELAY_MS = 8 * 1000;
 
 /**
  * Runs the alert checker on app foreground + on a 1-minute interval while
@@ -25,34 +28,61 @@ export function useAlertChecker() {
   // without resubscribing on every change.
   const alertsRef = useRef(alerts);
   const enabledRef = useRef(notificationsEnabled);
+  const runningRef = useRef(false);
   alertsRef.current = alerts;
   enabledRef.current = notificationsEnabled;
 
   useEffect(() => {
-    const runCheck = () => {
+    // findAlertsToTrigger is async (it fetches live prices per
+    // alert) — wrap in a self-invoking function so callers don't
+    // care. Errors are swallowed: an alert that can't be evaluated
+    // this cycle just waits for the next one rather than crashing
+    // the timer.
+    const runCheck = async () => {
       if (!enabledRef.current) return;
-      const toFire = findAlertsToTrigger(alertsRef.current);
-      for (const evaluation of toFire) {
-        const entry = recordTriggered(evaluation.alert, evaluation.currentPrice);
-        const { title, body } = formatAlertMessage(
-          evaluation.alert,
-          evaluation.currentPrice,
-        );
-        presentLocalNotification(title, body, {
-          cardId: entry.cardId,
-          triggeredAlertId: entry.id,
-        });
+      // In-flight guard: the mount run, the interval, and the
+      // foreground listener can all fire while a previous slow
+      // network pass is still awaiting. Without this, two passes
+      // evaluate the same still-un-triggered snapshot and both fire
+      // — two banners for one crossing. recordTriggered's idempotency
+      // is the second line of defense (and covers the background task,
+      // which this ref can't see).
+      if (runningRef.current) return;
+      runningRef.current = true;
+      try {
+        const toFire = await findAlertsToTrigger(alertsRef.current);
+        for (const evaluation of toFire) {
+          const entry = recordTriggered(
+            evaluation.alert,
+            evaluation.currentPrice,
+          );
+          // null = a concurrent check already recorded this fire.
+          if (!entry) continue;
+          const { title, body } = formatAlertMessage(
+            evaluation.alert,
+            evaluation.currentPrice,
+          );
+          presentLocalNotification(title, body, {
+            cardId: entry.cardId,
+            triggeredAlertId: entry.id,
+          });
+        }
+      } catch {
+        // Live-price fetch failed for every alert; skip this cycle.
+      } finally {
+        runningRef.current = false;
       }
     };
 
-    // Run immediately on mount, then on interval, then on every foreground.
-    runCheck();
+    // Deferred first run, then on interval, then on every foreground.
+    const firstRun = setTimeout(runCheck, FIRST_RUN_DELAY_MS);
     const interval = setInterval(runCheck, FOREGROUND_INTERVAL_MS);
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') runCheck();
     });
 
     return () => {
+      clearTimeout(firstRun);
       clearInterval(interval);
       sub.remove();
     };

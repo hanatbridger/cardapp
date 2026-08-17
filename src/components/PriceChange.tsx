@@ -28,7 +28,11 @@ export function PriceChange({ percent, size = 'md', showIcon = true }: PriceChan
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing['0.5'] }}>
       {showIcon && <Icon size={iconSize} color={color} />}
-      <Text variant={variant} color={color}>
+      <Text
+        variant={variant}
+        color={color}
+        style={{ fontVariant: ['tabular-nums'] }}
+      >
         {isPositive ? '+' : ''}{percent.toFixed(2)}%
       </Text>
     </View>

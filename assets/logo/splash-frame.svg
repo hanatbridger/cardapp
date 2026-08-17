@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 393 852" width="393" height="852" role="img" aria-label="CardPulse splash screen">
+  <title>CardPulse Splash</title>
+  <desc>iPhone 15/16 frame (393x852). Mirrors src/components/BrandedSplash.tsx.</desc>
+  <rect width="393" height="852" fill="#0D1117"/>
+  <!-- Prism mark, 96pt box, color variant. Group vertically centered. -->
+  <path d="M 196.5 354.5 L 228.5 402.5 L 196.5 418.5 L 164.5 402.5 Z" fill="#4B5EFC"/>
+  <path d="M 196.5 354.5 L 228.5 402.5 L 196.5 386.5 Z" fill="#A5B0FF"/>
+  <!-- Wordmark: Space Grotesk Bold 40 / -1.2 tracking. 16pt below mark. -->
+  <text x="196.5" y="466" text-anchor="middle" font-family="Space Grotesk" font-weight="700" font-size="40" letter-spacing="-1.2" fill="#F9FAFB">CardPulse</text>
+  <!-- Tagline: Space Grotesk Regular 15 / +0.2 tracking. 8pt below wordmark. -->
+  <text x="196.5" y="494" text-anchor="middle" font-family="Space Grotesk" font-weight="400" font-size="15" letter-spacing="0.2" fill="#9CA3AF">The pulse of the card market.</text>
+</svg>

@@ -28,12 +28,20 @@ Variants: `displayLg/Md/Sm`, `headingLg/Md/Sm`, `bodyLg/Md/Sm`, `labelLg/Md/Sm`,
 - `forwardRef` — works with React Hook Form
 - Vertical stack: label / field / hint or error
 
-### `<Badge variant="..." dot>`
-- Variants: `success`, `warning`, `danger`, `info`, `neutral`
-- Status dot on by default
+### `<Badge variant="..." dot>` — pulse chip
+Renders the brand book chip recipe: `{ramp-400}` at 18% alpha fill, `{ramp-200}` text, 12px radius, SG 500 12/-0.1. Every chip carries categorical meaning — do not invent free-form labels.
+
+- **Tier 1 — price movement:** `gain`, `loss` (use `▲`/`▼` prefix in children)
+- **Tier 2 — valuation verdict:** `undervalued`, `overvalued`
+- **Tier 3 — grading status:** `graded`, `ungraded`
+- **Tier 4 — signals / scarcity:** `live` (auto dot), `trophy` (used sparingly)
+- **Legacy aliases** (back-compat, prefer tier variants): `success`, `warning`, `danger`, `info`, `neutral`
 
 ### `<SegmentedControl options={[]} value onChange>`
 Glass background, active item gets `surface` + `shadows.sm`.
+
+### `<BrandMark size={24} variant="color" | "mono" color>`
+The CardPulse prism. Use only in brand moments (auth screens, home header, splash). Never rotate, stretch, gradient, glow, or place indigo-on-indigo — see brand book page 03.
 
 ### `<Avatar uri name size={40}>`
 Falls back to initials in `primaryContainer`.
@@ -57,16 +65,20 @@ Sizes: `sm`, `md`, `lg`. Auto color from `success`/`danger`. Trending icon prefi
 Reads from `src/constants/grades.ts`. **Note:** GRADES currently has hardcoded amber/gray — to be tokenized.
 
 ### `FloatingTabBar` (in `app/(tabs)/_layout.tsx`)
-Custom floating tab bar. Not exported from barrel — defined inline in the tab layout.
+Liquid-glass floating tab bar (Apple-style frosted capsule). Not exported from barrel; defined inline in the tab layout. `TabBarPreview` in `app/design-system.tsx` mirrors it — keep in sync when this changes.
 
-**Layout:** `[○ Home]  [Search · Bell · Profile]`
-- **Left:** Home button — standalone 48×48 circle, `glass.backgroundStrong` bg, `glass.border` 1px border, `radius` 24. Contains a 40×40 inner circle (`radius.xl`) that gets `withAlpha(primary, 0.15)` bg when active.
-- **Right:** Pill container — `flex: 1`, `glass.backgroundStrong` bg, `radius['2xl']` (24), `glass.border` 1px. Contains Search (`IconSearch`), Notifications (`IconBell`), Profile (`IconUser`) with `justifyContent: 'space-around'`. Each icon sits in a 40px pressable with `radius.xl` that gets `withAlpha(primary, 0.15)` bg when active.
-- **Active icon:** `colors.primary`, `strokeWidth: 2`
-- **Inactive icon:** `colors.onSurfaceMuted`, `strokeWidth: 1.5` (Home uses 1.6)
-- **Position:** `absolute`, `bottom: max(safeArea, 8) + 4`, horizontal margins `spacing[4]`, gap `spacing[2]`
-- All tabs trigger `Haptics.selectionAsync()` on press.
-- Icon size: 22 for all tabs.
+**Anatomy:** `[● Home]  [Search · News · Bell · Profile]` — a standalone frosted circle for Home plus a frosted capsule for the rest, both floating near the bottom (never docked — content scrolls underneath; the live backdrop is what the blur frosts), sharing one glass recipe and `gap: spacing[2]`. Icon-only, labels kept as a11y names. A single raised glass pill SLIDES between the capsule's tabs (one element translating — never per-tab backgrounds); the Home circle has its own inner pill that opacity-crossfades in when Home is active (a pill can't slide across separate surfaces).
+
+- **Geometry:** both surfaces 62pt tall (26 icon + 14×2 item pad + 4×2 track pad); capsule `radius 100`, Home a circle; inner padding 4; capsule tab items `flex: 1`, vertical padding 14; icons 26pt, strokeWidth 2 (both states). Pills inset 4; sliding pill width = (trackWidth − 8) / 4.
+- **Container:** `absolute`, left/right 0, bottom 0, `paddingHorizontal spacing[4]`, `paddingBottom = safeArea + 10`, `pointerEvents: 'box-none'` (in style, for Fabric).
+- **Shadow:** on a WRAPPER around the capsule (the capsule is `overflow: hidden` and would clip its own shadow). y10 / blur 20 / #000 @40% (Android `elevation 16`).
+- **Frost — native:** `BlurView` intensity 32, theme tint, absolute-fill as first child, under a translucent tint fill.
+- **Frost — web:** injected CSS. Baseline `backdrop-filter: blur(24px)`; Chromium gets SVG `feDisplacementMap` refraction filters (`#lg` track / `#lg-sm` pill) + inset specular shadows, gated on `CSS.supports('backdrop-filter','url(#x)')`. Applied via `dataSet={{ glass }}` → `[data-glass]` selectors.
+- **Tints (spec values, deliberately not tokens):** dark — track `rgba(0,0,0,0.10)`, pill `rgba(255,255,255,0.10)`; light — track `rgba(0,0,0,0.05)`, pill `#ffffff`. Icon color `colors.onSurface`; inactive opacity 0.2, active 1.0.
+- **Motion:** pill slides with spring (tension 58, friction 12); snaps (no animation) on first layout. Press pop: pill scales to 1.10 while held, springs back. Icon opacity crossfade 240ms.
+- **Unread badge:** 12pt dot (#ff3b30, 1.5pt ring in the track tint) on the Bell glyph when un-read triggered alerts exist; sits OUTSIDE the opacity fade so it stays bright on idle tabs.
+- **Scroll clearance:** screens reserve `TAB_BAR_HEIGHT` (96) of bottom padding so content scrolls under the bar but nothing hides behind it.
+- All tabs trigger `Haptics.selectionAsync()` on press; the Explore focused-search overlay still hides the bar via `tabBarStyle.display: 'none'`.
 
 ## Domain components
 

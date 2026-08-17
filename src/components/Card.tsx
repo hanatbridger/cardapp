@@ -22,7 +22,7 @@ export function Card({
   const baseStyle = isGlass
     ? {
         backgroundColor: glassTokens.background,
-        borderRadius: radius.xl,
+        borderRadius: radius.lg,
         borderWidth: 1,
         borderColor: glassTokens.border,
         ...shadows.glass,
@@ -33,12 +33,12 @@ export function Card({
     : elevated
       ? {
           backgroundColor: colors.surfaceElevated,
-          borderRadius: radius.xl,
+          borderRadius: radius.lg,
           ...shadows.md,
         }
       : {
           backgroundColor: colors.surface,
-          borderRadius: radius.xl,
+          borderRadius: radius.lg,
           borderWidth: 1,
           borderColor: colors.outline,
         };

@@ -6,9 +6,33 @@ const DEV_BASE_URL = Platform.select({
   default: 'http://localhost:3001',
 });
 
-const PROD_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://api.cardpulse.app';
+const PROD_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
 
 export const API_BASE_URL = __DEV__ ? DEV_BASE_URL : PROD_BASE_URL;
+
+/** Default network timeout for all app data fetches. */
+export const DEFAULT_FETCH_TIMEOUT_MS = 12000;
+
+/**
+ * fetch() with a hard timeout. React Native's fetch has NO default
+ * timeout, so a stalled TCP connection (a proxy that accepts but never
+ * responds) leaves the promise pending forever — and a query with
+ * retry:false then sits on skeletons with no error and no recovery.
+ * Aborting surfaces as a thrown error React Query can report.
+ */
+export async function fetchWithTimeout(
+  input: string,
+  init: RequestInit = {},
+  ms: number = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(input, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
@@ -17,7 +41,7 @@ export async function apiFetch<T>(path: string, options?: RequestInit): Promise<
     console.log(`[API] ${options?.method || 'GET'} ${url}`);
   }
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     ...options,
     headers: {
       'Content-Type': 'application/json',

@@ -36,7 +36,19 @@ interface FetchOptions {
   cardNumber?: string;
 }
 
+/**
+ * eBay sold-listings price fetch — used ONLY for graded cards (PSA 10).
+ * Raw/ungraded singles read from TCGPlayer instead — see
+ * `src/services/tcgplayer.ts → fetchRawCardPrice`. Calling this with
+ * `grade: 'UNGRADED'` is a programming error: assert it loudly so we
+ * catch the mistake before it reaches users.
+ */
 export async function fetchCardPrice(opts: FetchOptions): Promise<CardPrice> {
+  if (opts.grade === 'UNGRADED') {
+    throw new Error(
+      'fetchCardPrice (eBay) called with grade=UNGRADED. Raw prices come from TCGPlayer — use fetchRawCardPrice instead.',
+    );
+  }
   const params = new URLSearchParams({
     card: opts.cardName,
     grade: opts.grade,
@@ -65,6 +77,11 @@ export async function fetchCardPrice(opts: FetchOptions): Promise<CardPrice> {
 }
 
 export async function fetchPriceHistory(opts: FetchOptions): Promise<PriceHistory> {
+  if (opts.grade === 'UNGRADED') {
+    throw new Error(
+      'fetchPriceHistory (eBay) called with grade=UNGRADED. Raw history comes from TCGPlayer — use fetchRawCardPriceHistory instead.',
+    );
+  }
   const params = new URLSearchParams({
     card: opts.cardName,
     grade: opts.grade,
