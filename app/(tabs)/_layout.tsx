@@ -34,7 +34,9 @@ const BAR_HEIGHT = ICON_SIZE + ITEM_VPAD * 2 + TRACK_PAD * 2; // 62
 const BLUR_INTENSITY = 32;
 const FADE_MS = 240;
 const SLIDE_SPRING = { tension: 58, friction: 12 };
-const POP_SPRING = { tension: 300, friction: 10 };
+// Friction damps the pop so it lands ON the 1.10 spec value; at friction
+// 10 this spring overshot past 1.13 and rang, which reads as a glitch.
+const POP_SPRING = { tension: 300, friction: 22 };
 const POP_SCALE = 1.1;
 const INACTIVE_OPACITY = 0.2;
 
@@ -115,10 +117,17 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   // never per-tab backgrounds. The pill fades out while Home is active;
   // Home's own inner pill fades in (opacity-crossfade between surfaces).
   const slideX = useRef(new Animated.Value(0)).current;
-  const popScale = useRef(new Animated.Value(1)).current;
+  // One pop scale PER SURFACE — a shared value made the Home pill swell
+  // when a capsule tab was pressed (feedback under a finger that is not
+  // there).
+  const homePopScale = useRef(new Animated.Value(1)).current;
+  const capsulePopScale = useRef(new Animated.Value(1)).current;
   const pillOpacity = useRef(new Animated.Value(rightActiveIndex >= 0 ? 1 : 0)).current;
   const homePillOpacity = useRef(new Animated.Value(homeActive ? 1 : 0)).current;
   const hasSnapped = useRef(false);
+  // Previous capsule slot; -1 means Home was active, so the pill is
+  // invisible and must be repositioned without a spring.
+  const prevRightIndex = useRef(rightActiveIndex);
   // Per-tab icon dim/brighten crossfade.
   const fades = useRef(
     ALL_TABS.map((t) => new Animated.Value(t.name === focusedRoute.name ? 1 : INACTIVE_OPACITY)),
@@ -131,12 +140,16 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
     injectWebGlass();
   }, []);
 
-  // Snap into place on first layout; spring on every later change. While
-  // Home is active the pill holds its last slot and just fades.
+  // Snap into place on first layout, and again whenever we arrive from
+  // Home — the pill is still faded out there, so springing it across
+  // from its stale slot is motion the user never asked for. Spring only
+  // between two visible capsule slots.
   useEffect(() => {
+    const prev = prevRightIndex.current;
+    prevRightIndex.current = rightActiveIndex;
     if (pillWidth <= 0 || rightActiveIndex < 0) return;
     const x = rightActiveIndex * pillWidth;
-    if (!hasSnapped.current) {
+    if (!hasSnapped.current || prev < 0) {
       slideX.setValue(x);
       hasSnapped.current = true;
       return;
@@ -178,10 +191,15 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
   const pillFill = isDark ? 'rgba(255,255,255,0.10)' : '#ffffff';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(17,24,39,0.08)';
 
-  const popIn = () =>
-    Animated.spring(popScale, { toValue: POP_SCALE, useNativeDriver: true, ...POP_SPRING }).start();
-  const popOut = () =>
-    Animated.spring(popScale, { toValue: 1, useNativeDriver: true, ...POP_SPRING }).start();
+  // Pop only the surface under the finger, and only when that tab is
+  // already focused — an unfocused tab slides the pill instead. popOut
+  // is unconditional so a scale can never be left stranded.
+  const popIn = (scale: Animated.Value, isFocused: boolean) => {
+    if (!isFocused) return;
+    Animated.spring(scale, { toValue: POP_SCALE, useNativeDriver: true, ...POP_SPRING }).start();
+  };
+  const popOut = (scale: Animated.Value) =>
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, ...POP_SPRING }).start();
 
   // Shadow lives on WRAPPERS — both glass surfaces are overflow:hidden
   // and would clip their own shadows.
@@ -235,8 +253,8 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         <View style={{ borderRadius: BAR_HEIGHT / 2, ...shadowStyle }}>
           <Pressable
             onPress={() => tabPress(homeRoute, homeActive)}
-            onPressIn={popIn}
-            onPressOut={popOut}
+            onPressIn={() => popIn(homePopScale, homeActive)}
+            onPressOut={() => popOut(homePopScale)}
             accessibilityRole="button"
             accessibilityState={{ selected: homeActive }}
             accessibilityLabel={HOME_TAB.label}
@@ -271,7 +289,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 borderRadius: (BAR_HEIGHT - TRACK_PAD * 2) / 2,
                 backgroundColor: pillFill,
                 opacity: homePillOpacity,
-                transform: [{ scale: popScale }],
+                transform: [{ scale: homePopScale }],
                 pointerEvents: 'none',
               }}
             />
@@ -319,7 +337,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 borderRadius: TRACK_RADIUS,
                 backgroundColor: pillFill,
                 opacity: pillOpacity,
-                transform: [{ translateX: slideX }, { scale: popScale }],
+                transform: [{ translateX: slideX }, { scale: capsulePopScale }],
                 pointerEvents: 'none',
               }}
             />
@@ -335,8 +353,8 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
               <Pressable
                 key={route.key}
                 onPress={() => tabPress(route, isFocused)}
-                onPressIn={popIn}
-                onPressOut={popOut}
+                onPressIn={() => popIn(capsulePopScale, isFocused)}
+                onPressOut={() => popOut(capsulePopScale)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: isFocused }}
                 accessibilityLabel={tab.label}

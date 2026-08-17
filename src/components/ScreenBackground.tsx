@@ -1,15 +1,17 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useEffect, useRef } from 'react';
 import { View, StyleSheet, Platform, AppState } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withRepeat,
+  withSequence,
   withTiming,
   cancelAnimation,
   Easing,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 import { useTheme } from '../theme/ThemeProvider';
 
 const AnimatedGradient = Animated.createAnimatedComponent(LinearGradient);
@@ -19,55 +21,91 @@ interface ScreenBackgroundProps {
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
 }
 
+/** One full drift traverse, in ms. */
+const CYCLE_MS = 25000;
+
 export function ScreenBackground({ children, edges = ['top'] }: ScreenBackgroundProps) {
   const { gradientColors } = useTheme();
 
   const progress = useSharedValue(0);
+  const isFocused = useRef(false);
+  const isAppActive = useRef(true);
+  const isRunning = useRef(false);
 
-  useEffect(() => {
-    const start = () => {
-      progress.value = withRepeat(
-        withTiming(1, { duration: 25000, easing: Easing.linear }),
-        -1,
-        true,
+  // The loop may run only while this screen is focused AND the app is
+  // foregrounded. expo-router keeps every visited screen mounted, so
+  // without the focus half a dozen full-screen 1.8x gradients animate
+  // simultaneously and forever.
+  const sync = useCallback(() => {
+    const shouldRun = isFocused.current && isAppActive.current;
+    if (shouldRun === isRunning.current) return;
+    isRunning.current = shouldRun;
+    if (shouldRun) {
+      // Resume at the SAME rate rather than spending a fresh 25s on
+      // whatever distance is left — a screen blurred at 0.9 would
+      // otherwise crawl the last 10% over a full cycle and look frozen.
+      const remaining = 1 - progress.value;
+      progress.value = withSequence(
+        withTiming(1, { duration: CYCLE_MS * remaining, easing: Easing.linear }),
+        withRepeat(
+          withTiming(0, { duration: CYCLE_MS, easing: Easing.linear }),
+          -1,
+          true,
+        ),
       );
-    };
-    const stop = () => {
+    } else {
       cancelAnimation(progress);
-    };
+    }
+  }, [progress]);
 
-    start();
-
-    // Pause when the native app backgrounds (iOS/Android) or the web tab hides.
-    // Reanimated keeps driving the timing otherwise, which burns CPU for no benefit.
+  // Pause when the native app backgrounds (iOS/Android) or the web tab hides.
+  // Reanimated keeps driving the timing otherwise, which burns CPU for no benefit.
+  useEffect(() => {
     if (Platform.OS === 'web') {
       const onVisibility = () => {
         if (typeof document === 'undefined') return;
-        if (document.hidden) stop();
-        else start();
+        isAppActive.current = !document.hidden;
+        sync();
       };
       document.addEventListener('visibilitychange', onVisibility);
       return () => {
         document.removeEventListener('visibilitychange', onVisibility);
-        stop();
+        isFocused.current = false;
+        sync();
       };
     }
 
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') start();
-      else stop();
+      isAppActive.current = state === 'active';
+      sync();
     });
     return () => {
       sub.remove();
-      stop();
+      isFocused.current = false;
+      sync();
     };
-  }, []);
+  }, [sync]);
 
-  // Gentle drift — scale larger to hide edges, only translate (no rotation to avoid white corners)
+  // Same focus gate TrendingCarousel uses — run on focus, cancel on blur.
+  useFocusEffect(
+    useCallback(() => {
+      isFocused.current = true;
+      sync();
+      return () => {
+        isFocused.current = false;
+        sync();
+      };
+    }, [sync]),
+  );
+
+  // Gentle drift — scale larger to hide edges, only translate (no rotation to avoid white corners).
+  // Transform ONLY: the absolute fill is static and lives in the JSX style
+  // array. Returning layout props from the worklet pushed
+  // position/top/left/right/bottom through a Fabric shadow-tree commit on
+  // every frame.
   const animatedStyle = useAnimatedStyle(() => {
     const t = progress.value;
     return {
-      ...StyleSheet.absoluteFillObject,
       // Scale 1.8x so edges never show even when translating
       transform: [
         { scale: 1.8 },
@@ -89,7 +127,7 @@ export function ScreenBackground({ children, edges = ['top'] }: ScreenBackground
         colors={gradientColors as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[animatedStyle, { pointerEvents: 'none' }]}
+        style={[StyleSheet.absoluteFillObject, animatedStyle, { pointerEvents: 'none' }]}
       />
       <SafeAreaView style={{ flex: 1 }} edges={edges}>
         {children}
