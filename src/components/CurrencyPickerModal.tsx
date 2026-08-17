@@ -1,11 +1,20 @@
-import React, { useMemo, useState } from 'react';
-import { View, Modal, Pressable, FlatList } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  View,
+  Modal,
+  Pressable,
+  FlatList,
+  Animated,
+  Easing,
+  StyleSheet,
+  useWindowDimensions,
+  Keyboard,
+} from 'react-native';
 import { IconX, IconCheck } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { SearchBar } from './SearchBar';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius, shadows } from '../theme/tokens';
-import { withAlpha } from '../utils/withAlpha';
 import {
   ALL_CURRENCY_CODES,
   POPULAR_CODES,
@@ -36,7 +45,59 @@ export function CurrencyPickerModal({
   onClose,
 }: CurrencyPickerModalProps) {
   const { colors } = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const [query, setQuery] = useState('');
+
+  // Self-animated (Modal animationType="none") so the backdrop FADES while
+  // the sheet SLIDES — RN's "slide" drags a child backdrop up with the
+  // sheet. `mounted` holds the Modal open until the exit animation lands.
+  const [mounted, setMounted] = useState(visible);
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true);
+      backdropOpacity.setValue(0);
+      sheetTranslateY.setValue(windowHeight);
+      Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(sheetTranslateY, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+    if (!mounted) return;
+    // The search field can hold the keyboard up; dismiss it first or it
+    // covers the sheet through the whole slide-down.
+    Keyboard.dismiss();
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(sheetTranslateY, {
+        toValue: windowHeight,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setMounted(false);
+    });
+    // `windowHeight`/`mounted` are read at animation time only — listing them
+    // would restart the entry animation on rotation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible]);
 
   const data = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -50,23 +111,32 @@ export function CurrencyPickerModal({
   }, [query]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
       <View
         style={{
           flex: 1,
-          backgroundColor: withAlpha(colors.onSurface, 0.5),
           justifyContent: 'flex-end',
         }}
       >
+        {/* Backdrop is a sibling, not an ancestor, so its opacity animation
+            never bleeds into the sheet. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: colors.scrim, opacity: backdropOpacity },
+          ]}
+        />
         {/* Tap-outside to dismiss */}
         <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close currency picker" />
-        <View
+        <Animated.View
           style={{
             backgroundColor: colors.surface,
             borderTopLeftRadius: radius['2xl'],
             borderTopRightRadius: radius['2xl'],
             height: '80%',
             paddingTop: spacing[3],
+            transform: [{ translateY: sheetTranslateY }],
             ...shadows.xl,
           }}
         >
@@ -145,7 +215,7 @@ export function CurrencyPickerModal({
               </View>
             }
           />
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

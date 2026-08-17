@@ -98,6 +98,11 @@ export const lightColors = {
   onSurfaceVariant: '#4B5563',      // text 2 on light
   onSurfaceMuted: '#6B7280',        // text 3 on light
 
+  // Modal/sheet backdrop. Identical in both modes on purpose — a scrim is
+  // darkness behind the sheet, not a theme inversion. Deriving it from
+  // onSurface made dark mode flash a 50% white wash.
+  scrim: 'rgba(0, 0, 0, 0.5)',
+
   outline: palette.neutral[200],
   outlineVariant: palette.neutral[100],
   outlineStrong: palette.neutral[300],
@@ -138,6 +143,8 @@ export const darkColors = {
   onSurface: palette.neutral[50],       // text 1 #F9FAFB (16:1 AAA)
   onSurfaceVariant: palette.neutral[300], // text 2 #D1D5DB (10.9:1 AAA)
   onSurfaceMuted: palette.neutral[400], // text 3 #9CA3AF (7.2:1 AAA)
+
+  scrim: 'rgba(0, 0, 0, 0.5)', // same as light — see lightColors.scrim
 
   outline: palette.neutral[800],
   outlineVariant: palette.neutral[925],

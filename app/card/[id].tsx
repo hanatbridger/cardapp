@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal } from 'react-native';
+import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal, Animated, Easing, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -60,7 +60,7 @@ function CardDetailScreen() {
   const { colors } = useTheme();
   // Module-scope Dimensions.get is 0 on web before first layout and
   // stale after rotation — it fed PriceChart a negative width.
-  const { width: screenWidth } = useWindowDimensions();
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const formatMoney = useMoney();
   const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
   // Always open on Raw. PSA 10 only has real data for collectrics-
@@ -155,6 +155,55 @@ function CardDetailScreen() {
     }
     prevGradeRef.current = selectedGrade;
   }, [selectedGrade, statsSettled, psa10]);
+
+  // The coming-soon sheet animates itself (Modal animationType="none") so the
+  // backdrop can FADE while the sheet SLIDES — RN's built-in "slide" drags a
+  // child backdrop up with the sheet. `psaSheetMounted` keeps the Modal alive
+  // until the exit animation lands.
+  const [psaSheetMounted, setPsaSheetMounted] = useState(false);
+  const psaBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const psaSheetTranslateY = useRef(new Animated.Value(screenHeight)).current;
+
+  useEffect(() => {
+    if (psaModalVisible) {
+      setPsaSheetMounted(true);
+      psaBackdropOpacity.setValue(0);
+      psaSheetTranslateY.setValue(screenHeight);
+      Animated.parallel([
+        Animated.timing(psaBackdropOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(psaSheetTranslateY, {
+          toValue: 0,
+          duration: 250,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+    if (!psaSheetMounted) return;
+    Animated.parallel([
+      Animated.timing(psaBackdropOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(psaSheetTranslateY, {
+        toValue: screenHeight,
+        duration: 250,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setPsaSheetMounted(false);
+    });
+    // `screenHeight`/`psaSheetMounted` are read at animation time only —
+    // listing them would restart the entry animation on rotation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [psaModalVisible]);
 
   // Filter raw + PSA 10 history by the selected time range
   const filteredHistory = useMemo(
@@ -957,13 +1006,12 @@ function CardDetailScreen() {
           so it can pop even on the first render if the user lands on
           PSA 10 default. Backdrop tap dismisses; "Got it" closes. */}
       <Modal
-        visible={psaModalVisible}
+        visible={psaSheetMounted}
         transparent
-        // RN Modals "slide" animationType slides up from the bottom on
-        // show and back down on dismiss — matches the user-requested
-        // "slide up then slide down" affordance natively without us
-        // having to manage Animated values for the inner card.
-        animationType="slide"
+        // Self-animated: the backdrop fades while the sheet slides. RN's
+        // built-in "slide" would drag the backdrop up with the sheet since
+        // it is a child of the same view.
+        animationType="none"
         onRequestClose={() => setPsaModalVisible(false)}
       >
         <Pressable
@@ -973,10 +1021,19 @@ function CardDetailScreen() {
           // as a sheet rising rather than a centered alert appearing.
           style={{
             flex: 1,
-            backgroundColor: withAlpha('#000000', 0.5),
             justifyContent: 'flex-end',
           }}
         >
+          {/* Backdrop is a sibling, not an ancestor, so its opacity
+              animation never bleeds into the sheet. */}
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: colors.scrim, opacity: psaBackdropOpacity },
+            ]}
+          />
+          <Animated.View style={{ width: '100%', transform: [{ translateY: psaSheetTranslateY }] }}>
           {/* Inner pressable swallows taps so the modal doesn't dismiss
               when the user taps the card itself. */}
           <Pressable
@@ -1052,6 +1109,7 @@ function CardDetailScreen() {
               </Button>
             </View>
           </Pressable>
+          </Animated.View>
         </Pressable>
       </Modal>
     </SafeAreaView>
