@@ -46,7 +46,7 @@
       "package": "com.getcardpulse.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#4B5EFC"
+        "backgroundColor": "#5739FF"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
