@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Image, Pressable, Platform, KeyboardAvoidingView } from 'react-native';
 import Animated from 'react-native-reanimated';
 import * as ImagePicker from 'expo-image-picker';
@@ -36,6 +36,16 @@ function FeedbackScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const dismissTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  // Clear the auto-dismiss timer on unmount — otherwise it fires after
+  // the user has already navigated away and pops whatever screen is
+  // on top at that moment.
+  useEffect(() => {
+    return () => {
+      if (dismissTimer.current) clearTimeout(dismissTimer.current);
+    };
+  }, []);
 
   // Web: paste a screenshot straight into the composer.
   useEffect(() => {
@@ -80,7 +90,7 @@ function FeedbackScreen() {
     setBusy(false);
     if (res.ok) {
       setSent(true);
-      setTimeout(() => safeGoBack('/profile'), 1400);
+      dismissTimer.current = setTimeout(() => safeGoBack('/profile'), 1400);
     } else {
       setError(res.error);
     }

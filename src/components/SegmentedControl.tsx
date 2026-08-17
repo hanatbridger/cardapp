@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Pressable, Platform } from 'react-native';
-import * as Haptics from 'expo-haptics';
+import { Haptics } from '../utils/haptics';
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius, shadows } from '../theme/tokens';
@@ -78,7 +78,7 @@ export function SegmentedControl({
             <Text
               variant="labelLg"
               color={isActive ? colors.onSurface : colors.onSurfaceMuted}
-              style={{ fontWeight: isActive ? '600' : '400' }}
+              style={{ fontWeight: isActive ? '700' : '400' }}
             >
               {option}
             </Text>

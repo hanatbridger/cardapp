@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { View, Pressable } from 'react-native';
 import Animated, {
   scrollTo,
   useAnimatedRef,
   useAnimatedScrollHandler,
   useFrameCallback,
+  useReducedMotion,
   useSharedValue,
 } from 'react-native-reanimated';
 import { Image } from 'expo-image';
@@ -23,7 +24,15 @@ const ITEM_WIDTH = 200;
 const ITEM_GAP = 8;
 const SCROLL_SPEED = 0.5; // pixels per frame at 60fps
 
-function TrendingCard({ cardId, name, setName, imageUrl, percentChange }: TrendingTile) {
+// Memoized: the carousel lives in the home screen's ListHeaderComponent,
+// so every home re-render would otherwise re-render all 3x tiles.
+const TrendingCard = React.memo(function TrendingCard({
+  cardId,
+  name,
+  setName,
+  imageUrl,
+  percentChange,
+}: TrendingTile) {
   const { colors } = useTheme();
 
   return (
@@ -66,7 +75,7 @@ function TrendingCard({ cardId, name, setName, imageUrl, percentChange }: Trendi
       </View>
     </Pressable>
   );
-}
+});
 
 /**
  * Auto-scrolling trending ticker.
@@ -98,16 +107,19 @@ function TrendingCard({ cardId, name, setName, imageUrl, percentChange }: Trendi
  * dragging (isPaused = true), so resuming auto-scroll picks up
  * from wherever the user let go rather than snapping back.
  */
-export function TrendingCarousel({ items }: TrendingCarouselProps) {
+export const TrendingCarousel = React.memo(function TrendingCarousel({
+  items,
+}: TrendingCarouselProps) {
   const animatedRef = useAnimatedRef<Animated.FlatList<TrendingTile>>();
   const scrollOffset = useSharedValue(0);
   const isPaused = useSharedValue(false);
   const pauseTimeout = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const reduceMotion = useReducedMotion();
 
   // Triple the data for seamless infinite loop. We start in the middle
   // set so the user can scroll either direction without immediately
   // hitting an edge.
-  const tripleData = [...items, ...items, ...items];
+  const tripleData = useMemo(() => [...items, ...items, ...items], [items]);
   const singleSetWidth = items.length * (ITEM_WIDTH + ITEM_GAP);
 
   // Drive the auto-scroll on the UI thread. The frame callback runs
@@ -146,11 +158,16 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
   // When the user navigates to another tab or detail screen, we
   // pause; on return we resume. This also means the callback isn't
   // fighting other screens' work for UI-thread frames.
+  //
+  // Reduce Motion: a raw frame callback bypasses the ReduceMotion
+  // machinery that withRepeat/withTiming honor automatically, so the
+  // gate is explicit here. The rail stays manually scrollable.
   useFocusEffect(
     useCallback(() => {
+      if (reduceMotion) return;
       frameCallback.setActive(true);
       return () => frameCallback.setActive(false);
-    }, [frameCallback]),
+    }, [frameCallback, reduceMotion]),
   );
 
   // While the user is mid-drag we mirror their native scroll offset
@@ -176,12 +193,17 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
     }, 3000);
   };
 
+  const renderItem = useCallback(
+    ({ item }: { item: TrendingTile }) => <TrendingCard {...item} />,
+    [],
+  );
+
   return (
     <Animated.FlatList
       ref={animatedRef}
       data={tripleData}
       keyExtractor={(item, index) => `${item.productId}-${index}`}
-      renderItem={({ item }) => <TrendingCard {...item} />}
+      renderItem={renderItem}
       horizontal
       showsHorizontalScrollIndicator={false}
       removeClippedSubviews
@@ -197,4 +219,4 @@ export function TrendingCarousel({ items }: TrendingCarouselProps) {
       })}
     />
   );
-}
+});
