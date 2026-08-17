@@ -27,6 +27,7 @@ import {
 } from '../src/services/revenue-cat';
 import { configureGoogleSignin } from '../src/services/google-auth';
 import { registerForPushNotifications } from '../src/services/push';
+import { recordLaunch } from '../src/utils/review-prompt';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
   useFonts,
@@ -194,6 +195,8 @@ export default function RootLayout() {
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync().catch(() => {});
       registerBackgroundAlertTask();
+      // Gates the rating prompt so a first-run user is never asked.
+      recordLaunch();
     }
   }, [fontsLoaded, fontError]);
 

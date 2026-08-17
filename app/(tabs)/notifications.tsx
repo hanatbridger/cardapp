@@ -7,6 +7,7 @@ import { Text, NotificationItem, EmptyState, ScreenBackground, withErrorBoundary
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useAlertsStore } from '../../src/stores/alerts-store';
+import { maybeRequestReview } from '../../src/utils/review-prompt';
 import type { Notification } from '../../src/types/social';
 import type { TriggeredAlert } from '../../src/stores/alerts-store';
 
@@ -44,6 +45,20 @@ function NotificationsScreen() {
       return () => clearTimeout(timer);
     }
   }, [unreadCount, markAllTriggeredRead]);
+
+  // A price alert the user set has fired and they came to look at it —
+  // the one moment in this app where something demonstrably went right
+  // for them, and the only kind iOS's three-per-year cap is worth
+  // spending on. Eligibility (launch count, cooldown, one prompt per
+  // version) is decided inside maybeRequestReview. Delayed so it lands
+  // after the list has painted rather than on top of it.
+  useEffect(() => {
+    if (triggered.length === 0) return;
+    const timer = setTimeout(() => {
+      maybeRequestReview();
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [triggered.length]);
 
   const handlePress = (notification: Notification) => {
     markTriggeredRead(notification.id);
