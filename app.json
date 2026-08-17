@@ -65,7 +65,7 @@
       [
         "expo-notifications",
         {
-          "color": "#4B5EFC"
+          "color": "#5739FF"
         }
       ],
       "@sentry/react-native",

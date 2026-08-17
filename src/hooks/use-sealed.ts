@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { searchSealedProducts, getSealedProduct } from '../mocks/sealed';
+import { searchSealedProducts, getSealedProduct, SEALED_TYPE_LABEL } from '../mocks/sealed';
 import { fetchSealedPrice, fetchSealedPriceHistory } from '../services/tcgplayer';
 import type { SealedPriceHistoryPoint } from '../services/tcgplayer';
 import { searchSealedLive, fetchSealedLiveStats } from '../services/sealed-live';
@@ -174,9 +174,30 @@ export function useSealedSearch(query: string, typeFilter?: SealedType) {
   return useQuery({
     queryKey: ['sealed', 'search', q, typeFilter ?? null],
     queryFn: async (): Promise<SealedProduct[]> => {
-      if (!typeFilter && q.length >= 2) {
-        const live = await searchSealedLive(q);
-        if (live.length > 0) return live.map(liveHitToProduct);
+      // Browsing by type used to skip the live path entirely and serve
+      // the seeded catalog, so a type chip showed sample prices while
+      // the identical product found by typing showed a real one. With no
+      // text query, the type's own label is the query ("Booster Box",
+      // "Elite Trainer Box") — collectrics returns real inventory for
+      // each of them.
+      const liveQuery = q.length >= 2 ? q : typeFilter ? SEALED_TYPE_LABEL[typeFilter] : '';
+      if (liveQuery.length >= 2) {
+        const live = await searchSealedLive(liveQuery);
+        // Collectrics repeats a product across printings/conditions;
+        // one row per name keeps the list readable.
+        const seen = new Set<string>();
+        const mapped = live
+          .map(liveHitToProduct)
+          .filter((p) => {
+            const key = p.name.toLowerCase();
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          })
+          .filter((p) => !typeFilter || p.type === typeFilter);
+        // Only fall through to the seeded catalog when live genuinely
+        // has nothing — a thin live result is still real data.
+        if (mapped.length > 0) return mapped;
       }
       return searchSealedProducts(q, typeFilter);
     },

@@ -11,17 +11,33 @@
 export const palette = {
   // Brand indigo — the one brand color. Book locks 500 as "Indigo" and 200-ish
   // as "Indigo Lift" (#A5B0FF) for the logo facet.
+  // Ramp rebuilt around #5739FF, the violet in the shipped app icon and
+  // splash. The app previously ran #4B5EFC while the icon ran #5739FF,
+  // so the launch screen handed off to a visibly different blue.
+  //
+  // 400 vs 500 is deliberate, not decorative: dark mode binds primary to
+  // 400 because #5739FF sits at 3.10 contrast on the #0D1117 canvas and
+  // fails outright. 400 (#8974FF) restores 5.41, matching the 5.36 the
+  // old dark primary carried. Light mode takes 500 at 6.11 on white, up
+  // from 4.88.
+  //
+  // 200 stays #A5B0FF on purpose — it is the facet colour baked into the
+  // icon and splash PNGs, so moving it would desync the in-app BrandMark
+  // from the artwork already shipped to the App Store.
+  //
+  // Surfaces are neutral.*, untouched by any of this: dark mode's
+  // darkness does not come from this ramp.
   primary: {
-    50: '#EDF0FF',
-    100: '#D4DBFF',
-    200: '#A5B0FF', // Indigo Lift (brand book)
-    300: '#8B9AFF',
-    400: '#6B7CFF',
-    500: '#4B5EFC', // Indigo (brand book primary)
-    600: '#3344D1',
-    700: '#242FA6',
-    800: '#1A2280',
-    900: '#101559',
+    50: '#F3F1FF',
+    100: '#E4DFFF',
+    200: '#A5B0FF', // Indigo Lift — matches icon/splash facet
+    300: '#A392FF',
+    400: '#8974FF', // dark-mode primary (contrast-safe on canvas)
+    500: '#5739FF', // brand primary — matches app icon
+    600: '#462ECC',
+    700: '#36239E',
+    800: '#271A73',
+    900: '#181047',
   },
   // Tailwind-slate-aligned neutrals so book-specified surface/text hex values
   // are addressable by name. Book values: canvas 0D1117, surface 161B22,

@@ -24,7 +24,7 @@ export function BrandMark({ size = 64, variant = 'color', color }: BrandMarkProp
         <>
           <Path
             d="M 512 170.667 L 853.333 682.667 L 512 853.333 L 170.667 682.667 Z"
-            fill={variant === 'inverse' ? '#F9FAFB' : '#4B5EFC'}
+            fill={variant === 'inverse' ? '#F9FAFB' : '#5739FF'}
           />
           <Path d="M 512 170.667 L 853.333 682.667 L 512 512 Z" fill="#A5B0FF" />
         </>
