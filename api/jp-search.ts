@@ -63,6 +63,54 @@ async function fetchWithTimeout(
 
 const UA = { 'user-agent': 'Mozilla/5.0 (CardPulse JP Catalog)' };
 
+/**
+ * Collector nicknames the catalog does not carry in any field.
+ *
+ * TCGPlayer names the 2018 Pokemon x Munch Museum promos "Pikachu -
+ * 288/SM-P"; neither the product name, the set name ("SM-P: Sun & Moon
+ * Promos") nor the rarity mentions Munch, so no amount of text search
+ * finds them. Collectors only ever call them by the collab name, so the
+ * ids are pinned here.
+ *
+ * Keep the patterns narrow — a loose /scream/ would hijack every search
+ * for Scream Tail, a real Pokemon.
+ */
+const NICKNAMES: Array<{ test: RegExp; productIds: number[] }> = [
+  {
+    // Pokemon x Munch Museum, 2018 — "The Scream" promos, 286-290/SM-P.
+    test: /(\bmunch\b|ムンク|\bthe\s*scream\b)/i,
+    productIds: [598363, 598364, 598365, 598366, 598367],
+  },
+];
+
+function matchNickname(q: string): { productIds: number[]; residual: string } | null {
+  for (const n of NICKNAMES) {
+    if (!n.test.test(q)) continue;
+    return { productIds: n.productIds, residual: q.replace(n.test, ' ').trim() };
+  }
+  return null;
+}
+
+/**
+ * Pinned collab set, narrowed to the species the user also typed
+ * ("pikachu munch" -> just the Pikachu). A residual that matches nothing
+ * falls back to the whole set: the collab has no Charizard, and showing
+ * the five cards beats an empty screen.
+ */
+async function nicknameProducts(
+  productIds: number[],
+  residual: string,
+): Promise<JpProduct[]> {
+  const settled = await Promise.all(
+    productIds.map((id) => getProduct(String(id)).catch(() => null)),
+  );
+  const found = settled.filter((p): p is JpProduct => p !== null);
+  if (residual.length < 2) return found;
+  const needle = residual.toLowerCase();
+  const narrowed = found.filter((p) => p.name.toLowerCase().includes(needle));
+  return narrowed.length > 0 ? narrowed : found;
+}
+
 function imageUrl(productId: number, size: number): string {
   return `https://tcgplayer-cdn.tcgplayer.com/product/${productId}_in_${size}x${size}.jpg`;
 }
@@ -107,7 +155,12 @@ async function searchProducts(q: string): Promise<JpProduct[]> {
           },
         },
         context: { cart: {}, shippingCountry: 'US' },
-        settings: { useFuzzySearch: true, didYouMean: {} },
+        // Fuzzy off: the synonym algorithm already absorbs typos
+        // ("charzard" still returns 405 Charizard rows), while fuzzy
+        // matching turned unknown words into noise — "munch" came back
+        // as Caterpie, Weedle and Dedenne, which reads as if those were
+        // the results. An empty section is the honest answer.
+        settings: { useFuzzySearch: false, didYouMean: {} },
         sort: {},
       }),
     },
@@ -149,6 +202,12 @@ export default async function handler(req: Request): Promise<Response> {
     }
     if (q.length < 2 || q.length > 60) {
       return json(400, { error: 'q must be 2-60 chars' }, false);
+    }
+    const nick = matchNickname(q);
+    if (nick) {
+      return json(200, {
+        products: await nicknameProducts(nick.productIds, nick.residual),
+      });
     }
     return json(200, { products: await searchProducts(q) });
   } catch (e) {
