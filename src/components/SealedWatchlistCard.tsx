@@ -11,6 +11,7 @@ import { spacing, radius } from '../theme/tokens';
 import { CARD_BORDER_RADIUS } from '../constants/layout';
 import { useMoney } from '../hooks/use-money';
 import { useSealedPrice } from '../hooks/use-sealed';
+import { isSealedPriceLive } from '../services/tcgplayer';
 import { SEALED_TYPE_LABEL } from '../mocks/sealed';
 import type { SealedType } from '../types/sealed';
 
@@ -99,6 +100,14 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
         </Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], flexWrap: 'wrap' }}>
           <Badge variant="info">{SEALED_TYPE_LABEL[productType]}</Badge>
+          {/* Sealed products off the curated catalog still price from
+              seeded mocks (tcgplayer.ts LIVE.sealedPrice). The detail
+              screen has always said so; the watchlist row did not, which
+              left a fabricated number sitting unlabelled in the list the
+              app is now named after. */}
+          {isSealedPriceLive(productId) ? null : (
+            <Badge variant="neutral">Sample data</Badge>
+          )}
         </View>
       </View>
 

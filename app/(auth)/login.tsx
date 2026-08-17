@@ -109,7 +109,7 @@ function LoginScreen() {
             <View style={{ gap: spacing[2] }}>
               <Text variant="displaySm">Welcome back</Text>
               <Text variant="bodyMd" color={colors.onSurfaceVariant}>
-                Sign in to keep tracking your collection.
+                Sign in to keep your watchlist.
               </Text>
             </View>
           </View>

@@ -8,8 +8,36 @@ const BASE_URL = 'https://api.pokemontcg.io/v2';
 // rate limit substantially; requests work without one, just worse.
 const API_KEY = process.env.EXPO_PUBLIC_POKEMONTCG_API_KEY;
 
-function tcgFetch(url: string) {
-  return fetchWithTimeout(url, API_KEY ? { headers: { 'X-Api-Key': API_KEY } } : {});
+/**
+ * pokemontcg.io load-sheds under pressure — measured at 5 of 12 requests
+ * returning 500/502 during one sustained spell, on identical queries that
+ * succeed moments later. Only the search hook carried a React Query
+ * retry, so every other caller (card detail, sets, similar cards) turned
+ * a transient upstream blip into an empty screen.
+ *
+ * Two quick retries on 5xx and on network failure, which converts a ~40%
+ * per-request failure rate into roughly 6%. 4xx is returned untouched —
+ * a 404 or a malformed query is an answer, not a blip.
+ */
+const TCG_RETRY_DELAYS_MS = [400, 1200];
+
+async function tcgFetch(url: string): Promise<Response> {
+  const init = API_KEY ? { headers: { 'X-Api-Key': API_KEY } } : {};
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= TCG_RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      const res = await fetchWithTimeout(url, init);
+      if (res.status < 500 || attempt === TCG_RETRY_DELAYS_MS.length) return res;
+    } catch (e) {
+      lastError = e;
+      // Timeouts and network errors retry on the same schedule; the
+      // final attempt rethrows so callers still see a real failure.
+      if (attempt === TCG_RETRY_DELAYS_MS.length) throw e;
+    }
+    await new Promise((r) => setTimeout(r, TCG_RETRY_DELAYS_MS[attempt]));
+  }
+  // Unreachable — the loop always returns or throws on its last pass.
+  throw lastError ?? new Error('pokemontcg.io request failed');
 }
 
 /**
