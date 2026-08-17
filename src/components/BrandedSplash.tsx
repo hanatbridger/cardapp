@@ -52,18 +52,18 @@ export function BrandedSplash({ ready }: { ready: boolean }) {
         StyleSheet.absoluteFillObject,
         {
           pointerEvents: 'none',
-          // Match expo splash backgroundColor exactly (#0D1117) so the
-          // crossfade has no seam. Hardcoded here — this is a brand
-          // surface pinned by the native splash config, not themeable.
-          backgroundColor: '#0D1117',
+          // Must equal app.json expo.splash.backgroundColor exactly so
+          // the native-to-JS handoff has no seam. Hardcoded — this is a
+          // brand surface pinned by the native splash, not themeable.
+          backgroundColor: '#5739FF',
           alignItems: 'center',
           justifyContent: 'center',
           opacity,
         },
       ]}
     >
-      <View style={{ alignItems: 'center', gap: spacing[4] }}>
-        <BrandMark size={96} variant="color" />
+      <View style={{ alignItems: 'center', gap: spacing[5] }}>
+        <BrandMark size={64} variant="inverse" />
         <View style={{ alignItems: 'center', gap: spacing[2] }}>
           <Text
             variant="display"
@@ -74,7 +74,7 @@ export function BrandedSplash({ ready }: { ready: boolean }) {
           </Text>
           <Text
             variant="body"
-            color="#9CA3AF"
+            color="#F9FAFB"
             style={{ letterSpacing: 0.2 }}
           >
             The pulse of the card market.
