@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Pressable, ActivityIndicator } from 'react-native';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -35,6 +35,9 @@ async function resolvePickCardId(query: string): Promise<string | null> {
   }
 }
 
+/** Ceiling on the resolve round trip — past this the tap falls through. */
+const RESOLVE_TIMEOUT_MS = 2500;
+
 export interface AIPickItem {
   cardId: string;
   cardName: string;
@@ -66,6 +69,10 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
   const accentColor = isUnder ? colors.success : colors.danger;
   const Icon = isUnder ? IconTrendingUp : IconTrendingDown;
   const [resolving, setResolving] = useState(false);
+  // The timeout only wins the race — the underlying request keeps going,
+  // so the settle can land after the user has navigated away.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
   const open = async () => {
     if (!item.searchQuery) {
@@ -77,7 +84,15 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
     // degrade to the search tab with the query pre-filled.
     if (resolving) return;
     setResolving(true);
-    const id = await resolvePickCardId(item.searchQuery);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const id = await Promise.race([
+      resolvePickCardId(item.searchQuery),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), RESOLVE_TIMEOUT_MS);
+      }),
+    ]);
+    if (timer) clearTimeout(timer);
+    if (!mounted.current) return;
     setResolving(false);
     if (id) {
       router.push(`/card/${id}`);
@@ -91,13 +106,17 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
   return (
     <Pressable
       onPress={open}
+      disabled={resolving}
+      accessibilityState={{ busy: resolving }}
       style={({ pressed }) => ({
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: spacing[2],
         paddingHorizontal: spacing[1],
         gap: spacing[3],
-        opacity: pressed ? 0.7 : 1,
+        // Whole row dims while the pick resolves — a badge-sized spinner
+        // alone reads as a dead tap.
+        opacity: resolving ? 0.45 : pressed ? 0.7 : 1,
       })}
     >
       <Image

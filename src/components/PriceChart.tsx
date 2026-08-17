@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { View, Platform } from 'react-native';
 import Svg, { Polyline, Defs, LinearGradient, Stop, Polygon, Line, Circle, Text as SvgText } from 'react-native-svg';
 import { Text } from './Text';
@@ -31,6 +31,7 @@ interface TouchInfo {
 
 const LABEL_HEIGHT = 20; // space for month labels at bottom
 const PRICE_LABEL_WIDTH = 50; // space for high/low labels on right
+const PAD = 4; // inset so the stroke and dots aren't clipped by the viewport
 
 export function PriceChart({
   data,
@@ -46,9 +47,9 @@ export function PriceChart({
   const containerRef = useRef<View>(null);
 
   // NOTE: the `data.length < 2` early return lives AFTER all hooks below.
-  // Returning here would skip the four useCallback hooks and violate the
+  // Returning here would skip the memo/callback hooks and violate the
   // Rules of Hooks if this component ever re-renders across the 2-point
-  // boundary while mounted. The geometry consts compute harmless
+  // boundary while mounted. The geometry memo computes harmless
   // NaN/empty values for short data — they're never rendered because the
   // guard returns null before the JSX.
 
@@ -61,39 +62,130 @@ export function PriceChart({
   const chartHeight = Math.max(0, interactive ? safeHeight - LABEL_HEIGHT : safeHeight);
   const chartWidth = Math.max(0, interactive ? safeWidth - PRICE_LABEL_WIDTH : safeWidth);
 
-  const prices = data.map((d) => d.price);
-  const minPrice = Math.min(...prices);
-  const maxPrice = Math.max(...prices);
-  const range = maxPrice - minPrice || 1;
-  const pad = 4;
+  // Scrubbing the crosshair re-renders this component on every responder
+  // move, so all point/string geometry is memoized — a scrub must only
+  // repaint the crosshair layer, never rebuild the polyline.
+  const geometry = useMemo(() => {
+    const prices = data.map((d) => d.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const range = maxPrice - minPrice || 1;
+    const isPositive = prices[prices.length - 1] >= prices[0];
 
-  const isPositive = prices[prices.length - 1] >= prices[0];
-  const chartColor = colorOverride ?? (isPositive ? colors.success : colors.danger);
+    const chartPoints = data.map((d, i) => ({
+      x: PAD + (i / (data.length - 1)) * (chartWidth - PAD * 2),
+      y: PAD + (1 - (d.price - minPrice) / range) * (chartHeight - PAD * 2),
+      price: d.price,
+      date: d.date,
+    }));
 
-  const chartPoints = data.map((d, i) => ({
-    x: pad + (i / (data.length - 1)) * (chartWidth - pad * 2),
-    y: pad + (1 - (d.price - minPrice) / range) * (chartHeight - pad * 2),
-    price: d.price,
-    date: d.date,
-  }));
+    const polylinePoints = chartPoints.map((p) => `${p.x},${p.y}`).join(' ');
+    const fillPoints = `${PAD},${chartHeight} ${polylinePoints} ${chartWidth - PAD},${chartHeight}`;
 
-  const polylinePoints = chartPoints.map((p) => `${p.x},${p.y}`).join(' ');
-  const fillPoints = `${pad},${chartHeight} ${polylinePoints} ${chartWidth - pad},${chartHeight}`;
-
-  // Month labels for X axis
-  const monthLabels: { label: string; x: number }[] = [];
-  if (interactive) {
-    const seenMonths = new Set<string>();
-    for (const p of chartPoints) {
-      const d = new Date(p.date);
-      const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
-      const label = d.toLocaleDateString('en-US', { month: 'short' });
-      if (!seenMonths.has(monthKey)) {
-        seenMonths.add(monthKey);
-        monthLabels.push({ label, x: p.x });
+    // Month labels for X axis
+    const monthLabels: { label: string; x: number }[] = [];
+    if (interactive) {
+      const seenMonths = new Set<string>();
+      for (const p of chartPoints) {
+        const d = new Date(p.date);
+        const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
+        const label = d.toLocaleDateString('en-US', { month: 'short' });
+        if (!seenMonths.has(monthKey)) {
+          seenMonths.add(monthKey);
+          monthLabels.push({ label, x: p.x });
+        }
       }
     }
-  }
+
+    return { minPrice, maxPrice, isPositive, chartPoints, polylinePoints, fillPoints, monthLabels };
+  }, [data, chartWidth, chartHeight, interactive]);
+
+  const { minPrice, maxPrice, chartPoints, polylinePoints, fillPoints, monthLabels } = geometry;
+  const chartColor = colorOverride ?? (geometry.isPositive ? colors.success : colors.danger);
+
+  // Labels are keyed into the memo below as strings, not as `formatValue` —
+  // the default formatter is a fresh closure on every render and would
+  // invalidate the memo each time, while the text it produces does not.
+  const mutedColor = colors.onSurfaceMuted;
+  const highLabel = formatValue(maxPrice);
+  const lowLabel = formatValue(minPrice);
+
+  const staticLayers = useMemo(
+    () => (
+      <>
+        <Defs>
+          <LinearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={chartColor} stopOpacity={0.25} />
+            <Stop offset="1" stopColor={chartColor} stopOpacity={0} />
+          </LinearGradient>
+        </Defs>
+
+        {/* High/Low dashed lines */}
+        {interactive && (
+          <>
+            <Line
+              x1={0} y1={PAD} x2={chartWidth} y2={PAD}
+              stroke={mutedColor} strokeWidth={1} strokeDasharray="4,4" opacity={0.25}
+            />
+            <Line
+              x1={0} y1={chartHeight - PAD} x2={chartWidth} y2={chartHeight - PAD}
+              stroke={mutedColor} strokeWidth={1} strokeDasharray="4,4" opacity={0.25}
+            />
+            {/* High label */}
+            <SvgText
+              x={chartWidth + 8} y={PAD + 4}
+              fill={mutedColor} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
+            >
+              {highLabel}
+            </SvgText>
+            {/* Low label */}
+            <SvgText
+              x={chartWidth + 8} y={chartHeight - PAD + 4}
+              fill={mutedColor} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
+            >
+              {lowLabel}
+            </SvgText>
+          </>
+        )}
+
+        {showGradient && (
+          <Polygon points={fillPoints} fill="url(#chartGrad)" />
+        )}
+        <Polyline
+          points={polylinePoints}
+          fill="none"
+          stroke={chartColor}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Month labels on X axis */}
+        {interactive && monthLabels.map((m) => (
+          <SvgText
+            key={m.label + m.x}
+            x={m.x} y={chartHeight + LABEL_HEIGHT - 4}
+            fill={mutedColor} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
+          >
+            {m.label}
+          </SvgText>
+        ))}
+      </>
+    ),
+    [
+      chartColor,
+      chartHeight,
+      chartWidth,
+      fillPoints,
+      highLabel,
+      interactive,
+      lowLabel,
+      monthLabels,
+      mutedColor,
+      polylinePoints,
+      showGradient,
+    ],
+  );
 
   const findClosestPoint = useCallback(
     (touchX: number): TouchInfo | null => {
@@ -132,7 +224,9 @@ export function PriceChart({
       if (!interactive) return;
       const x = getRelativeX(evt);
       const point = findClosestPoint(x);
-      setActivePoint(point);
+      // chartPoints are memoized, so an unchanged resolve is the same object
+      // — returning `prev` lets React bail out of the whole re-render.
+      setActivePoint((prev) => (prev === point || prev?.x === point?.x ? prev : point));
     },
     [interactive, findClosestPoint, getRelativeX],
   );
@@ -201,63 +295,7 @@ export function PriceChart({
         {...webProps}
       >
         <Svg height={svgHeight} width={svgWidth} style={{ pointerEvents: 'none' } as any}>
-          <Defs>
-            <LinearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={chartColor} stopOpacity={0.25} />
-              <Stop offset="1" stopColor={chartColor} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-
-          {/* High/Low dashed lines */}
-          {interactive && (
-            <>
-              <Line
-                x1={0} y1={pad} x2={chartWidth} y2={pad}
-                stroke={colors.onSurfaceMuted} strokeWidth={1} strokeDasharray="4,4" opacity={0.25}
-              />
-              <Line
-                x1={0} y1={chartHeight - pad} x2={chartWidth} y2={chartHeight - pad}
-                stroke={colors.onSurfaceMuted} strokeWidth={1} strokeDasharray="4,4" opacity={0.25}
-              />
-              {/* High label */}
-              <SvgText
-                x={chartWidth + 8} y={pad + 4}
-                fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
-              >
-                {formatValue(maxPrice)}
-              </SvgText>
-              {/* Low label */}
-              <SvgText
-                x={chartWidth + 8} y={chartHeight - pad + 4}
-                fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
-              >
-                {formatValue(minPrice)}
-              </SvgText>
-            </>
-          )}
-
-          {showGradient && (
-            <Polygon points={fillPoints} fill="url(#chartGrad)" />
-          )}
-          <Polyline
-            points={polylinePoints}
-            fill="none"
-            stroke={chartColor}
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-
-          {/* Month labels on X axis */}
-          {interactive && monthLabels.map((m) => (
-            <SvgText
-              key={m.label + m.x}
-              x={m.x} y={chartHeight + LABEL_HEIGHT - 4}
-              fill={colors.onSurfaceMuted} fontSize={10} fontFamily="SpaceGrotesk_400Regular"
-            >
-              {m.label}
-            </SvgText>
-          ))}
+          {staticLayers}
 
           {/* Crosshair + dot */}
           {interactive && activePoint && (
