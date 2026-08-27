@@ -1,0 +1,240 @@
+/*
+ * Tokens mirror src/theme/tokens.ts in the app so the site and the
+ * product read as one thing. Dark mode binds the accent to the 400 step
+ * (#8974FF) because #5739FF sits at 3.10 contrast on the dark canvas and
+ * fails; 400 restores 5.41.
+ */
+:root {
+  --brand: #5739FF;
+  --brand-ink: #FFFFFF;
+  --brand-soft: #F3F1FF;
+
+  --canvas: #FFFFFF;
+  --surface: #F9FAFB;
+  --ink: #111827;
+  --ink-2: #4B5563;
+  --ink-3: #6B7280;
+  --rule: #E9ECEF;
+
+  --measure: 66ch;
+  --gap-1: 0.5rem;
+  --gap-2: 0.875rem;
+  --gap-3: 1.5rem;
+  --gap-4: 2.5rem;
+  --gap-5: 4rem;
+  --gap-6: 6rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand: #8974FF;
+    --brand-ink: #101559;
+    --brand-soft: #191331;
+
+    --canvas: #0D1117;
+    --surface: #161B22;
+    --ink: #F9FAFB;
+    --ink-2: #D1D5DB;
+    --ink-3: #9CA3AF;
+    --rule: #343A40;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-grotesk), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--brand);
+  text-underline-offset: 2px;
+
+  &:focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+  margin: 0;
+}
+
+h1 { font-size: clamp(2.1rem, 6vw, 3.1rem); line-height: 1.06; font-weight: 700; }
+h2 { font-size: 1.55rem; line-height: 1.2; font-weight: 700; }
+h3 { font-size: 1.05rem; line-height: 1.3; font-weight: 500; }
+
+p { margin: 0; text-wrap: pretty; }
+
+.shell {
+  max-width: var(--measure);
+  margin: 0 auto;
+  padding: 0 var(--gap-3);
+}
+
+/* ---------- chrome ---------- */
+
+.masthead {
+  border-bottom: 1px solid var(--rule);
+
+  & .inner {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: var(--gap-3);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-3);
+  }
+
+  & .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--gap-1);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 1.05rem;
+  }
+
+  & nav {
+    display: flex;
+    gap: var(--gap-3);
+    font-size: 0.9rem;
+    flex-wrap: wrap;
+  }
+
+  & nav a {
+    color: var(--ink-2);
+    text-decoration: none;
+
+    &:hover { color: var(--ink); text-decoration: underline; }
+  }
+}
+
+.foot {
+  border-top: 1px solid var(--rule);
+  margin-top: var(--gap-6);
+  padding: var(--gap-4) 0 var(--gap-5);
+  color: var(--ink-3);
+  font-size: 0.85rem;
+
+  & .inner {
+    max-width: var(--measure);
+    margin: 0 auto;
+    padding: 0 var(--gap-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-2);
+  }
+
+  & nav { display: flex; flex-wrap: wrap; gap: var(--gap-1) var(--gap-3); }
+  & a { color: var(--ink-3); }
+}
+
+/* ---------- page rhythm ---------- */
+
+main { padding-top: var(--gap-5); }
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-3);
+}
+
+section.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-2);
+  padding-top: var(--gap-5);
+}
+
+.lede { font-size: 1.15rem; color: var(--ink-2); }
+
+.eyebrow {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand);
+  font-weight: 500;
+}
+
+.cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-weight: 500;
+  font-size: 1rem;
+  padding: 0.85rem 1.4rem;
+  border-radius: 12px;
+  text-decoration: none;
+
+  &:hover { opacity: 0.9; }
+}
+
+.note {
+  font-size: 0.9rem;
+  color: var(--ink-3);
+}
+
+dl.facts {
+  display: grid;
+  gap: var(--gap-3);
+  margin: 0;
+
+  & > div {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    border-top: 1px solid var(--rule);
+    padding-top: var(--gap-2);
+  }
+
+  & dt { font-weight: 500; }
+  & dd { margin: 0; color: var(--ink-2); font-size: 0.95rem; }
+}
+
+table.plans {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95rem;
+
+  & th, & td {
+    text-align: left;
+    padding: var(--gap-2) var(--gap-2) var(--gap-2) 0;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  & th { font-weight: 500; color: var(--ink-3); font-size: 0.8rem; letter-spacing: 0.06em; text-transform: uppercase; }
+  & td:not(:first-child) { font-variant-numeric: tabular-nums; }
+}
+
+.scroll { overflow-x: auto; }
+
+ul.plain {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-1);
+  color: var(--ink-2);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

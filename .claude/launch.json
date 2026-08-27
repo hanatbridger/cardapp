@@ -9,6 +9,15 @@
         "cd /Users/hanwong/code/cardApp && npx expo start --web --port 8088"
       ],
       "port": 8088
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "cd /Users/hanwong/code/cardApp/website && npm run dev -- --port 3000"
+      ],
+      "port": 3000
     }
   ]
 }
