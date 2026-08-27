@@ -49,7 +49,7 @@ function Phone() {
 
 export default function Home() {
   return (
-    <div className="shell">
+    <div className="shell wide">
       <section className="hero">
         <div>
           <h1>Know what your cards are worth.</h1>

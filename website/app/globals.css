@@ -16,7 +16,8 @@
   --ink-3: #6B7280;
   --rule: #E9ECEF;
 
-  --measure: 66ch;
+  --measure: 66ch;   /* reading width — prose pages */
+  --wide: 1080px;    /* visual width — homepage */
   --gap-1: 0.5rem;
   --gap-2: 0.875rem;
   --gap-3: 1.5rem;
@@ -127,7 +128,7 @@ p { margin: 0; text-wrap: pretty; }
 .foot {
   border-top: 1px solid var(--rule);
   margin-top: var(--gap-6);
-  padding: var(--gap-4) 0 var(--gap-5);
+  padding: var(--gap-2) 0 var(--gap-4);
   color: var(--ink-3);
   font-size: 0.85rem;
 
@@ -146,7 +147,7 @@ p { margin: 0; text-wrap: pretty; }
 
 /* ---------- page rhythm ---------- */
 
-main { padding-top: var(--gap-5); }
+main { padding-top: var(--gap-3); }
 
 .stack {
   display: flex;
@@ -250,7 +251,7 @@ ul.plain {
   grid-template-columns: 1fr;
   gap: var(--gap-4);
   align-items: center;
-  padding: var(--gap-4) 0 var(--gap-5);
+  padding: var(--gap-2) 0 var(--gap-4);
 }
 
 @media (min-width: 860px) {
@@ -280,7 +281,7 @@ ul.plain {
   width: 100%;
   max-width: 300px;
   margin: 0 auto;
-  aspect-ratio: 9 / 15.5;
+  aspect-ratio: 9 / 12.6;
   background: var(--canvas);
   border: 1px solid var(--rule);
   border-radius: 34px;
@@ -363,7 +364,7 @@ ul.plain {
   grid-template-columns: 1fr;
   gap: var(--gap-3);
   align-items: center;
-  padding: var(--gap-6) 0 0;
+  padding: var(--gap-5) 0 0;
 }
 
 @media (min-width: 780px) {
@@ -408,7 +409,7 @@ ul.plain {
 
 .closer {
   text-align: center;
-  padding: var(--gap-6) 0 0;
+  padding: var(--gap-5) 0 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -431,4 +432,14 @@ ul.plain {
     gap: var(--gap-2) var(--gap-3);
     font-size: 0.85rem;
   }
+}
+
+/* The homepage is a visual layout, not a reading column: 66ch leaves ~280px
+   dead on each side of a 1280 viewport and squeezes the hero headline into a
+   318px column. Prose pages keep the reading measure. */
+.shell.wide { max-width: var(--wide); }
+
+body:has(.shell.wide) {
+  & .masthead .inner,
+  & .foot .inner { max-width: var(--wide); }
 }
