@@ -322,23 +322,52 @@ ul.plain {
   max-width: 280px;
   margin: 0 auto;
   aspect-ratio: 9 / 19;
-  /* iPhone frame: rim, inset screen, island */
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 44px;
-  padding: 10px;
+  /* titanium band -> black bezel -> screen, like the hardware */
+  background: linear-gradient(145deg, #5B5E66 0%, #393B41 28%, #24262B 62%, #4C4F57 100%);
+  border-radius: 56px;
+  padding: 4px;
   box-shadow:
-    inset 0 0 0 2px color-mix(in srgb, var(--ink) 14%, transparent),
-    0 30px 70px -24px rgb(0 0 0 / 0.4);
+    inset 0 1px 1px rgb(255 255 255 / 0.25),
+    inset 0 -1px 1px rgb(0 0 0 / 0.5),
+    0 34px 80px -26px rgb(0 0 0 / 0.55);
+  position: relative;
+}
+
+/* side hardware: volume pair left, power right */
+.phone::before,
+.phone::after {
+  content: '';
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #55585F, #2E3036);
+}
+
+.phone::before {
+  left: -2px;
+  top: 25%;
+  height: 92px;
+  background:
+    linear-gradient(to bottom,
+      #4E5158 0 40px, transparent 40px 52px, #4E5158 52px 92px);
+}
+
+.phone::after { right: -2px; top: 29%; height: 66px; }
+
+.bezel {
+  height: 100%;
+  background: #010102;
+  border-radius: 52px;
+  padding: 9px;
   position: relative;
 }
 
 .phone .screen {
   height: 100%;
+  border-radius: 44px;
   /* the app's own gradient top, sampled from the capture, so the
      status-bar strip continues the real background */
   background: #10101D;
-  border-radius: 35px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -356,7 +385,14 @@ ul.plain {
   padding: 0 22px 4px;
   color: #F9FAFB;
 
-  & .clock { font-size: 10.5px; font-weight: 700; letter-spacing: 0.01em; }
+  /* iOS status bar replica: the system face (SF on Apple hardware),
+     not the brand face -- SF Semibold is what the hardware shows. */
+  & .clock {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, sans-serif;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0;
+  }
   & .status-right { display: inline-flex; align-items: center; gap: 4px; }
 }
 
@@ -401,7 +437,7 @@ ul.plain {
 
 .phone .island {
   position: absolute;
-  top: 24px;
+  top: 20px;
   left: 50%;
   translate: -50%;
   width: 86px;
@@ -725,51 +761,93 @@ body::before {
     radial-gradient(44rem 32rem at 55% 108%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 72%);
 }
 
-/* ---------- the list, as a hand of the actual cards ---------- */
-
-.fan {
-  position: relative;
-  height: 300px;
-  width: 100%;
-}
-
-.fan img {
-  position: absolute;
-  left: 50%;
-  bottom: 12px;
-  width: 158px;
-  margin-left: -79px;
-  border-radius: 8px;
-  box-shadow: 0 18px 40px -14px rgb(0 0 0 / 0.55);
-  transform-origin: 50% 120%;
-  transform: translateX(var(--tx)) rotate(var(--rot));
-}
-
-@supports (animation-timeline: view()) {
-  .fan img {
-    animation: fan-out both;
-    animation-timeline: view();
-    animation-range: entry 25% cover 40%;
-  }
-}
-
-@keyframes fan-out {
-  from { transform: translateX(0) rotate(0deg); }
-  to { transform: translateX(var(--tx)) rotate(var(--rot)); }
-}
 
 /* ---------- the notification, dropping in like a real banner ---------- */
 
+/* Two arrivals, iOS-style: the first banner springs down; the second
+   arrives later, takes the top slot, and pushes the first down. */
+.notif-stack {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  min-height: 182px;
+}
+
+.notif-stack .second {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+}
+
 @supports (animation-timeline: view()) {
-  .notif.banner {
+  .notif.banner.first {
     animation: banner-drop both;
     animation-timeline: view();
-    animation-range: entry 30% cover 42%;
+    animation-range: entry 22% cover 34%;
   }
+  .notif.banner.second {
+    animation: banner-drop both;
+    animation-timeline: view();
+    animation-range: entry 52% cover 60%;
+  }
+  .slot-shift {
+    animation: shift-down both;
+    animation-timeline: view();
+    animation-range: entry 52% cover 60%;
+  }
+}
+
+@keyframes shift-down {
+  from { transform: translateY(0); }
+  to { transform: translateY(96px); }
 }
 
 @keyframes banner-drop {
   0% { opacity: 0; transform: translateY(-34px) scale(0.94); }
   72% { opacity: 1; transform: translateY(5px) scale(1.01); }
   100% { opacity: 1; transform: none; }
+}
+
+/* ---------- the list, as UI cards stacked isometrically ---------- */
+
+.iso-stack {
+  height: 340px;
+  width: 100%;
+  display: grid;
+  place-items: center;
+  perspective: 1400px;
+}
+
+.iso-plane {
+  transform: rotateX(55deg) rotateZ(-42deg);
+  transform-style: preserve-3d;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.iso-card {
+  width: 300px;
+  transform: translateZ(var(--z));
+  box-shadow: 0 24px 34px -18px rgb(0 0 0 / 0.5);
+  background: var(--surface);
+}
+
+@supports (animation-timeline: view()) {
+  /* .showcase .row's tilt would outrank a bare .iso-card selector and
+     flatten the stack to z=0 -- match its specificity and come later. */
+  .showcase .iso-card {
+    animation: iso-rise both;
+    animation-timeline: view();
+  }
+  .showcase .iso-card:nth-child(1) { animation-range: entry 25% cover 36%; }
+  .showcase .iso-card:nth-child(2) { animation-range: entry 33% cover 42%; }
+  .showcase .iso-card:nth-child(3) { animation-range: entry 41% cover 48%; }
+}
+
+@keyframes iso-rise {
+  from { opacity: 0; transform: translateZ(0); }
+  to { opacity: 1; transform: translateZ(var(--z)); }
 }

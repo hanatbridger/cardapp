@@ -31,9 +31,10 @@ function TickerRun() {
 function Phone() {
   return (
     <div className="phone" role="img" aria-label="The CardPulse home screen: ten tracked cards with live prices and the trending ticker">
-      <div className="island" />
-      <div className="screen">
-        <div className="status">
+      <div className="bezel">
+        <div className="island" />
+        <div className="screen">
+          <div className="status">
           <span className="clock">9:41 &middot; Aug 27</span>
           <span className="status-right">
             <svg viewBox="0 0 16 10" width="14" height="9" aria-hidden="true"><rect x="0" y="6" width="3" height="4" rx="0.8" fill="currentColor"/><rect x="4.3" y="4" width="3" height="6" rx="0.8" fill="currentColor"/><rect x="8.6" y="2" width="3" height="8" rx="0.8" fill="currentColor"/><rect x="12.9" y="0" width="3" height="10" rx="0.8" fill="currentColor" opacity="0.35"/></svg>
@@ -41,12 +42,13 @@ function Phone() {
             <svg viewBox="0 0 22 11" width="19" height="10" aria-hidden="true"><rect x="0.5" y="0.5" width="18" height="10" rx="2.6" fill="none" stroke="currentColor" opacity="0.5"/><rect x="2" y="2" width="13" height="7" rx="1.4" fill="currentColor"/><rect x="19.6" y="3.4" width="1.8" height="4.2" rx="0.9" fill="currentColor" opacity="0.5"/></svg>
           </span>
         </div>
-        <img className="slice" src="/screens/header.webp" alt="" />
-        <div className="ticker">
-          <TickerRun />
-          <TickerRun />
+          <img className="slice" src="/screens/header.webp" alt="" />
+          <div className="ticker">
+            <TickerRun />
+            <TickerRun />
+          </div>
+          <img className="slice" src="/screens/list.webp" alt="" />
         </div>
-        <img className="slice" src="/screens/list.webp" alt="" />
       </div>
     </div>
   );
@@ -71,11 +73,42 @@ export default function Home() {
           <h2>One list, not a collection.</h2>
           <p className="say">Track what you don&rsquo;t own yet.</p>
         </div>
-        <div className="fan" aria-hidden="true">
-          <img src="/cards/latias.png" alt="" style={{ '--tx': '-108px', '--rot': '-14deg' } as React.CSSProperties} />
-          <img src="/cards/moonbreon.png" alt="" style={{ '--tx': '-36px', '--rot': '-5deg' } as React.CSSProperties} />
-          <img src="/cards/umbreon.png" alt="" style={{ '--tx': '36px', '--rot': '5deg' } as React.CSSProperties} />
-          <img src="/cards/charizard.png" alt="" style={{ '--tx': '108px', '--rot': '14deg' } as React.CSSProperties} />
+        <div className="iso-stack" aria-hidden="true">
+          <div className="iso-plane">
+            <div className="row iso-card" style={{ '--z': '110px' } as React.CSSProperties}>
+              <img className="art" src="/cards/charizard.png" alt="" />
+              <div>
+                <div className="name">Charizard ex</div>
+                <div className="set">151</div>
+              </div>
+              <div>
+                <div className="money">$373.91</div>
+                <div className="delta up">&#9650; 2.4%</div>
+              </div>
+            </div>
+            <div className="row iso-card" style={{ '--z': '55px' } as React.CSSProperties}>
+              <img className="art" src="/cards/moonbreon.png" alt="" />
+              <div>
+                <div className="name">Umbreon VMAX</div>
+                <div className="set">Evolving Skies</div>
+              </div>
+              <div>
+                <div className="money">$2,380</div>
+                <div className="delta up">&#9650; 4.1%</div>
+              </div>
+            </div>
+            <div className="row iso-card" style={{ '--z': '0px' } as React.CSSProperties}>
+              <img className="art" src="/cards/latias.png" alt="" />
+              <div>
+                <div className="name">Latias &#9733;</div>
+                <div className="set">EX Deoxys</div>
+              </div>
+              <div>
+                <div className="money">$1,500</div>
+                <div className="delta down">&#9660; 1.1%</div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -84,11 +117,22 @@ export default function Home() {
           <h2>A push when it hits your price.</h2>
           <p className="say">Set a number. Put the phone down.</p>
         </div>
-        <div className="notif banner">
-          <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-          <div>
-            <div className="t">CardPulse</div>
-            <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
+        <div className="notif-stack">
+          <div className="notif banner second">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Latias &#9733; is now below $1,450 &mdash; currently $1,439.</div>
+            </div>
+          </div>
+          <div className="slot-shift">
+            <div className="notif banner first">
+              <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+              <div>
+                <div className="t">CardPulse</div>
+                <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
