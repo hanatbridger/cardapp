@@ -55,7 +55,7 @@ function Phone() {
 
 export default function Home() {
   return (
-    <div className="shell wide">
+    <div className="shell">
       <section className="hero">
         <div>
           <h1>Know what your cards are worth.</h1>
