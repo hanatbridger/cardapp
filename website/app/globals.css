@@ -319,9 +319,9 @@ ul.plain {
 
 .phone {
   width: 100%;
-  max-width: 300px;
+  max-width: 280px;
   margin: 0 auto;
-  aspect-ratio: 9 / 14.5;
+  aspect-ratio: 9 / 19;
   /* iPhone frame: rim, inset screen, island */
   background: var(--surface);
   border: 1px solid var(--rule);
