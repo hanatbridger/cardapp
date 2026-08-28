@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk } from 'next/font/google';
 import Link from 'next/link';
+import { BrandMark } from '@/components/BrandMark';
 import './globals.css';
 
 const grotesk = Space_Grotesk({
@@ -69,7 +70,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <header className="masthead">
           <div className="inner">
-            <Link href="/" className="brand">CardPulse</Link>
+            <Link href="/" className="brand">
+              <BrandMark size={26} />
+              CardPulse
+            </Link>
             <nav>
               <Link href="/how-it-works">How it works</Link>
               <Link href="/price-alerts">Alerts</Link>

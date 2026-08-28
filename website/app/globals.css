@@ -5,16 +5,20 @@
  * fails; 400 restores 5.41.
  */
 :root {
-  --brand: #5739FF;
-  --brand-ink: #FFFFFF;
-  --brand-soft: #F3F1FF;
+  --brand: #5739FF;          /* primary[500] */
+  --brand-ink: #FFFFFF;      /* onPrimary */
+  --brand-soft: #F3F1FF;     /* primary[50] */
+  --lift: #A5B0FF;           /* indigoLift / primary[200] — the icon facet */
 
   --canvas: #FFFFFF;
   --surface: #F9FAFB;
   --ink: #111827;
   --ink-2: #4B5563;
   --ink-3: #6B7280;
-  --rule: #E9ECEF;
+  --rule: #E5E7EB;           /* outline / neutral[200] */
+  --rule-soft: #F3F4F6;      /* outlineVariant / neutral[100] */
+  --up: #059669;             /* success[600] */
+  --down: #DC2626;           /* danger[600] */
 
   --measure: 66ch;   /* reading width — prose pages */
   --wide: 1080px;    /* visual width — homepage */
@@ -28,16 +32,20 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --brand: #8974FF;
-    --brand-ink: #101559;
-    --brand-soft: #191331;
+    --brand: #8974FF;        /* primary[400] — contrast-safe on canvas */
+    --brand-ink: #181047;    /* onPrimary / primary[900] */
+    --brand-soft: #241F3D;
+    --lift: #A5B0FF;         /* unchanged: matches the shipped icon */
 
     --canvas: #0D1117;
     --surface: #161B22;
     --ink: #F9FAFB;
     --ink-2: #D1D5DB;
     --ink-3: #9CA3AF;
-    --rule: #343A40;
+    --rule: #1F2937;         /* outline / neutral[800] */
+    --rule-soft: #161B22;    /* outlineVariant / neutral[925] */
+    --up: #34D399;           /* success[400] */
+    --down: #F87171;         /* danger[400] */
   }
 }
 
@@ -102,7 +110,7 @@ p { margin: 0; text-wrap: pretty; }
   & .brand {
     display: inline-flex;
     align-items: center;
-    gap: var(--gap-1);
+    gap: 0.55rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--ink);
@@ -323,15 +331,15 @@ ul.plain {
   width: 30px;
   height: 42px;
   border-radius: 3px;
-  background: linear-gradient(150deg, var(--brand) 0%, #A5B0FF 100%);
+  background: linear-gradient(150deg, var(--brand) 0%, var(--lift) 100%);
 }
 
 .row .name { font-size: 0.72rem; font-weight: 500; line-height: 1.25; }
 .row .set { font-size: 0.6rem; color: var(--ink-3); }
 .row .money { text-align: right; font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .row .delta { text-align: right; font-size: 0.6rem; font-variant-numeric: tabular-nums; }
-.row .up { color: #10B981; }
-.row .down { color: #F87171; }
+.row .up { color: var(--up); }
+.row .down { color: var(--down); }
 
 /* ---- notification ---- */
 
@@ -341,7 +349,7 @@ ul.plain {
   align-items: flex-start;
   background: var(--surface);
   border: 1px solid var(--rule);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 12px;
   max-width: 340px;
 }

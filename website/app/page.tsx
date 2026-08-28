@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { BrandMark } from '@/components/BrandMark';
 
 const APP_STORE =
   'https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336';
@@ -8,7 +9,12 @@ const APP_STORE =
 function Phone() {
   return (
     <div className="phone" role="img" aria-label="The CardPulse watchlist showing two tracked cards with current prices">
-      <div className="bar"><span>9:41</span><span>CardPulse</span></div>
+      <div className="bar">
+        <span>9:41</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <BrandMark size={11} /> CardPulse
+        </span>
+      </div>
       <div className="title">2 cards tracked</div>
       <div className="row">
         <div className="art" />
