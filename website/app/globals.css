@@ -68,11 +68,7 @@ a {
   color: var(--brand);
   text-underline-offset: 2px;
 
-  &:focus-visible {
-    outline: 2px solid var(--brand);
-    outline-offset: 3px;
-    border-radius: 2px;
-  }
+  &:focus-visible { outline: none; }
 }
 
 h1, h2, h3 {
@@ -165,11 +161,19 @@ p { margin: 0; text-wrap: pretty; }
     margin: 0 auto;
     padding: 0 var(--gap-3);
     display: flex;
-    flex-direction: column;
-    gap: var(--gap-2);
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--gap-3) var(--gap-4);
   }
 
-  & nav { display: flex; flex-wrap: wrap; gap: var(--gap-1) var(--gap-3); }
+  & nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-1) var(--gap-3);
+  }
+
+  & p { max-width: 46ch; }
   & a { color: var(--ink-3); }
 }
 
@@ -323,13 +327,6 @@ ul.plain {
   overflow: hidden;
 }
 
-.phone .bar {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.6rem;
-  color: var(--ink-3);
-  padding: 2px 8px 0;
-}
 
 .phone .title {
   font-weight: 700;
@@ -375,7 +372,15 @@ ul.plain {
   border: 1px solid var(--rule);
   border-radius: 16px;
   padding: 12px;
-  max-width: 340px;
+}
+
+/* Every mock in a showcase column renders at the same width — the
+   Moonbreon row was filling its 496px grid column while the
+   notification shrank to fit at 279px. */
+.showcase .row,
+.showcase .notif {
+  width: 100%;
+  max-width: 360px;
 }
 
 .notif .glyph {

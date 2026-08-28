@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { BrandMark } from '@/components/BrandMark';
 
 const APP_STORE =
@@ -9,12 +8,6 @@ const APP_STORE =
 function Phone() {
   return (
     <div className="phone" role="img" aria-label="The CardPulse watchlist showing two tracked cards with current prices">
-      <div className="bar">
-        <span>9:41</span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <BrandMark size={11} /> CardPulse
-        </span>
-      </div>
       <div className="title">2 cards tracked</div>
       <div className="row">
         <img className="art" src="/cards/charizard.png" alt="" />
@@ -122,10 +115,7 @@ export default function Home() {
       <section className="showcase flip">
         <div>
           <h2>Real numbers, named.</h2>
-          <p className="say">
-            Every price says where it came from.{' '}
-            <Link href="/methodology">See the sources</Link>
-          </p>
+          <p className="say">Every price says where it came from.</p>
         </div>
         <div className="stack">
           <div className="notif">
