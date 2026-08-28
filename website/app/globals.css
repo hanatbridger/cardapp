@@ -382,8 +382,12 @@ ul.plain {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: var(--brand);
+  /* A replica of the shipped app icon, so it stays the icon's #5739FF
+     in both themes rather than following the themed accent. */
+  background: #5739FF;
   flex: none;
+  display: grid;
+  place-items: center;
 }
 
 .notif .t { font-size: 0.76rem; font-weight: 700; }
@@ -419,25 +423,6 @@ ul.plain {
   color: var(--brand);
 }
 
-.tiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--gap-3);
-  padding-top: var(--gap-2);
-}
-
-.tier {
-  flex: 1 1 190px;
-  border: 1px solid var(--rule);
-  border-radius: 16px;
-  padding: var(--gap-3);
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-}
-
-.tier .amount { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
-.tier .who { font-size: 0.8rem; color: var(--ink-3); }
 
 .closer {
   text-align: center;
@@ -528,4 +513,48 @@ p, li, dd, dt { max-width: var(--measure); }
 @keyframes parallax {
   from { transform: translateY(0); }
   to { transform: translateY(-4rem); }
+}
+
+/* Hide-on-scroll-down: the Masthead island toggles data-hidden by
+   scroll direction. Transition is killed by the reduced-motion rule. */
+.masthead {
+  transition: translate 0.3s ease;
+}
+
+.masthead[data-hidden] {
+  translate: 0 -100%;
+}
+
+@supports (animation-timeline: view()) {
+  /* The visual mocks get their own motion on top of the section rise:
+     price rows tilt up off the page plane, notifications pop the way a
+     real push does. Scrubbed by scroll, so reversing plays them back. */
+  .showcase .row {
+    animation: card-tilt both;
+    animation-timeline: view();
+    animation-range: entry 10% entry 70%;
+  }
+
+  .showcase .notif {
+    animation: notif-pop both;
+    animation-timeline: view();
+    animation-range: entry 10% entry 70%;
+  }
+}
+
+@keyframes card-tilt {
+  from {
+    opacity: 0;
+    transform: perspective(700px) rotateX(16deg) translateY(2rem);
+  }
+  to {
+    opacity: 1;
+    transform: perspective(700px) rotateX(0deg) translateY(0);
+  }
+}
+
+@keyframes notif-pop {
+  0% { opacity: 0; transform: scale(0.82) translateY(1.25rem); }
+  70% { transform: scale(1.03) translateY(-2px); }
+  100% { opacity: 1; transform: none; }
 }

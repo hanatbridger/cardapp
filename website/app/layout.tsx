@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Space_Grotesk } from 'next/font/google';
 import Link from 'next/link';
-import { BrandMark } from '@/components/BrandMark';
+import { Masthead } from '@/components/Masthead';
 import './globals.css';
 
 const grotesk = Space_Grotesk({
@@ -68,20 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }}
         />
-        <header className="masthead">
-          <div className="inner">
-            <Link href="/" className="brand">
-              <BrandMark size={26} />
-              CardPulse
-            </Link>
-            <nav>
-              <Link href="/how-it-works">How it works</Link>
-              <Link href="/price-alerts">Alerts</Link>
-              <Link href="/methodology">Sources</Link>
-              <Link href="/pricing">Price</Link>
-            </nav>
-          </div>
-        </header>
+        <Masthead />
         <main>{children}</main>
         <footer className="foot">
           <div className="inner">

@@ -94,7 +94,7 @@ export default function Home() {
           <p className="say">Set a number. Put the phone down.</p>
         </div>
         <div className="notif">
-          <div className="glyph" />
+          <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
           <div>
             <div className="t">CardPulse</div>
             <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
@@ -129,31 +129,11 @@ export default function Home() {
         </div>
         <div className="stack">
           <div className="notif">
-            <div className="glyph" />
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
             <div>
               <div className="t">$361.45</div>
               <div className="b">TCGplayer market price &middot; raw &middot; updated today</div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="showcase">
-        <div>
-          <h2>Free to start.</h2>
-          <p className="say">
-            Two caps, and a subscription that removes them.{' '}
-            <Link href="/pricing">What&rsquo;s included</Link>
-          </p>
-        </div>
-        <div className="tiers">
-          <div className="tier">
-            <span className="amount">Free</span>
-            <span className="who">5 cards, 3 alerts</span>
-          </div>
-          <div className="tier">
-            <span className="amount">$4.99</span>
-            <span className="who">a month, no caps</span>
           </div>
         </div>
       </section>
