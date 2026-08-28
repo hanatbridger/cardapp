@@ -707,97 +707,7 @@ p, li, dd, dt { max-width: var(--measure); }
   to { opacity: 1; transform: none; }
 }
 
-/* ---------- the alert story: set it, then the push it produces.
-   The "Price moves below" line is Robinhood's alert vocabulary — the
-   clearest phrasing this pattern has, and the app's own above/below
-   model matches it. ---------- */
 
-.alert-story {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-1);
-  width: 100%;
-  max-width: 360px;
-
-  /* both cards in the story span the story, exactly */
-  & > .alert-mock,
-  & > .notif { width: 100%; max-width: none; }
-}
-
-.alert-mock {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  border-radius: 16px;
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.alert-head {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-3);
-  font-weight: 500;
-}
-
-.alert-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 0.85rem;
-
-  & .alert-amount {
-    margin-left: auto;
-    font-weight: 700;
-    font-variant-numeric: tabular-nums;
-  }
-}
-
-.switch {
-  width: 34px;
-  height: 20px;
-  border-radius: 999px;
-  background: var(--brand);
-  position: relative;
-  flex: none;
-
-  &::after {
-    content: '';
-    position: absolute;
-    top: 2px;
-    right: 2px;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    background: #FFFFFF;
-  }
-}
-
-.story-arrow {
-  color: var(--ink-3);
-  font-size: 0.9rem;
-  padding-left: 22px;
-}
-
-@supports (animation-timeline: view()) {
-  /* The story plays in order as it scrolls in: alert card, then the
-     notification it fires. */
-  .alert-story .alert-mock {
-    animation: rise-in both;
-    animation-timeline: view();
-    animation-range: entry 20% cover 30%;
-  }
-  .alert-story .story-arrow {
-    animation: rise-in both;
-    animation-timeline: view();
-    animation-range: entry 40% cover 42%;
-  }
-  .alert-story .notif {
-    animation-range: entry 60% cover 55%;
-  }
-}
 
 /* ---------- ambient brand glow (the Collectr green wash, in violet).
    Fixed radial fields behind everything; barely-there in light mode,
@@ -813,4 +723,53 @@ body::before {
     radial-gradient(48rem 34rem at 78% -6%, color-mix(in srgb, var(--brand) 13%, transparent), transparent 70%),
     radial-gradient(40rem 30rem at -12% 42%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 70%),
     radial-gradient(44rem 32rem at 55% 108%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 72%);
+}
+
+/* ---------- the list, as a hand of the actual cards ---------- */
+
+.fan {
+  position: relative;
+  height: 300px;
+  width: 100%;
+}
+
+.fan img {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  width: 158px;
+  margin-left: -79px;
+  border-radius: 8px;
+  box-shadow: 0 18px 40px -14px rgb(0 0 0 / 0.55);
+  transform-origin: 50% 120%;
+  transform: translateX(var(--tx)) rotate(var(--rot));
+}
+
+@supports (animation-timeline: view()) {
+  .fan img {
+    animation: fan-out both;
+    animation-timeline: view();
+    animation-range: entry 25% cover 40%;
+  }
+}
+
+@keyframes fan-out {
+  from { transform: translateX(0) rotate(0deg); }
+  to { transform: translateX(var(--tx)) rotate(var(--rot)); }
+}
+
+/* ---------- the notification, dropping in like a real banner ---------- */
+
+@supports (animation-timeline: view()) {
+  .notif.banner {
+    animation: banner-drop both;
+    animation-timeline: view();
+    animation-range: entry 30% cover 42%;
+  }
+}
+
+@keyframes banner-drop {
+  0% { opacity: 0; transform: translateY(-34px) scale(0.94); }
+  72% { opacity: 1; transform: translateY(5px) scale(1.01); }
+  100% { opacity: 1; transform: none; }
 }

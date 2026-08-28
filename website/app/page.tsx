@@ -71,19 +71,11 @@ export default function Home() {
           <h2>One list, not a collection.</h2>
           <p className="say">Track what you don&rsquo;t own yet.</p>
         </div>
-        <div className="stack">
-          <div className="row">
-            <img className="art" src="/cards/moonbreon.png" alt="" />
-            <div>
-              <div className="name">Moonbreon</div>
-              <div className="set">Evolving Skies &middot; target $420</div>
-            </div>
-            <div>
-              <div className="money">$438</div>
-              <div className="delta down">&#9660; 4.1%</div>
-            </div>
-          </div>
-          <p className="note">Waiting to buy. $18 to go.</p>
+        <div className="fan" aria-hidden="true">
+          <img src="/cards/latias.png" alt="" style={{ '--tx': '-108px', '--rot': '-14deg' } as React.CSSProperties} />
+          <img src="/cards/moonbreon.png" alt="" style={{ '--tx': '-36px', '--rot': '-5deg' } as React.CSSProperties} />
+          <img src="/cards/umbreon.png" alt="" style={{ '--tx': '36px', '--rot': '5deg' } as React.CSSProperties} />
+          <img src="/cards/charizard.png" alt="" style={{ '--tx': '108px', '--rot': '14deg' } as React.CSSProperties} />
         </div>
       </section>
 
@@ -92,22 +84,11 @@ export default function Home() {
           <h2>A push when it hits your price.</h2>
           <p className="say">Set a number. Put the phone down.</p>
         </div>
-        <div className="alert-story">
-          <div className="alert-mock">
-            <div className="alert-head">Price alert &middot; Moonbreon</div>
-            <div className="alert-line">
-              <span>Price moves below</span>
-              <span className="alert-amount">$420.00</span>
-              <span className="switch" aria-hidden="true" />
-            </div>
-          </div>
-          <div className="story-arrow" aria-hidden="true">&darr;</div>
-          <div className="notif">
-            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-            <div>
-              <div className="t">CardPulse</div>
-              <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
-            </div>
+        <div className="notif banner">
+          <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+          <div>
+            <div className="t">CardPulse</div>
+            <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
           </div>
         </div>
       </section>
