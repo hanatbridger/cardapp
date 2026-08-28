@@ -115,11 +115,17 @@ p { margin: 0; text-wrap: pretty; }
     max-width: var(--wide);
     margin: 0 auto;
     padding: var(--gap-3);
-    display: flex;
+    /* three zones: brand | centered nav | pill. The 1fr flanks keep the
+       nav on the bar's true centerline regardless of the outer widths. */
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    justify-content: space-between;
     gap: var(--gap-3);
   }
+
+  & .brand { justify-self: start; }
+  & > .inner > nav { justify-self: center; }
+  & .pill-cta { justify-self: end; }
 
   & .brand {
     display: inline-flex;
@@ -466,15 +472,16 @@ ul.plain {
 
 /* Narrow screens: the four nav links wrap around the wordmark and read
    as a broken grid. Stack them under it instead. */
-@media (max-width: 560px) {
+@media (max-width: 700px) {
   .masthead .inner {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--gap-2);
+    grid-template-columns: auto 1fr;
+    gap: var(--gap-2) var(--gap-3);
     padding-bottom: var(--gap-2);
   }
 
-  .masthead nav {
+  .masthead .inner > nav {
+    grid-column: 1 / -1;
+    justify-self: start;
     gap: var(--gap-2) var(--gap-3);
     font-size: 0.85rem;
   }
