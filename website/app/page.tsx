@@ -87,11 +87,22 @@ export default function Home() {
           <h2>A push when it hits your price.</h2>
           <p className="say">Set a number. Put the phone down.</p>
         </div>
-        <div className="notif">
-          <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-          <div>
-            <div className="t">CardPulse</div>
-            <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
+        <div className="alert-story">
+          <div className="alert-mock">
+            <div className="alert-head">Price alert &middot; Moonbreon</div>
+            <div className="alert-line">
+              <span>Price moves below</span>
+              <span className="alert-amount">$420.00</span>
+              <span className="switch" aria-hidden="true" />
+            </div>
+          </div>
+          <div className="story-arrow" aria-hidden="true">&darr;</div>
+          <div className="notif">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
+            </div>
           </div>
         </div>
       </section>

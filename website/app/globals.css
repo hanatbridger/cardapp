@@ -645,3 +645,95 @@ p, li, dd, dt { max-width: var(--measure); }
   from { opacity: 0; transform: translateY(14px) scale(0.97); }
   to { opacity: 1; transform: none; }
 }
+
+/* ---------- the alert story: set it, then the push it produces.
+   The "Price moves below" line is Robinhood's alert vocabulary — the
+   clearest phrasing this pattern has, and the app's own above/below
+   model matches it. ---------- */
+
+.alert-story {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-1);
+  width: 100%;
+  max-width: 360px;
+
+  /* both cards in the story span the story, exactly */
+  & > .alert-mock,
+  & > .notif { width: 100%; max-width: none; }
+}
+
+.alert-mock {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alert-head {
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.alert-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+
+  & .alert-amount {
+    margin-left: auto;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.switch {
+  width: 34px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--brand);
+  position: relative;
+  flex: none;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #FFFFFF;
+  }
+}
+
+.story-arrow {
+  color: var(--ink-3);
+  font-size: 0.9rem;
+  padding-left: 22px;
+}
+
+@supports (animation-timeline: view()) {
+  /* The story plays in order as it scrolls in: alert card, then the
+     notification it fires. */
+  .alert-story .alert-mock {
+    animation: rise-in both;
+    animation-timeline: view();
+    animation-range: entry 5% entry 45%;
+  }
+  .alert-story .story-arrow {
+    animation: rise-in both;
+    animation-timeline: view();
+    animation-range: entry 25% entry 60%;
+  }
+  .alert-story .notif {
+    animation-range: entry 40% entry 85%;
+  }
+}
