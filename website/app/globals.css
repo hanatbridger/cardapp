@@ -696,8 +696,15 @@ p, li, dd, dt { max-width: var(--measure); }
   color: var(--ink);
   text-decoration: none;
   background: transparent;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
 
-  &:hover { border-color: var(--ink); }
+  &:hover {
+    background: var(--brand);
+    border-color: var(--brand);
+    color: var(--brand-ink);
+
+    & .pre { color: var(--brand-ink); opacity: 0.8; }
+  }
 }
 
 .store-badge-text {
