@@ -52,8 +52,8 @@ export default function Home() {
     <div className="shell">
       <section className="hero">
         <div>
-          <h1>Know what your cards are worth.</h1>
-          <p className="sub">One list. Live prices. A push when a card hits your price.</p>
+          <h1>Know when a card hits your price.</h1>
+          <p className="sub">One list of the cards you&rsquo;re watching. Live market prices. A push the moment your number comes up.</p>
           <div className="actions">
             <AppStoreBadge height={58} />
           </div>
