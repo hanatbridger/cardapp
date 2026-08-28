@@ -1,45 +1,46 @@
 import { BrandMark } from '@/components/BrandMark';
-
-const APP_STORE =
-  'https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336';
+import { AppStoreBadge } from '@/components/AppStoreBadge';
 
 /* The watchlist, drawn in CSS. Real cards and real numbers from the app
    rather than lorem — the whole pitch is that the numbers are real. */
 function Phone() {
   return (
     <div className="phone" role="img" aria-label="The CardPulse watchlist showing two tracked cards with current prices">
-      <div className="title">2 cards tracked</div>
-      <div className="row">
-        <img className="art" src="/cards/charizard.png" alt="" />
-        <div>
-          <div className="name">Charizard ex</div>
-          <div className="set">151 &middot; Special Illustration Rare</div>
+      <div className="island" />
+      <div className="screen">
+        <div className="title">2 cards tracked</div>
+        <div className="row">
+          <img className="art" src="/cards/charizard.png" alt="" />
+          <div>
+            <div className="name">Charizard ex</div>
+            <div className="set">151 &middot; Special Illustration Rare</div>
+          </div>
+          <div>
+            <div className="money">$361.45</div>
+            <div className="delta up">&#9650; 2.4%</div>
+          </div>
         </div>
-        <div>
-          <div className="money">$361.45</div>
-          <div className="delta up">&#9650; 2.4%</div>
+        <div className="row">
+          <img className="art" src="/cards/umbreon.png" alt="" />
+          <div>
+            <div className="name">Umbreon ex</div>
+            <div className="set">Prismatic Evolutions</div>
+          </div>
+          <div>
+            <div className="money">$1,350</div>
+            <div className="delta up">&#9650; 3.9%</div>
+          </div>
         </div>
-      </div>
-      <div className="row">
-        <img className="art" src="/cards/umbreon.png" alt="" />
-        <div>
-          <div className="name">Umbreon ex</div>
-          <div className="set">Prismatic Evolutions</div>
-        </div>
-        <div>
-          <div className="money">$1,350</div>
-          <div className="delta up">&#9650; 3.9%</div>
-        </div>
-      </div>
-      <div className="row">
-        <img className="art" src="/cards/latias.png" alt="" />
-        <div>
-          <div className="name">Latias &#9733;</div>
-          <div className="set">EX Deoxys &middot; Gold Star</div>
-        </div>
-        <div>
-          <div className="money">$1,500</div>
-          <div className="delta down">&#9660; 1.1%</div>
+        <div className="row">
+          <img className="art" src="/cards/latias.png" alt="" />
+          <div>
+            <div className="name">Latias &#9733;</div>
+            <div className="set">EX Deoxys &middot; Gold Star</div>
+          </div>
+          <div>
+            <div className="money">$1,500</div>
+            <div className="delta down">&#9660; 1.1%</div>
+          </div>
         </div>
       </div>
     </div>
@@ -54,7 +55,7 @@ export default function Home() {
           <h1>Know what your cards are worth.</h1>
           <p className="sub">One list. Live prices. A push when a card hits your price.</p>
           <div className="actions">
-            <a className="cta" href={APP_STORE}>Download on the App Store</a>
+            <AppStoreBadge height={58} />
           </div>
         </div>
         <Phone />
@@ -130,7 +131,7 @@ export default function Home() {
 
       <section className="closer">
         <h2>Start with one card.</h2>
-        <a className="cta" href={APP_STORE}>Download on the App Store</a>
+        <AppStoreBadge height={58} />
       </section>
     </div>
   );

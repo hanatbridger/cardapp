@@ -57,6 +57,12 @@ export function Masthead() {
           <Link href="/price-alerts">Alerts</Link>
           <Link href="/methodology">Sources</Link>
           <Link href="/pricing">Price</Link>
+          <a
+            className="pill-cta"
+            href="https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336"
+          >
+            Get the app
+          </a>
         </nav>
       </div>
     </header>
