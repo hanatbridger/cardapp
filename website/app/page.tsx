@@ -1,6 +1,5 @@
 import { BrandMark } from '@/components/BrandMark';
 import { AppStoreBadge } from '@/components/AppStoreBadge';
-import { InView } from '@/components/InView';
 
 /* The hero device: real captures of the app (header, watchlist) layered
    with live DOM for the moving parts — the iOS status bar and the
@@ -120,7 +119,7 @@ export default function Home() {
           <h2>A push when it hits your price.</h2>
           <p className="say">Set a number. Put the phone down.</p>
         </div>
-        <InView className="notif-stack">
+        <div className="notif-stack">
           <div className="notif banner second">
             <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
             <div>
@@ -137,7 +136,7 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </InView>
+        </div>
       </section>
 
       <section className="showcase">

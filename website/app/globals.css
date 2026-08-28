@@ -783,8 +783,8 @@ body::before {
 
 /* The two arrivals run as one 8s looping film with a rest phase --
    the pattern every notification-product site ships (looping video /
-   Lottie), done in DOM. The InView island only pauses it off-screen,
-   so the sequence can never be missed. Drops use a linear() spring
+   Lottie), done in DOM, autoplaying like theirs do -- visibility
+   gating proved fragile twice. Drops use a linear() spring
    fitted to the iOS banner entrance (zeta 0.7, one ~4.5% overshoot);
    the push-down uses the calmer SwiftUI default spring.
 
@@ -796,12 +796,6 @@ body::before {
   animation-duration: 8s;
   animation-iteration-count: infinite;
   animation-fill-mode: both;
-  animation-play-state: paused;
-}
-
-.notif-stack[data-play] .notif.banner,
-.notif-stack[data-play] .slot-shift {
-  animation-play-state: running;
 }
 
 .notif-stack .first { animation-name: loop-first; }
