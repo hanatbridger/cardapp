@@ -377,12 +377,19 @@ ul.plain {
 
 /* ---- iOS status bar, drawn ---- */
 .status {
-  height: 46px;
+  /* the island sits at top 20 with height 24; centering this 24px line
+     inside a 20px-top margin puts time and battery on the island's own
+     centerline instead of hanging below it */
+  /* the screen sits 9px inside the bezel; the island is positioned
+     from the bezel, so the status offset compensates: 9 + 11 + 12 = 32,
+     the island's own centerline */
+  margin-top: 11px;
+  height: 24px;
   flex: none;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
-  padding: 0 22px 4px;
+  padding: 0 26px;
   color: #F9FAFB;
 
   /* iOS status bar replica: the system face (SF on Apple hardware),
@@ -765,22 +772,22 @@ body::before {
   z-index: 2;
 }
 
-@supports (animation-timeline: view()) {
-  .notif.banner.first {
-    animation: banner-drop both;
-    animation-timeline: view();
-    animation-range: entry 22% cover 34%;
-  }
-  .notif.banner.second {
-    animation: banner-drop both;
-    animation-timeline: view();
-    animation-range: entry 52% cover 60%;
-  }
-  .slot-shift {
-    animation: shift-down both;
-    animation-timeline: view();
-    animation-range: entry 52% cover 60%;
-  }
+/* The arrivals play on a clock, like the hardware: nothing until the
+   stack is seen (data-play from the InView island), then the first
+   banner springs down, and 1.4s later the second takes the top slot
+   while the first is pushed down. */
+.notif-stack .notif.banner { opacity: 0; }
+
+.notif-stack[data-play] .first {
+  animation: banner-drop 0.6s cubic-bezier(0.32, 1.4, 0.42, 1) 0.2s both;
+}
+
+.notif-stack[data-play] .second {
+  animation: banner-drop 0.6s cubic-bezier(0.32, 1.4, 0.42, 1) 1.6s both;
+}
+
+.notif-stack[data-play] .slot-shift {
+  animation: shift-down 0.55s cubic-bezier(0.4, 0.9, 0.3, 1) 1.6s both;
 }
 
 @keyframes shift-down {
@@ -812,28 +819,43 @@ body::before {
   gap: 18px;
 }
 
+.iso-lift {
+  transform: translateZ(var(--z));
+  transform-style: preserve-3d;
+}
+
 .iso-card {
   width: 300px;
-  transform: translateZ(var(--z));
   box-shadow: 0 24px 34px -18px rgb(0 0 0 / 0.5);
   background: var(--surface);
 }
 
 @supports (animation-timeline: view()) {
-  /* .showcase .row's tilt would outrank a bare .iso-card selector and
-     flatten the stack to z=0 -- match its specificity and come later. */
-  .showcase .iso-card {
+  .showcase .iso-lift {
     animation: iso-rise both;
     animation-timeline: view();
   }
-  .showcase .iso-card:nth-child(1) { animation-range: entry 25% cover 36%; }
-  .showcase .iso-card:nth-child(2) { animation-range: entry 33% cover 42%; }
-  .showcase .iso-card:nth-child(3) { animation-range: entry 41% cover 48%; }
+  .showcase .iso-lift:nth-child(1) { animation-range: entry 25% cover 36%; }
+  .showcase .iso-lift:nth-child(2) { animation-range: entry 33% cover 42%; }
+  .showcase .iso-lift:nth-child(3) { animation-range: entry 41% cover 48%; }
+}
+
+/* ambient float, phase-offset per card -- the .showcase .row tilt rule
+   is outranked here by order at equal specificity */
+@media (prefers-reduced-motion: no-preference) {
+  .showcase .iso-card { animation: iso-bob 4.6s ease-in-out infinite; }
+  .iso-lift:nth-child(2) .iso-card { animation-delay: -1.5s; }
+  .iso-lift:nth-child(3) .iso-card { animation-delay: -3s; }
 }
 
 @keyframes iso-rise {
   from { opacity: 0; transform: translateZ(0); }
   to { opacity: 1; transform: translateZ(var(--z)); }
+}
+
+@keyframes iso-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
 }
 
 /* ---------- price history, drawing itself as you scroll ---------- */
@@ -1001,4 +1023,83 @@ body::before {
   50%, 68%  { transform: translateY(-5.2rem); }
   75%, 93%  { transform: translateY(-7.8rem); }
   100%      { transform: translateY(-10.4rem); }
+}
+
+/* ---------- market dynamics panel ---------- */
+
+.dyn-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.dyn-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+
+  & > div {
+    background: var(--surface-2, rgb(255 255 255 / 0.04));
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+.dyn-val {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.dyn-key { font-size: 0.68rem; color: var(--ink-3); }
+
+.dyn-gauge { display: flex; flex-direction: column; gap: 6px; }
+
+.g-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--ink-2);
+}
+
+.g-read { font-weight: 500; color: var(--ink-3); }
+.g-read.up { color: var(--up); }
+
+.g-track {
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  overflow: hidden;
+}
+
+.g-fill {
+  height: 100%;
+  width: var(--w);
+  border-radius: 999px;
+  background: var(--brand);
+}
+
+.g-fill.dim { background: color-mix(in srgb, var(--brand) 45%, transparent); }
+
+@supports (animation-timeline: view()) {
+  .g-fill {
+    animation: gauge-fill both;
+    animation-timeline: view();
+    animation-range: entry 30% cover 45%;
+  }
+}
+
+@keyframes gauge-fill {
+  from { width: 0; }
+  to { width: var(--w); }
 }

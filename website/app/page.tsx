@@ -1,14 +1,17 @@
 import { BrandMark } from '@/components/BrandMark';
 import { AppStoreBadge } from '@/components/AppStoreBadge';
+import { InView } from '@/components/InView';
 
 /* The hero device: real captures of the app (header, watchlist) layered
    with live DOM for the moving parts — the iOS status bar and the
    trending ticker, which marquees the way the in-app carousel does. */
 const TICKER = [
-  { art: 'charizard', name: 'Charizard ex', set: '151', delta: '+2.4%', up: true },
-  { art: 'moonbreon', name: 'Umbreon VMAX', set: 'Evolving Skies', delta: '+4.1%', up: true },
-  { art: 'latias', name: 'Latias \u2605', set: 'EX Deoxys', delta: '-1.1%', up: false },
-  { art: 'umbreon', name: 'Umbreon ex', set: 'Prismatic Evolutions', delta: '+3.9%', up: true },
+  { art: '/trend/t0.webp', name: "Greavard #70", set: "Scarlet & Violet Promo", delta: '-13.2%', up: false },
+  { art: '/trend/t1.webp', name: "Philippe #110", set: "Chaos Rising", delta: '+11.8%', up: true },
+  { art: '/trend/t2.webp', name: "Jamming Tower #261", set: "Ascended Heroes", delta: '+7.2%', up: true },
+  { art: '/trend/t3.webp', name: "Mamoswine ex #174", set: "Journey Together", delta: '-6.2%', up: false },
+  { art: '/trend/t4.webp', name: "Tool Scrapper #115", set: "Chaos Rising", delta: '-5.8%', up: false },
+  { art: '/trend/t5.webp', name: "Mismagius ex #112", set: "Phantasmal Flames", delta: '-5.7%', up: false },
 ];
 
 function TickerRun() {
@@ -16,7 +19,7 @@ function TickerRun() {
     <div className="ticker-run" aria-hidden="true">
       {TICKER.map((t) => (
         <div className="ticker-tile" key={t.name}>
-          <img src={`/cards/${t.art}.png`} alt="" />
+          <img src={t.art} alt="" />
           <div>
             <div className="tt-name">{t.name}</div>
             <div className="tt-set">{t.set}</div>
@@ -35,7 +38,7 @@ function Phone() {
         <div className="island" />
         <div className="screen">
           <div className="status">
-          <span className="clock">9:41 &middot; Aug 27</span>
+          <span className="clock">9:41</span>
           <span className="status-right">
             <svg viewBox="0 0 16 10" width="14" height="9" aria-hidden="true"><rect x="0" y="6" width="3" height="4" rx="0.8" fill="currentColor"/><rect x="4.3" y="4" width="3" height="6" rx="0.8" fill="currentColor"/><rect x="8.6" y="2" width="3" height="8" rx="0.8" fill="currentColor"/><rect x="12.9" y="0" width="3" height="10" rx="0.8" fill="currentColor" opacity="0.35"/></svg>
             <svg viewBox="0 0 16 11" width="14" height="10" aria-hidden="true"><path d="M8 9.5 L5.2 6.6 a4 4 0 0 1 5.6 0 Z M3.2 4.5 a6.8 6.8 0 0 1 9.6 0 L11.4 6 a4.8 4.8 0 0 0 -6.8 0 Z" fill="currentColor"/></svg>
@@ -75,7 +78,7 @@ export default function Home() {
         </div>
         <div className="iso-stack" aria-hidden="true">
           <div className="iso-plane">
-            <div className="row iso-card" style={{ '--z': '110px' } as React.CSSProperties}>
+            <div className="iso-lift" style={{ '--z': '110px' } as React.CSSProperties}><div className="row iso-card">
               <img className="art" src="/cards/charizard.png" alt="" />
               <div>
                 <div className="name">Charizard ex</div>
@@ -85,8 +88,8 @@ export default function Home() {
                 <div className="money">$373.91</div>
                 <div className="delta up">&#9650; 2.4%</div>
               </div>
-            </div>
-            <div className="row iso-card" style={{ '--z': '55px' } as React.CSSProperties}>
+            </div></div>
+            <div className="iso-lift" style={{ '--z': '55px' } as React.CSSProperties}><div className="row iso-card">
               <img className="art" src="/cards/moonbreon.png" alt="" />
               <div>
                 <div className="name">Umbreon VMAX</div>
@@ -96,8 +99,8 @@ export default function Home() {
                 <div className="money">$2,380</div>
                 <div className="delta up">&#9650; 4.1%</div>
               </div>
-            </div>
-            <div className="row iso-card" style={{ '--z': '0px' } as React.CSSProperties}>
+            </div></div>
+            <div className="iso-lift" style={{ '--z': '0px' } as React.CSSProperties}><div className="row iso-card">
               <img className="art" src="/cards/latias.png" alt="" />
               <div>
                 <div className="name">Latias &#9733;</div>
@@ -107,7 +110,7 @@ export default function Home() {
                 <div className="money">$1,500</div>
                 <div className="delta down">&#9660; 1.1%</div>
               </div>
-            </div>
+            </div></div>
           </div>
         </div>
       </section>
@@ -117,7 +120,7 @@ export default function Home() {
           <h2>A push when it hits your price.</h2>
           <p className="say">Set a number. Put the phone down.</p>
         </div>
-        <div className="notif-stack">
+        <InView className="notif-stack">
           <div className="notif banner second">
             <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
             <div>
@@ -134,23 +137,29 @@ export default function Home() {
               </div>
             </div>
           </div>
-        </div>
+        </InView>
       </section>
 
       <section className="showcase">
         <div>
-          <h2>Every printing.</h2>
-          <p className="say">English, Japanese, vintage and sealed, in one search.</p>
+          <h2>The market, measured.</h2>
+          <p className="say">Active listings, sales a day, and demand pressure, from live eBay data.</p>
         </div>
-        <div className="chips">
-          <span className="chip-tag">English</span>
-          <span className="chip-tag">Japanese</span>
-          <span className="chip-tag">Vintage</span>
-          <span className="chip-tag">Gold Star</span>
-          <span className="chip-tag">Booster boxes</span>
-          <span className="chip-tag">Elite Trainer Boxes</span>
-          <span className="chip-tag">Tins</span>
-          <span className="chip-tag">PSA 10</span>
+        <div className="dyn-card" aria-label="Market dynamics: 34 active listings, 2.6 new per day, 3.1 sold per day, demand pressure high">
+          <div className="chart-label">EBAY MARKET DYNAMICS &middot; 7D AVG</div>
+          <div className="dyn-grid">
+            <div><span className="dyn-val">34</span><span className="dyn-key">Active</span></div>
+            <div><span className="dyn-val">2.6</span><span className="dyn-key">New/Day</span></div>
+            <div><span className="dyn-val">3.1</span><span className="dyn-key">Sold/Day</span></div>
+          </div>
+          <div className="dyn-gauge">
+            <div className="g-head"><span>Demand Pressure</span><span className="g-read up">High</span></div>
+            <div className="g-track"><div className="g-fill" style={{ '--w': '78%' } as React.CSSProperties} /></div>
+          </div>
+          <div className="dyn-gauge">
+            <div className="g-head"><span>Supply Saturation</span><span className="g-read">Low</span></div>
+            <div className="g-track"><div className="g-fill dim" style={{ '--w': '31%' } as React.CSSProperties} /></div>
+          </div>
         </div>
       </section>
 
