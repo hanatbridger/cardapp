@@ -507,7 +507,7 @@ p, li, dd, dt { max-width: var(--measure); }
   .showcase, .closer {
     animation: rise-in both;
     animation-timeline: view();
-    animation-range: entry 5% entry 55%;
+    animation-range: entry 20% cover 32%;
   }
 
   /* Direction-aware: flipped rows drift in from their own side. */
@@ -516,7 +516,7 @@ p, li, dd, dt { max-width: var(--measure); }
   .showcase > * {
     animation: rise-in both;
     animation-timeline: view();
-    animation-range: entry 5% entry 60%;
+    animation-range: entry 25% cover 36%;
   }
 
   /* The hero phone parallax-floats against the scroll. */
@@ -531,8 +531,8 @@ p, li, dd, dt { max-width: var(--measure); }
     animation: rise-in both;
     animation-timeline: view();
   }
-  .chips .chip-tag:nth-child(odd) { animation-range: entry 0% entry 45%; }
-  .chips .chip-tag:nth-child(even) { animation-range: entry 15% entry 60%; }
+  .chips .chip-tag:nth-child(odd) { animation-range: entry 20% cover 30%; }
+  .chips .chip-tag:nth-child(even) { animation-range: entry 35% cover 42%; }
 }
 
 @keyframes rise-in {
@@ -572,13 +572,13 @@ p, li, dd, dt { max-width: var(--measure); }
   .showcase .row {
     animation: card-tilt both;
     animation-timeline: view();
-    animation-range: entry 10% entry 70%;
+    animation-range: entry 25% cover 40%;
   }
 
   .showcase .notif {
     animation: notif-pop both;
     animation-timeline: view();
-    animation-range: entry 10% entry 70%;
+    animation-range: entry 25% cover 40%;
   }
 }
 
@@ -736,15 +736,15 @@ p, li, dd, dt { max-width: var(--measure); }
   .alert-story .alert-mock {
     animation: rise-in both;
     animation-timeline: view();
-    animation-range: entry 5% entry 45%;
+    animation-range: entry 20% cover 30%;
   }
   .alert-story .story-arrow {
     animation: rise-in both;
     animation-timeline: view();
-    animation-range: entry 25% entry 60%;
+    animation-range: entry 40% cover 42%;
   }
   .alert-story .notif {
-    animation-range: entry 40% entry 85%;
+    animation-range: entry 60% cover 55%;
   }
 }
 
