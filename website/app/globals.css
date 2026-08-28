@@ -114,7 +114,7 @@ p { margin: 0; text-wrap: pretty; }
   & .inner {
     max-width: var(--wide);
     margin: 0 auto;
-    padding: var(--gap-3);
+    padding: 0.7rem var(--gap-3);
     /* three zones: brand | centered nav | pill. The 1fr flanks keep the
        nav on the bar's true centerline regardless of the outer widths. */
     display: grid;
@@ -130,17 +130,17 @@ p { margin: 0; text-wrap: pretty; }
   & .brand {
     display: inline-flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.6rem;
     font-weight: 700;
     letter-spacing: -0.02em;
     color: var(--ink);
     text-decoration: none;
-    font-size: 1.05rem;
+    font-size: 1.2rem;
   }
 
   & nav {
     display: flex;
-    gap: var(--gap-3);
+    gap: var(--gap-4);
     font-size: 0.9rem;
     flex-wrap: wrap;
   }
@@ -707,7 +707,8 @@ p, li, dd, dt { max-width: var(--measure); }
   background: var(--brand);
   color: var(--brand-ink);
   font-weight: 500;
-  padding: 0.55rem 1.1rem;
+  font-size: 0.85rem;
+  padding: 0.45rem 0.95rem;
   border-radius: 999px;
   text-decoration: none;
 

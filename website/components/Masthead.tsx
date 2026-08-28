@@ -49,7 +49,7 @@ export function Masthead() {
     <header className="masthead" ref={ref}>
       <div className="inner">
         <Link href="/" className="brand">
-          <BrandMark size={26} />
+          <BrandMark size={34} />
           CardPulse
         </Link>
         <nav>
