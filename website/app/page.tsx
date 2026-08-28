@@ -17,7 +17,7 @@ function Phone() {
       </div>
       <div className="title">2 cards tracked</div>
       <div className="row">
-        <div className="art" />
+        <img className="art" src="/cards/charizard.png" alt="" />
         <div>
           <div className="name">Charizard ex</div>
           <div className="set">151 &middot; Special Illustration Rare</div>
@@ -28,7 +28,7 @@ function Phone() {
         </div>
       </div>
       <div className="row">
-        <div className="art" />
+        <img className="art" src="/cards/umbreon.png" alt="" />
         <div>
           <div className="name">Umbreon ex</div>
           <div className="set">Prismatic Evolutions</div>
@@ -39,7 +39,7 @@ function Phone() {
         </div>
       </div>
       <div className="row">
-        <div className="art" />
+        <img className="art" src="/cards/latias.png" alt="" />
         <div>
           <div className="name">Latias &#9733;</div>
           <div className="set">EX Deoxys &middot; Gold Star</div>
@@ -74,7 +74,7 @@ export default function Home() {
         </div>
         <div className="stack">
           <div className="row">
-            <div className="art" />
+            <img className="art" src="/cards/moonbreon.png" alt="" />
             <div>
               <div className="name">Moonbreon</div>
               <div className="set">Evolving Skies &middot; target $420</div>

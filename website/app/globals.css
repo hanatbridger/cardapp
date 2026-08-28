@@ -22,7 +22,7 @@
 
   --measure: 66ch;      /* reading measure — applied to text, not containers */
   --wide: 1080px;       /* the one container width, every page */
-  --section: clamp(5.5rem, 12vh, 8.5rem);  /* homepage section rhythm */
+  --section: clamp(12rem, 30vh, 20rem);  /* homepage section rhythm — each idea gets real air */
   --gap-1: 0.5rem;
   --gap-2: 0.875rem;
   --gap-3: 1.5rem;
@@ -96,7 +96,24 @@ p { margin: 0; text-wrap: pretty; }
 /* ---------- chrome ---------- */
 
 .masthead {
+  position: sticky;
+  top: 0;
+  z-index: 50;
   border-bottom: 1px solid var(--rule);
+  /* Frosted like the app's glass surfaces; solid canvas where
+     backdrop-filter is unavailable. */
+  background: var(--canvas);
+}
+
+@supports (backdrop-filter: blur(12px)) {
+  .masthead {
+    background: color-mix(in srgb, var(--canvas) 80%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+}
+
+.masthead {
 
   & .inner {
     max-width: var(--wide);
@@ -137,7 +154,9 @@ p { margin: 0; text-wrap: pretty; }
 .foot {
   border-top: 1px solid var(--rule);
   margin-top: var(--gap-6);
-  padding: clamp(2.5rem, 7vh, 5rem) 0 clamp(3rem, 8vh, 5.5rem);
+  min-height: calc(88svh - 72px);
+  align-content: center;
+  padding: clamp(2rem, 5vh, 3.5rem) 0;
   color: var(--ink-3);
   font-size: 0.85rem;
 
@@ -260,7 +279,9 @@ ul.plain {
   grid-template-columns: 1fr;
   gap: var(--gap-4);
   align-items: center;
-  padding: clamp(2.5rem, 7vh, 5rem) 0 clamp(3rem, 8vh, 5.5rem);
+  min-height: calc(88svh - 72px);
+  align-content: center;
+  padding: clamp(2rem, 5vh, 3.5rem) 0;
 }
 
 @media (min-width: 860px) {
@@ -332,6 +353,8 @@ ul.plain {
   width: 30px;
   height: 42px;
   border-radius: 3px;
+  object-fit: cover;
+  /* gradient shows behind the PNG while it loads, and IS the art if it fails */
   background: linear-gradient(150deg, var(--brand) 0%, var(--lift) 100%);
 }
 
@@ -452,3 +475,57 @@ p, li, dd, dt { max-width: var(--measure); }
 /* .cta defaults to flex-start for in-flow sections; the centered closer
    must override it or the button hangs left of its own heading. */
 .closer .cta { align-self: center; }
+
+@supports (animation-timeline: view()) {
+  /* Sections rise and fade in as they enter, finishing while still in
+     the lower third — content is never illegible mid-viewport. */
+  .showcase, .closer {
+    animation: rise-in both;
+    animation-timeline: view();
+    animation-range: entry 5% entry 55%;
+  }
+
+  /* Direction-aware: flipped rows drift in from their own side. */
+  .showcase:not(.flip) > *:last-child { animation-name: drift-right; }
+  .showcase.flip > *:first-child { animation-name: drift-left; }
+  .showcase > * {
+    animation: rise-in both;
+    animation-timeline: view();
+    animation-range: entry 5% entry 60%;
+  }
+
+  /* The hero phone parallax-floats against the scroll. */
+  .phone {
+    animation: parallax linear both;
+    animation-timeline: view();
+    animation-range: exit 0% exit 100%;
+  }
+
+  /* Coverage chips stagger by column. */
+  .chips .chip-tag {
+    animation: rise-in both;
+    animation-timeline: view();
+  }
+  .chips .chip-tag:nth-child(odd) { animation-range: entry 0% entry 45%; }
+  .chips .chip-tag:nth-child(even) { animation-range: entry 15% entry 60%; }
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(2.25rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes drift-right {
+  from { opacity: 0; transform: translateX(3rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes drift-left {
+  from { opacity: 0; transform: translateX(-3rem); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes parallax {
+  from { transform: translateY(0); }
+  to { transform: translateY(-4rem); }
+}
