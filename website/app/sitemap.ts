@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const BASE = 'https://cardpulse.app';
+const BASE = 'https://getcardpulse.app';
 
 const routes = [
   '', '/how-it-works', '/price-alerts', '/methodology', '/pricing',

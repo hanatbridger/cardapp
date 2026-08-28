@@ -13,7 +13,7 @@ const grotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://cardpulse.app'),
+  metadataBase: new URL('https://getcardpulse.app'),
   title: {
     default: 'CardPulse — Pokémon card price tracker with target-price alerts',
     template: '%s — CardPulse',
@@ -41,9 +41,9 @@ const schema = {
   '@graph': [
     {
       '@type': 'Organization',
-      '@id': 'https://cardpulse.app/#org',
+      '@id': 'https://getcardpulse.app/#org',
       name: 'CardPulse',
-      url: 'https://cardpulse.app',
+      url: 'https://getcardpulse.app',
     },
     {
       '@type': 'SoftwareApplication',
@@ -51,7 +51,7 @@ const schema = {
       applicationCategory: 'FinanceApplication',
       operatingSystem: 'iOS',
       url: APP_STORE,
-      publisher: { '@id': 'https://cardpulse.app/#org' },
+      publisher: { '@id': 'https://getcardpulse.app/#org' },
       offers: [
         { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free' },
         { '@type': 'Offer', price: '4.99', priceCurrency: 'USD', name: 'Premium monthly' },
