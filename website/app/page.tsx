@@ -156,15 +156,62 @@ export default function Home() {
 
       <section className="showcase flip">
         <div>
-          <h2>Real numbers, named.</h2>
-          <p className="say">Every price says where it came from.</p>
+          <h2>Every card&rsquo;s history, charted.</h2>
+          <p className="say">Daily closes for any card you open &mdash; raw and PSA&nbsp;10.</p>
         </div>
-        <div className="stack">
-          <div className="notif">
-            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+        <div className="chart-card" aria-label="Price history chart for Umbreon VMAX: rising from $1,850 to $2,380 over three months">
+          <div className="chart-head">
             <div>
-              <div className="t">$361.45</div>
-              <div className="b">TCGplayer market price &middot; raw &middot; updated today</div>
+              <div className="chart-label">UMBREON VMAX &middot; RAW</div>
+              <div className="chart-price">$2,380</div>
+            </div>
+            <span className="chart-delta">&#9650; 4.1%</span>
+          </div>
+          <svg className="chart" viewBox="0 0 320 130" aria-hidden="true">
+            <defs>
+              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--brand)" stopOpacity="0.28" />
+                <stop offset="100%" stopColor="var(--brand)" stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              className="chart-area"
+              d="M0,98 C22,92 34,96 52,88 C70,80 82,90 100,84 C118,78 132,60 150,64 C168,68 180,56 198,50 C216,44 228,58 246,48 C264,38 284,30 302,22 L320,18 L320,130 L0,130 Z"
+              fill="url(#chartFill)"
+            />
+            <path
+              className="chart-line"
+              d="M0,98 C22,92 34,96 52,88 C70,80 82,90 100,84 C118,78 132,60 150,64 C168,68 180,56 198,50 C216,44 228,58 246,48 C264,38 284,30 302,22 L320,18"
+              pathLength="1"
+              fill="none"
+              stroke="var(--brand)"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            <circle className="chart-dot" cx="320" cy="18" r="4" fill="var(--brand)" />
+          </svg>
+          <div className="chart-ranges">
+            <span>1W</span>
+            <span>1M</span>
+            <span className="on">3M</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="showcase">
+        <div>
+          <h2>Any currency.</h2>
+          <p className="say">Every price converts to the one you pick, at a daily rate.</p>
+        </div>
+        <div className="currency-card" aria-label="The same card price shown in dollars, euros, yen and pounds">
+          <div className="chart-label">UMBREON VMAX &middot; RAW</div>
+          <div className="cur-roll" aria-hidden="true">
+            <div className="cur-list">
+              <div className="cur-line"><span className="cur-amount">$2,380</span><span className="cur-code">USD</span></div>
+              <div className="cur-line"><span className="cur-amount">&euro;2,190</span><span className="cur-code">EUR</span></div>
+              <div className="cur-line"><span className="cur-amount">&yen;352,000</span><span className="cur-code">JPY</span></div>
+              <div className="cur-line"><span className="cur-amount">&pound;1,860</span><span className="cur-code">GBP</span></div>
+              <div className="cur-line"><span className="cur-amount">$2,380</span><span className="cur-code">USD</span></div>
             </div>
           </div>
         </div>

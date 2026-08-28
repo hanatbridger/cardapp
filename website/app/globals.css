@@ -538,16 +538,6 @@ ul.plain {
 
 .showcase .say { color: var(--ink-2); margin-top: var(--gap-1); max-width: 34ch; }
 
-.chips { display: flex; flex-wrap: wrap; gap: var(--gap-1); }
-
-.chip-tag {
-  font-size: 0.78rem;
-  font-weight: 500;
-  padding: 0.4rem 0.7rem;
-  border-radius: 999px;
-  background: var(--brand-soft);
-  color: var(--brand);
-}
 
 
 .closer {
@@ -613,13 +603,6 @@ p, li, dd, dt { max-width: var(--measure); }
     animation-range: exit 0% exit 100%;
   }
 
-  /* Coverage chips stagger by column. */
-  .chips .chip-tag {
-    animation: rise-in both;
-    animation-timeline: view();
-  }
-  .chips .chip-tag:nth-child(odd) { animation-range: entry 20% cover 30%; }
-  .chips .chip-tag:nth-child(even) { animation-range: entry 35% cover 42%; }
 }
 
 @keyframes rise-in {
@@ -756,9 +739,10 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(48rem 34rem at 78% -6%, color-mix(in srgb, var(--brand) 13%, transparent), transparent 70%),
-    radial-gradient(40rem 30rem at -12% 42%, color-mix(in srgb, var(--brand) 9%, transparent), transparent 70%),
-    radial-gradient(44rem 32rem at 55% 108%, color-mix(in srgb, var(--brand) 7%, transparent), transparent 72%);
+    radial-gradient(52rem 38rem at 78% -6%, color-mix(in srgb, var(--brand) 22%, transparent), transparent 70%),
+    radial-gradient(44rem 34rem at -12% 42%, color-mix(in srgb, var(--brand) 15%, transparent), transparent 70%),
+    radial-gradient(40rem 30rem at 108% 68%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 70%),
+    radial-gradient(48rem 34rem at 55% 108%, color-mix(in srgb, var(--brand) 12%, transparent), transparent 72%);
 }
 
 
@@ -850,4 +834,171 @@ body::before {
 @keyframes iso-rise {
   from { opacity: 0; transform: translateZ(0); }
   to { opacity: 1; transform: translateZ(var(--z)); }
+}
+
+/* ---------- price history, drawing itself as you scroll ---------- */
+
+.chart-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 16px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.chart-label {
+  font-size: 0.66rem;
+  letter-spacing: 0.09em;
+  color: var(--ink-3);
+  font-weight: 500;
+}
+
+.chart-price {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-delta { color: var(--up); font-size: 0.8rem; font-weight: 500; }
+
+.chart { width: 100%; height: auto; display: block; }
+
+.chart-line { stroke-dasharray: 1; }
+
+.chart-ranges {
+  display: flex;
+  gap: 6px;
+
+  & span {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: var(--ink-3);
+    padding: 0.3rem 0.65rem;
+    border-radius: 999px;
+  }
+
+  & .on { background: var(--brand-soft); color: var(--brand); }
+}
+
+@supports (animation-timeline: view()) {
+  .chart-line {
+    animation: draw-line both;
+    animation-timeline: view();
+    animation-range: entry 25% cover 55%;
+  }
+  .chart-area {
+    animation: area-in both;
+    animation-timeline: view();
+    animation-range: entry 40% cover 55%;
+  }
+  .chart-dot {
+    animation: dot-pop both;
+    animation-timeline: view();
+    animation-range: cover 50% cover 58%;
+  }
+}
+
+@keyframes draw-line {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes area-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dot-pop {
+  0% { opacity: 0; transform: scale(0); transform-origin: 320px 18px; }
+  70% { opacity: 1; transform: scale(1.6); transform-origin: 320px 18px; }
+  100% { opacity: 1; transform: scale(1); transform-origin: 320px 18px; }
+}
+
+/* ---------- coverage chips (restored) ---------- */
+
+.chips { display: flex; flex-wrap: wrap; gap: var(--gap-1); }
+
+.chip-tag {
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.4rem 0.7rem;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+@supports (animation-timeline: view()) {
+  .chips .chip-tag {
+    animation: rise-in both;
+    animation-timeline: view();
+  }
+  .chips .chip-tag:nth-child(odd) { animation-range: entry 20% cover 30%; }
+  .chips .chip-tag:nth-child(even) { animation-range: entry 35% cover 42%; }
+}
+
+/* ---------- one price, any currency: a rolling odometer ---------- */
+
+.currency-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cur-roll { height: 2.6rem; overflow: hidden; }
+
+.cur-list {
+  display: flex;
+  flex-direction: column;
+  animation: cur-cycle 9s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+.cur-line {
+  height: 2.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.cur-amount {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cur-code {
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: var(--brand);
+  background: var(--brand-soft);
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+}
+
+/* hold each currency, then roll to the next; the fifth line repeats the
+   first so the loop closes without a jump */
+@keyframes cur-cycle {
+  0%, 18%   { transform: translateY(0); }
+  25%, 43%  { transform: translateY(-2.6rem); }
+  50%, 68%  { transform: translateY(-5.2rem); }
+  75%, 93%  { transform: translateY(-7.8rem); }
+  100%      { transform: translateY(-10.4rem); }
 }
