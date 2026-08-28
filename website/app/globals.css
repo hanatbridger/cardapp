@@ -335,17 +335,68 @@ ul.plain {
 
 .phone .screen {
   height: 100%;
-  background: var(--canvas);
+  /* the app's own gradient top, sampled from the capture, so the
+     status-bar strip continues the real background */
+  background: #10101D;
   border-radius: 35px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
-.screen-shot {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top;
-  display: block;
+.screen .slice { width: 100%; display: block; flex: none; }
+
+/* ---- iOS status bar, drawn ---- */
+.status {
+  height: 46px;
+  flex: none;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 22px 4px;
+  color: #F9FAFB;
+
+  & .clock { font-size: 10.5px; font-weight: 700; letter-spacing: 0.01em; }
+  & .status-right { display: inline-flex; align-items: center; gap: 4px; }
+}
+
+/* ---- trending ticker: two copies of the run marquee left forever ---- */
+.ticker {
+  flex: none;
+  display: flex;
+  overflow: hidden;
+  padding: 4px 0 10px;
+}
+
+.ticker-run {
+  display: flex;
+  gap: 8px;
+  padding-right: 8px;
+  flex: none;
+  animation: marquee 26s linear infinite;
+}
+
+.ticker-tile {
+  flex: none;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  width: 148px;
+  background: rgb(255 255 255 / 0.055);
+  border-radius: 12px;
+  padding: 7px 9px;
+
+  & img { width: 26px; height: 36px; object-fit: cover; border-radius: 3px; }
+  & .tt-name { font-size: 8.5px; font-weight: 700; color: #F9FAFB; white-space: nowrap; }
+  & .tt-set { font-size: 7.5px; color: #9CA3AF; white-space: nowrap; }
+  & .tt-delta { font-size: 8px; font-weight: 500; }
+  & .up { color: #34D399; }
+  & .down { color: #F87171; }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
 }
 
 .phone .island {
@@ -643,7 +694,7 @@ p, li, dd, dt { max-width: var(--measure); }
 
 @media (prefers-reduced-motion: no-preference) {
   .phone { animation: phone-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.1s; }
-  .screen-shot { animation: cascade 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.25s; }
+  .screen > * { animation: cascade 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both 0.25s; }
 }
 
 @keyframes phone-in {
