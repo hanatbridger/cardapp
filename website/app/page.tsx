@@ -62,7 +62,6 @@ export default function Home() {
           <p className="sub">One list. Live prices. A push when a card hits your price.</p>
           <div className="actions">
             <a className="cta" href={APP_STORE}>Download on the App Store</a>
-            <p className="note">Free for 5 cards and 3 alerts.</p>
           </div>
         </div>
         <Phone />
