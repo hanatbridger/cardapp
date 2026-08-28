@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Space_Grotesk } from 'next/font/google';
 import Link from 'next/link';
 import { Masthead } from '@/components/Masthead';
+import { BrandMark } from '@/components/BrandMark';
 import './globals.css';
 
 const grotesk = Space_Grotesk({
@@ -72,6 +73,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main>{children}</main>
         <footer className="foot">
           <div className="inner">
+            <div className="foot-brand">
+              <BrandMark size={24} />
+              CardPulse
+            </div>
             <nav>
               <Link href="/about">About</Link>
               <Link href="/changelog">Changelog</Link>

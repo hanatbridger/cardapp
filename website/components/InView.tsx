@@ -17,14 +17,17 @@ export function InView({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Toggles rather than fires once: the animations are infinite loops
+    // with a rest phase, and this just pauses them off-screen. A loop
+    // can never be "missed" the way a one-shot can.
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          el.setAttribute('data-play', '');
-          io.disconnect();
+        for (const e of entries) {
+          if (e.isIntersecting) el.setAttribute('data-play', '');
+          else el.removeAttribute('data-play');
         }
       },
-      { threshold: 0.45 },
+      { threshold: 0.3 },
     );
     io.observe(el);
     return () => io.disconnect();

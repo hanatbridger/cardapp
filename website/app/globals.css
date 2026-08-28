@@ -155,10 +155,8 @@ p { margin: 0; text-wrap: pretty; }
 
 .foot {
   border-top: 1px solid var(--rule);
-  margin-top: var(--gap-6);
-  min-height: calc(88svh - 72px);
-  align-content: center;
-  padding: clamp(2rem, 5vh, 3.5rem) 0;
+  margin-top: var(--gap-5);
+  padding: var(--gap-3) 0 var(--gap-4);
   color: var(--ink-3);
   font-size: 0.85rem;
 
@@ -179,7 +177,17 @@ p { margin: 0; text-wrap: pretty; }
     gap: var(--gap-1) var(--gap-3);
   }
 
-  & p { max-width: 46ch; }
+  & .foot-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  & p { max-width: 46ch; font-size: 0.78rem; }
   & a { color: var(--ink-3); }
 }
 
@@ -773,22 +781,69 @@ body::before {
   z-index: 2;
 }
 
-/* The arrivals play on a clock, like the hardware: nothing until the
-   stack is seen (data-play from the InView island), then the first
-   banner springs down, and 1.4s later the second takes the top slot
-   while the first is pushed down. */
-.notif-stack .notif.banner { opacity: 0; }
+/* The two arrivals run as one 8s looping film with a rest phase --
+   the pattern every notification-product site ships (looping video /
+   Lottie), done in DOM. The InView island only pauses it off-screen,
+   so the sequence can never be missed. Drops use a linear() spring
+   fitted to the iOS banner entrance (zeta 0.7, one ~4.5% overshoot);
+   the push-down uses the calmer SwiftUI default spring.
 
-.notif-stack[data-play] .first {
-  animation: banner-drop 0.6s cubic-bezier(0.32, 1.4, 0.42, 1) 0.2s both;
+   Timeline: drop 1 at 0s -> second arrives + push at 2.3s -> both
+   exit upward at 6s -> 1.5s rest -> repeat. */
+
+.notif-stack .notif.banner,
+.notif-stack .slot-shift {
+  animation-duration: 8s;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+  animation-play-state: paused;
 }
 
-.notif-stack[data-play] .second {
-  animation: banner-drop 0.6s cubic-bezier(0.32, 1.4, 0.42, 1) 1.6s both;
-}
-
+.notif-stack[data-play] .notif.banner,
 .notif-stack[data-play] .slot-shift {
-  animation: shift-down 0.55s cubic-bezier(0.4, 0.9, 0.3, 1) 1.6s both;
+  animation-play-state: running;
+}
+
+.notif-stack .first { animation-name: loop-first; }
+.notif-stack .second { animation-name: loop-second; }
+.notif-stack .slot-shift { animation-name: loop-shift; }
+
+/* spring B: iOS banner drop, ~850ms = 10.6% of the cycle */
+@keyframes loop-first {
+  0% {
+    opacity: 0;
+    transform: translateY(-34px) scale(0.94);
+    animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
+  }
+  10.6%, 75% { opacity: 1; transform: none; animation-timing-function: ease-in; }
+  80.6%, 100% { opacity: 0; transform: translateY(-20px); }
+}
+
+@keyframes loop-second {
+  0%, 28.7% {
+    opacity: 0;
+    transform: translateY(-34px) scale(0.94);
+    animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
+  }
+  39.4%, 75% { opacity: 1; transform: none; animation-timing-function: ease-in; }
+  80.6%, 100% { opacity: 0; transform: translateY(-20px); }
+}
+
+/* spring A: SwiftUI default -- the push is calmer than the drop */
+@keyframes loop-shift {
+  0%, 28.7% {
+    transform: translateY(0);
+    animation-timing-function: linear(0, 0.017, 0.06, 0.121, 0.193, 0.271, 0.35, 0.429, 0.504, 0.575, 0.639, 0.698, 0.75, 0.796, 0.835, 0.87, 0.899, 0.923, 0.943, 0.96, 0.973, 0.983, 0.992, 0.998, 1.002, 1.006, 1.008, 1.009, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+  }
+  35%, 82% { transform: translateY(96px); }
+  84%, 100% { transform: translateY(0); }
+}
+
+/* the global reduced-motion kill removes the animations entirely, which
+   would strand the banners at opacity 0 -- pin the finished stack */
+@media (prefers-reduced-motion: reduce) {
+  .notif-stack .notif.banner { opacity: 1; }
+  .notif-stack .slot-shift { transform: translateY(96px); }
 }
 
 @keyframes shift-down {
@@ -809,7 +864,8 @@ body::before {
   width: 100%;
   display: grid;
   place-items: center;
-  perspective: 1400px;
+  /* no perspective: isometric is a parallel projection; adding it makes
+     edges converge and the stack stops reading as one object */
 }
 
 .iso-plane {
@@ -817,19 +873,31 @@ body::before {
   transform-style: preserve-3d;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 0;
 }
 
+/* elevation steps are small relative to card size (research: 18-30px
+   reads as layers of one object; the old 110px read as scattered chips)
+   and cards overlap in-plane instead of gapping apart */
 .iso-lift {
   transform: translateZ(var(--z));
   transform-style: preserve-3d;
 }
 
+.iso-lift + .iso-lift { margin-top: -16px; }
+
+.iso-bob { transform: translateZ(0); }
+
 .iso-card {
   width: 300px;
-  box-shadow: 0 24px 34px -18px rgb(0 0 0 / 0.5);
   background: var(--surface);
 }
+
+/* shadow carries the elevation: offset and blur grow with z, opacity
+   falls -- and lower layers sit slightly dimmer, lighting with depth */
+.iso-lift:nth-child(1) .iso-card { box-shadow: 0 14px 28px rgb(0 0 0 / 0.14); }
+.iso-lift:nth-child(2) .iso-card { box-shadow: 0 6px 14px rgb(0 0 0 / 0.2); filter: brightness(0.96); }
+.iso-lift:nth-child(3) .iso-card { box-shadow: 0 2px 5px rgb(0 0 0 / 0.28); filter: brightness(0.92); }
 
 @supports (animation-timeline: view()) {
   .showcase .iso-lift {
@@ -841,12 +909,14 @@ body::before {
   .showcase .iso-lift:nth-child(3) { animation-range: entry 41% cover 48%; }
 }
 
-/* ambient float, phase-offset per card -- the .showcase .row tilt rule
-   is outranked here by order at equal specificity */
+/* ambient float along the plane NORMAL (translateZ) -- a translateY
+   here runs in the rotated frame and reads as sliding across the
+   table. Durations differ per card and phases are offset so the three
+   never move in unison. */
 @media (prefers-reduced-motion: no-preference) {
-  .showcase .iso-card { animation: iso-bob 4.6s ease-in-out infinite; }
-  .iso-lift:nth-child(2) .iso-card { animation-delay: -1.5s; }
-  .iso-lift:nth-child(3) .iso-card { animation-delay: -3s; }
+  .iso-lift:nth-child(1) .iso-bob { animation: iso-bob 5.4s ease-in-out infinite; }
+  .iso-lift:nth-child(2) .iso-bob { animation: iso-bob 6.3s ease-in-out infinite -2.1s; }
+  .iso-lift:nth-child(3) .iso-bob { animation: iso-bob 4.7s ease-in-out infinite -3.4s; }
 }
 
 @keyframes iso-rise {
@@ -855,8 +925,8 @@ body::before {
 }
 
 @keyframes iso-bob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
+  0%, 100% { transform: translateZ(0); }
+  50% { transform: translateZ(7px); }
 }
 
 /* ---------- price history, drawing itself as you scroll ---------- */

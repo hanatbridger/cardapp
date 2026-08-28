@@ -78,7 +78,7 @@ export default function Home() {
         </div>
         <div className="iso-stack" aria-hidden="true">
           <div className="iso-plane">
-            <div className="iso-lift" style={{ '--z': '110px' } as React.CSSProperties}><div className="row iso-card">
+            <div className="iso-lift" style={{ '--z': '52px' } as React.CSSProperties}><div className="iso-bob"><div className="row iso-card">
               <img className="art" src="/cards/charizard.png" alt="" />
               <div>
                 <div className="name">Charizard ex</div>
@@ -88,8 +88,8 @@ export default function Home() {
                 <div className="money">$373.91</div>
                 <div className="delta up">&#9650; 2.4%</div>
               </div>
-            </div></div>
-            <div className="iso-lift" style={{ '--z': '55px' } as React.CSSProperties}><div className="row iso-card">
+            </div></div></div>
+            <div className="iso-lift" style={{ '--z': '26px' } as React.CSSProperties}><div className="iso-bob"><div className="row iso-card">
               <img className="art" src="/cards/moonbreon.png" alt="" />
               <div>
                 <div className="name">Umbreon VMAX</div>
@@ -99,8 +99,8 @@ export default function Home() {
                 <div className="money">$2,380</div>
                 <div className="delta up">&#9650; 4.1%</div>
               </div>
-            </div></div>
-            <div className="iso-lift" style={{ '--z': '0px' } as React.CSSProperties}><div className="row iso-card">
+            </div></div></div>
+            <div className="iso-lift" style={{ '--z': '0px' } as React.CSSProperties}><div className="iso-bob"><div className="row iso-card">
               <img className="art" src="/cards/latias.png" alt="" />
               <div>
                 <div className="name">Latias &#9733;</div>
@@ -110,7 +110,7 @@ export default function Home() {
                 <div className="money">$1,500</div>
                 <div className="delta down">&#9660; 1.1%</div>
               </div>
-            </div></div>
+            </div></div></div>
           </div>
         </div>
       </section>
