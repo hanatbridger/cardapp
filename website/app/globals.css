@@ -689,39 +689,8 @@ p, li, dd, dt { max-width: var(--measure); }
   translate: 0 -100%;
 }
 
-@supports (animation-timeline: view()) {
-  /* The visual mocks get their own motion on top of the section rise:
-     price rows tilt up off the page plane, notifications pop the way a
-     real push does. Scrubbed by scroll, so reversing plays them back. */
-  .showcase .row {
-    animation: card-tilt both;
-    animation-timeline: view();
-    animation-range: entry 25% cover 40%;
-  }
 
-  .showcase .notif {
-    animation: notif-pop both;
-    animation-timeline: view();
-    animation-range: entry 25% cover 40%;
-  }
-}
 
-@keyframes card-tilt {
-  from {
-    opacity: 0;
-    transform: perspective(700px) rotateX(16deg) translateY(2rem);
-  }
-  to {
-    opacity: 1;
-    transform: perspective(700px) rotateX(0deg) translateY(0);
-  }
-}
-
-@keyframes notif-pop {
-  0% { opacity: 0; transform: scale(0.82) translateY(1.25rem); }
-  70% { transform: scale(1.03) translateY(-2px); }
-  100% { opacity: 1; transform: none; }
-}
 
 /* ---------- App Store badge (official anatomy) ---------- */
 
@@ -842,6 +811,11 @@ body::before {
   animation-duration: 8s;
   animation-iteration-count: infinite;
   animation-fill-mode: both;
+  /* explicitly the document clock -- a scroll timeline inherited from
+     any broader rule turns the loop into a scroll scrub that parks at
+     opacity 0 once the section is in view */
+  animation-timeline: auto;
+  animation-range: normal;
 }
 
 .notif-stack .first { animation-name: loop-first; }
