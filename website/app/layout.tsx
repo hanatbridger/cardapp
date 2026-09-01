@@ -44,6 +44,9 @@ const schema = {
       '@id': 'https://getcardpulse.app/#org',
       name: 'CardPulse',
       url: 'https://getcardpulse.app',
+      // the App Store listing is the entity's other public record --
+      // linking them is what lets crawlers reconcile the two
+      sameAs: [APP_STORE],
     },
     {
       '@type': 'SoftwareApplication',
