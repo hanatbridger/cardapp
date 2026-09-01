@@ -53,7 +53,7 @@ export function Masthead() {
       <div className="inner">
         <Link href="/" className="brand">
           <BrandMark size={34} />
-          CardPulse
+          <span className="brand-word">CardPulse</span>
         </Link>
         <nav>
           <Link href="/how-it-works">How it works</Link>
