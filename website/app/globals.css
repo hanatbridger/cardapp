@@ -95,32 +95,36 @@ p { margin: 0; text-wrap: pretty; }
   position: sticky;
   top: 0;
   z-index: 50;
-  border-bottom: 1px solid var(--rule);
-  /* Frosted like the app's glass surfaces; solid canvas where
-     backdrop-filter is unavailable. */
-  background: var(--canvas);
-}
-
-@supports (backdrop-filter: blur(12px)) {
-  .masthead {
-    background: color-mix(in srgb, var(--canvas) 80%, transparent);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-  }
+  padding: 10px 0;
+  pointer-events: none;
+  /* the bar itself is invisible; the capsule inside is the nav */
 }
 
 .masthead {
 
   & .inner {
-    max-width: var(--wide);
+    pointer-events: auto;
+    width: fit-content;
     margin: 0 auto;
-    padding: 0.7rem var(--gap-3);
-    /* three zones: brand | centered nav | pill. The 1fr flanks keep the
-       nav on the bar's true centerline regardless of the outer widths. */
-    display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    padding: 0.45rem 0.6rem 0.45rem 1rem;
+    display: flex;
     align-items: center;
-    gap: var(--gap-3);
+    gap: var(--gap-4);
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+    background: color-mix(in srgb, var(--canvas) 72%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+    transition: box-shadow 0.35s ease, background 0.35s ease, transform 0.35s ease;
+  }
+
+  /* scrolled: the capsule detaches -- deeper shadow, denser glass */
+  &[data-scrolled] .inner {
+    background: color-mix(in srgb, var(--canvas) 88%, transparent);
+    box-shadow:
+      0 12px 32px -12px rgb(0 0 0 / 0.4),
+      0 2px 8px rgb(0 0 0 / 0.12);
   }
 
   & .brand { justify-self: start; }
@@ -570,14 +574,16 @@ ul.plain {
    as a broken grid. Stack them under it instead. */
 @media (max-width: 700px) {
   .masthead .inner {
-    grid-template-columns: auto 1fr;
+    width: calc(100% - 2 * var(--gap-3));
+    flex-wrap: wrap;
+    justify-content: space-between;
     gap: var(--gap-2) var(--gap-3);
-    padding-bottom: var(--gap-2);
+    border-radius: 24px;
   }
 
   .masthead .inner > nav {
-    grid-column: 1 / -1;
-    justify-self: start;
+    order: 3;
+    width: 100%;
     gap: var(--gap-2) var(--gap-3);
     font-size: 0.85rem;
   }
@@ -809,15 +815,16 @@ body::before {
 .notif-stack .second { animation-name: loop-second; }
 .notif-stack .slot-shift { animation-name: loop-shift; }
 
-/* spring B: iOS banner drop, ~850ms = 10.6% of the cycle */
+/* Overlapping cycles: at least one banner is on screen at every moment,
+   so no glance or screenshot ever catches the demo empty. */
 @keyframes loop-first {
   0% {
     opacity: 0;
     transform: translateY(-34px) scale(0.94);
     animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
   }
-  10.6%, 75% { opacity: 1; transform: none; animation-timing-function: ease-in; }
-  80.6%, 100% { opacity: 0; transform: translateY(-20px); }
+  10.6%, 88% { opacity: 1; transform: none; animation-timing-function: ease-in; }
+  93%, 100% { opacity: 0; transform: translateY(-20px); }
 }
 
 @keyframes loop-second {
@@ -826,8 +833,8 @@ body::before {
     transform: translateY(-34px) scale(0.94);
     animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
   }
-  39.4%, 75% { opacity: 1; transform: none; animation-timing-function: ease-in; }
-  80.6%, 100% { opacity: 0; transform: translateY(-20px); }
+  39.4%, 95% { opacity: 1; transform: none; animation-timing-function: ease-in; }
+  99.5%, 100% { opacity: 0; transform: translateY(-20px); }
 }
 
 /* spring A: SwiftUI default -- the push is calmer than the drop */
@@ -836,8 +843,8 @@ body::before {
     transform: translateY(0);
     animation-timing-function: linear(0, 0.017, 0.06, 0.121, 0.193, 0.271, 0.35, 0.429, 0.504, 0.575, 0.639, 0.698, 0.75, 0.796, 0.835, 0.87, 0.899, 0.923, 0.943, 0.96, 0.973, 0.983, 0.992, 0.998, 1.002, 1.006, 1.008, 1.009, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
   }
-  35%, 82% { transform: translateY(96px); }
-  84%, 100% { transform: translateY(0); }
+  35%, 93.5% { transform: translateY(96px); }
+  94.5%, 100% { transform: translateY(0); }
 }
 
 /* the global reduced-motion kill removes the animations entirely, which

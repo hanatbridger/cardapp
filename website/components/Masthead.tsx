@@ -22,6 +22,9 @@ export function Masthead() {
       const el = ref.current;
       if (!el) return;
       const y = window.scrollY;
+      // Capsule state: detached shadow once the page is moving.
+      if (y > 14) el.setAttribute('data-scrolled', '');
+      else el.removeAttribute('data-scrolled');
       // Near the top the bar is always shown; below that, direction rules.
       // The 8px deadband stops trackpad jitter from flickering it.
       if (y < 96) {
