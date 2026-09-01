@@ -120,20 +120,25 @@ export default function Home() {
           <p className="say">Set a number. Put the phone down.</p>
         </div>
         <div className="notif-stack">
-          <div className="notif banner second">
+          <div className="notif banner n3">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Charizard ex is now below $370 &mdash; currently $368.20.</div>
+            </div>
+          </div>
+          <div className="notif banner n2">
             <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
             <div>
               <div className="t">CardPulse</div>
               <div className="b">Latias &#9733; is now below $1,450 &mdash; currently $1,439.</div>
             </div>
           </div>
-          <div className="slot-shift">
-            <div className="notif banner first">
-              <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-              <div>
-                <div className="t">CardPulse</div>
-                <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
-              </div>
+          <div className="notif banner n1">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
             </div>
           </div>
         </div>

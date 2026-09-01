@@ -781,85 +781,80 @@ body::before {
 
 /* Two arrivals, iOS-style: the first banner springs down; the second
    arrives later, takes the top slot, and pushes the first down. */
+/* Three arrivals as one 12s looping film on the document clock: each
+   new banner takes the top slot and pushes the stack down. Slots sit
+   74px apart -- tight, the cards nearly touching, like the hardware's
+   stack. At least one banner is visible at every instant. */
 .notif-stack {
   position: relative;
   width: 100%;
   max-width: 360px;
-  min-height: 182px;
+  min-height: 218px;
 }
 
-.notif-stack .second {
+.notif-stack .notif.banner {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  z-index: 2;
-}
-
-/* The two arrivals run as one 8s looping film with a rest phase --
-   the pattern every notification-product site ships (looping video /
-   Lottie), done in DOM, autoplaying like theirs do -- visibility
-   gating proved fragile twice. Drops use a linear() spring
-   fitted to the iOS banner entrance (zeta 0.7, one ~4.5% overshoot);
-   the push-down uses the calmer SwiftUI default spring.
-
-   Timeline: drop 1 at 0s -> second arrives + push at 2.3s -> both
-   exit upward at 6s -> 1.5s rest -> repeat. */
-
-.notif-stack .notif.banner,
-.notif-stack .slot-shift {
-  animation-duration: 8s;
+  animation-duration: 12s;
   animation-iteration-count: infinite;
   animation-fill-mode: both;
-  /* explicitly the document clock -- a scroll timeline inherited from
-     any broader rule turns the loop into a scroll scrub that parks at
-     opacity 0 once the section is in view */
   animation-timeline: auto;
   animation-range: normal;
 }
 
-.notif-stack .first { animation-name: loop-first; }
-.notif-stack .second { animation-name: loop-second; }
-.notif-stack .slot-shift { animation-name: loop-shift; }
+.notif-stack .n1 { z-index: 1; animation-name: loop-n1; }
+.notif-stack .n2 { z-index: 2; animation-name: loop-n2; }
+.notif-stack .n3 { z-index: 3; animation-name: loop-n3; }
 
-/* Overlapping cycles: at least one banner is on screen at every moment,
-   so no glance or screenshot ever catches the demo empty. */
-@keyframes loop-first {
+/* springs: B = iOS banner drop for arrivals; A = SwiftUI default for
+   the pushes. Arrivals at 0s / 3s / 6s; exits staggered near the end
+   with n3 held to the wrap so the column is never empty. */
+@keyframes loop-n1 {
   0% {
     opacity: 0;
     transform: translateY(-34px) scale(0.94);
     animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
   }
-  10.6%, 88% { opacity: 1; transform: none; animation-timing-function: ease-in; }
-  93%, 100% { opacity: 0; transform: translateY(-20px); }
+  7%, 25% { opacity: 1; transform: translateY(0); animation-timing-function: linear(0, 0.017, 0.06, 0.121, 0.193, 0.271, 0.35, 0.429, 0.504, 0.575, 0.639, 0.698, 0.75, 0.796, 0.835, 0.87, 0.899, 0.923, 0.943, 0.96, 0.973, 0.983, 0.992, 0.998, 1.002, 1.006, 1.008, 1.009, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1); }
+  31%, 50% { opacity: 1; transform: translateY(74px); animation-timing-function: linear(0, 0.017, 0.06, 0.121, 0.193, 0.271, 0.35, 0.429, 0.504, 0.575, 0.639, 0.698, 0.75, 0.796, 0.835, 0.87, 0.899, 0.923, 0.943, 0.96, 0.973, 0.983, 0.992, 0.998, 1.002, 1.006, 1.008, 1.009, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1); }
+  56%, 88% { opacity: 1; transform: translateY(148px); animation-timing-function: ease-in; }
+  93%, 100% { opacity: 0; transform: translateY(128px); }
 }
 
-@keyframes loop-second {
-  0%, 28.7% {
+@keyframes loop-n2 {
+  0%, 25% {
     opacity: 0;
     transform: translateY(-34px) scale(0.94);
     animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
   }
-  39.4%, 95% { opacity: 1; transform: none; animation-timing-function: ease-in; }
-  99.5%, 100% { opacity: 0; transform: translateY(-20px); }
+  32%, 50% { opacity: 1; transform: translateY(0); animation-timing-function: linear(0, 0.017, 0.06, 0.121, 0.193, 0.271, 0.35, 0.429, 0.504, 0.575, 0.639, 0.698, 0.75, 0.796, 0.835, 0.87, 0.899, 0.923, 0.943, 0.96, 0.973, 0.983, 0.992, 0.998, 1.002, 1.006, 1.008, 1.009, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1); }
+  56%, 90% { opacity: 1; transform: translateY(74px); animation-timing-function: ease-in; }
+  95%, 100% { opacity: 0; transform: translateY(54px); }
 }
 
-/* spring A: SwiftUI default -- the push is calmer than the drop */
-@keyframes loop-shift {
-  0%, 28.7% {
-    transform: translateY(0);
-    animation-timing-function: linear(0, 0.017, 0.06, 0.121, 0.193, 0.271, 0.35, 0.429, 0.504, 0.575, 0.639, 0.698, 0.75, 0.796, 0.835, 0.87, 0.899, 0.923, 0.943, 0.96, 0.973, 0.983, 0.992, 0.998, 1.002, 1.006, 1.008, 1.009, 1.01, 1.009, 1.008, 1.007, 1.006, 1.005, 1.004, 1.003, 1.002, 1.001, 1);
+@keyframes loop-n3 {
+  0%, 50% {
+    opacity: 0;
+    transform: translateY(-34px) scale(0.94);
+    animation-timing-function: linear(0, 0.023, 0.082, 0.166, 0.263, 0.366, 0.469, 0.567, 0.657, 0.738, 0.808, 0.868, 0.917, 0.956, 0.987, 1.01, 1.026, 1.037, 1.043, 1.046, 1.044, 1.04, 1.036, 1.031, 1.027, 1.022, 1.018, 1.014, 1.01, 1.007, 1.005, 1.003, 1.001, 1, 0.999, 0.998, 0.999, 1);
   }
-  35%, 93.5% { transform: translateY(96px); }
-  94.5%, 100% { transform: translateY(0); }
+  57%, 96.5% { opacity: 1; transform: translateY(0); animation-timing-function: ease-in; }
+  100% { opacity: 0; transform: translateY(-16px); }
 }
 
-/* the global reduced-motion kill removes the animations entirely, which
-   would strand the banners at opacity 0 -- pin the finished stack */
+/* the global reduced-motion kill removes the animations, which would
+   strand everything at opacity 0 -- pin the finished three-stack */
 @media (prefers-reduced-motion: reduce) {
   .notif-stack .notif.banner { opacity: 1; }
-  .notif-stack .slot-shift { transform: translateY(96px); }
+  .notif-stack .n1 { transform: translateY(148px); }
+  .notif-stack .n2 { transform: translateY(74px); }
 }
+
+
+
+
 
 @keyframes shift-down {
   from { transform: translateY(0); }
