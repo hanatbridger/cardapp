@@ -592,7 +592,7 @@ ul.plain {
 
 .closer {
   text-align: center;
-  padding: var(--section) 0 var(--gap-4);
+  padding: var(--section) 0 clamp(6rem, 14vh, 10rem);
   display: flex;
   flex-direction: column;
   align-items: center;

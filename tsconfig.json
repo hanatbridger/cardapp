@@ -32,6 +32,7 @@
   "exclude": [
     "BDS",
     "node_modules",
-    "server"
+    "server",
+    "website"
   ]
 }

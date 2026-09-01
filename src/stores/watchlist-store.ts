@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeStorage } from './safe-storage';
 import type { GradeType } from '../constants/grades';
 import type { SealedType } from '../types/sealed';
 // Direct import (not via stores/index) to keep the dependency edge
@@ -201,7 +201,7 @@ export const useWatchlistStore = create<WatchlistStore>()(
     }),
     {
       name: 'cardpulse-watchlist',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeStorage),
       version: 2,
       // maxFreeItems is a code constant, not user state. It used to be
       // persisted, which froze the cap at whatever value shipped when

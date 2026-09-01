@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeStorage } from './safe-storage';
 import type { GradeType } from '../constants/grades';
 // One-way import edge (alerts-store → user-store) for the premium
 // read; user-store imports neither store, so no cycle.
@@ -242,7 +242,7 @@ export const useAlertsStore = create<AlertsStore>()(
     }),
     {
       name: 'cardpulse-alerts',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeStorage),
     },
   ),
 );

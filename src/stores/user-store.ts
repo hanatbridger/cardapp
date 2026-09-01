@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { safeStorage } from './safe-storage';
 import type { GradeType } from '../constants/grades';
 import type { CurrencyCode } from '../constants/currencies';
 import { setUser as setSentryUser } from '../services/sentry';
@@ -193,7 +193,7 @@ export const useUserStore = create<UserStore>()(
     }),
     {
       name: 'cardpulse-user',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => safeStorage),
       // Deep-merge preferences: the default shallow merge would replace
       // the whole nested object with the persisted (older-shaped) one,
       // so preference keys added in later releases would rehydrate as
