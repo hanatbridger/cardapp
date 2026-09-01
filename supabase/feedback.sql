@@ -11,7 +11,9 @@ create extension if not exists "pgcrypto";
 -- flag pogo uses, without needing a profiles table.
 create or replace function public.is_feedback_admin()
 returns boolean language sql stable as $$
-  select coalesce(lower(auth.jwt()->>'email') = 'hanwong118@gmail.com', false);
+  select coalesce(
+    lower(auth.jwt()->>'email') in ('hanwong118@gmail.com', 'junehalloween@gmail.com'),
+    false);
 $$;
 
 create table if not exists public.feedback (

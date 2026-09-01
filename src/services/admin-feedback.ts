@@ -6,7 +6,7 @@ import type { FeedbackKind } from './feedback';
 // The one account allowed to triage. The real gate is the JWT-email
 // check inside the RLS policies (public.is_feedback_admin); this
 // client-side list only decides whether the inbox row renders.
-export const SUPERADMIN_EMAILS = ['hanwong118@gmail.com'] as const;
+export const SUPERADMIN_EMAILS = ['hanwong118@gmail.com', 'junehalloween@gmail.com'] as const;
 
 export function isSuperadminEmail(email?: string | null): boolean {
   if (!email) return false;
