@@ -164,21 +164,30 @@ export const useWatchlistStore = create<WatchlistStore>()(
         })),
 
       updatePrice: (id, price, priceChange, grade) =>
-        set((state) => ({
-          items: state.items.map((i) => {
-            if (i.kind === 'sealed' && i.productId === id) {
-              return { ...i, lastPrice: price, lastPriceChange: priceChange };
-            }
-            if (
-              i.kind === 'card' &&
+        set((state) => {
+          // Bail without a new items array when nothing would change —
+          // this fires from card detail on every open (including cache
+          // hits mid-push-animation), and an unconditional map re-rendered
+          // every watchlist subscriber each visit.
+          const matches = (i: (typeof state.items)[number]) =>
+            (i.kind === 'sealed' && i.productId === id) ||
+            (i.kind === 'card' &&
               i.cardId === id &&
-              (grade === undefined || i.grade === grade)
-            ) {
-              return { ...i, lastPrice: price, lastPriceChange: priceChange };
-            }
-            return i;
-          }),
-        })),
+              (grade === undefined || i.grade === grade));
+          const needsWrite = state.items.some(
+            (i) =>
+              matches(i) &&
+              (i.lastPrice !== price || i.lastPriceChange !== priceChange),
+          );
+          if (!needsWrite) return state;
+          return {
+            items: state.items.map((i) =>
+              matches(i)
+                ? { ...i, lastPrice: price, lastPriceChange: priceChange }
+                : i,
+            ),
+          };
+        }),
 
       canAddMore: () => {
         const { items, maxFreeItems } = get();

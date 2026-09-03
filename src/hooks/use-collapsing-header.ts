@@ -4,6 +4,8 @@ import {
   useAnimatedStyle,
   useAnimatedScrollHandler,
   withTiming,
+  interpolate,
+  Extrapolation,
   Easing,
 } from 'react-native-reanimated';
 
@@ -35,31 +37,36 @@ export function useCollapsingHeader() {
   // filter row, etc.) up with the title bar. Consumers set it from onLayout.
   const headerOffset = useSharedValue(0);
   const extraHideHeight = useSharedValue(0);
+  const scrollY = useSharedValue(0);
+  // Direction the bar is currently animating toward — lets us start a
+  // withTiming only on actual show/hide transitions instead of restarting
+  // a fresh 220ms animation on every scroll frame in the same direction.
+  const isHidden = useSharedValue(false);
 
   const scrollHandler = useAnimatedScrollHandler({
     onScroll: (event) => {
       const y = event.contentOffset.y;
+      scrollY.value = y;
       const delta = y - prevScrollY.value;
-      const fullHide = -(headerHeight + extraHideHeight.value);
 
-      if (y <= 0) {
-        // Always show at top (handles bounce)
-        headerOffset.value = withTiming(0, {
-          duration: ANIMATION_MS,
-          easing: Easing.out(Easing.ease),
-        });
+      if (y <= 0 || delta < -DELTA_THRESHOLD) {
+        // At top (handles bounce) or scrolling up — show
+        if (isHidden.value) {
+          isHidden.value = false;
+          headerOffset.value = withTiming(0, {
+            duration: ANIMATION_MS,
+            easing: Easing.out(Easing.ease),
+          });
+        }
       } else if (delta > DELTA_THRESHOLD && y > HIDE_THRESHOLD_PX) {
         // Scrolling down past threshold — hide
-        headerOffset.value = withTiming(fullHide, {
-          duration: ANIMATION_MS,
-          easing: Easing.out(Easing.ease),
-        });
-      } else if (delta < -DELTA_THRESHOLD) {
-        // Scrolling up — show
-        headerOffset.value = withTiming(0, {
-          duration: ANIMATION_MS,
-          easing: Easing.out(Easing.ease),
-        });
+        if (!isHidden.value) {
+          isHidden.value = true;
+          headerOffset.value = withTiming(-(headerHeight + extraHideHeight.value), {
+            duration: ANIMATION_MS,
+            easing: Easing.out(Easing.ease),
+          });
+        }
       }
 
       prevScrollY.value = y;
@@ -70,5 +77,12 @@ export function useCollapsingHeader() {
     transform: [{ translateY: headerOffset.value }],
   }));
 
-  return { scrollHandler, headerAnimatedStyle, headerHeight, extraHideHeight };
+  // Fades a backing surface in once content has scrolled under the header.
+  // Screens whose header/sticky controls are transparent at rest (fill
+  // 'none') put this on a scrim so rows never show through them mid-list.
+  const scrimAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 32], [0, 1], Extrapolation.CLAMP),
+  }));
+
+  return { scrollHandler, headerAnimatedStyle, scrimAnimatedStyle, headerHeight, extraHideHeight };
 }

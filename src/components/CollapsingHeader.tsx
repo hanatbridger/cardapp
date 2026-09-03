@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Pressable, type ViewStyle } from 'react-native';
+import { View, Pressable, StyleSheet, type ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { IconChevronLeft } from '@tabler/icons-react-native';
@@ -41,6 +41,13 @@ interface CollapsingHeaderProps {
    * use `headingLg`; nested screens with a back button use the smaller `headingSm`.
    */
   titleVariant?: TitleVariant;
+  /**
+   * Scroll-fade scrim for `fill="none"` screens — pass
+   * `useCollapsingHeader().scrimAnimatedStyle` and a frosted surface fades
+   * in behind the bar once content scrolls underneath, so list rows never
+   * show through the transparent header mid-scroll.
+   */
+  scrimStyle?: ViewStyle;
 }
 
 const HEADER_BAR_HEIGHT = 56;
@@ -63,6 +70,7 @@ export function CollapsingHeader({
   children,
   fill = 'translucent',
   titleVariant = 'headingSm',
+  scrimStyle,
 }: CollapsingHeaderProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -95,6 +103,15 @@ export function CollapsingHeader({
         animatedStyle,
       ]}
     >
+      {scrimStyle && fill === 'none' ? (
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFillObject,
+            { backgroundColor: withAlpha(colors.surface, 0.92) },
+            scrimStyle,
+          ]}
+        />
+      ) : null}
       <View
         style={{
           height: HEADER_BAR_HEIGHT,

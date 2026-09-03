@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import {
   searchCards,
   searchSets,
@@ -18,16 +18,22 @@ export function useCardSearch(query: string, filters: CardSearchFilters = {}) {
     queryFn: () => searchCards(query, filters),
     enabled,
     staleTime: 5 * 60 * 1000,
+    // Keep showing the previous query's results while the next keystroke's
+    // fetch is in flight — the list must never blank to a spinner mid-type.
+    placeholderData: keepPreviousData,
   });
 }
 
-export function useSetSearch(query: string) {
+export function useSetSearch(query: string, enabled = true) {
   return useQuery({
     queryKey: ['sets', 'search', query],
     queryFn: () => searchSets(query),
-    // Enable even on empty query — show all recent sets when user opens tab
-    enabled: true,
+    // Empty query is a real request — the Sets tab shows recent sets — but
+    // consumers gate on tab visibility so Explore doesn't fetch sets while
+    // the user is on Cards.
+    enabled,
     staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 
@@ -51,6 +57,7 @@ export function useArtistSearch(query: string) {
     queryFn: () => searchArtists(query),
     enabled: query.length >= 2,
     staleTime: 5 * 60 * 1000,
+    placeholderData: keepPreviousData,
   });
 }
 

@@ -7,6 +7,7 @@ export type { BatchPriceEntry, BatchPrices } from './use-batch-prices';
 export { usePriceHistory } from './use-price-history';
 export { useAlertChecker } from './use-alert-checker';
 export { useCollapsingHeader } from './use-collapsing-header';
+export { useDebouncedValue } from './use-debounced-value';
 export {
   useSealedSearch,
   useSealedProduct,

@@ -22,7 +22,7 @@ interface TrendingCarouselProps {
 
 const ITEM_WIDTH = 200;
 const ITEM_GAP = 8;
-const SCROLL_SPEED = 0.5; // pixels per frame at 60fps
+const SCROLL_SPEED_PX_PER_S = 30; // steady drift, display-rate independent
 
 // Memoized: the carousel lives in the home screen's ListHeaderComponent,
 // so every home re-render would otherwise re-render all 3x tiles.
@@ -125,13 +125,17 @@ export const TrendingCarousel = React.memo(function TrendingCarousel({
   // Drive the auto-scroll on the UI thread. The frame callback runs
   // once per frame (~60fps) and schedules a native scrollTo with no
   // bridge call, so the JS thread stays idle.
-  const frameCallback = useFrameCallback(() => {
+  const frameCallback = useFrameCallback((frameInfo) => {
     'worklet';
     // No items → singleSetWidth is 0 and the wrap condition below would
     // fire every frame; nothing to scroll anyway.
     if (singleSetWidth === 0) return;
     if (isPaused.value) return;
-    scrollOffset.value += SCROLL_SPEED;
+    // Delta-time scaled: a fixed per-frame step ran 2x speed on 120Hz
+    // ProMotion displays. Clamp the dt so a dropped-frame hitch doesn't
+    // produce a visible jump when frames resume.
+    const dtMs = Math.min(frameInfo.timeSincePreviousFrame ?? 16.7, 64);
+    scrollOffset.value += (SCROLL_SPEED_PX_PER_S * dtMs) / 1000;
     // Wrap back to the first set when we've crossed into the third —
     // produces the seamless infinite-loop visual.
     if (scrollOffset.value >= singleSetWidth * 2) {

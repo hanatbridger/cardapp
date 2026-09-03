@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, TextInput, Pressable, ScrollView, ActivityIndicator, Image, Keyboard } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, TextInput, Pressable, ScrollView, ActivityIndicator, Keyboard } from 'react-native';
+import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
 import { IconX, IconTrendingUp, IconClock } from '@tabler/icons-react-native';
@@ -18,9 +19,10 @@ import {
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
+import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useUserStore } from '../../src/stores';
-import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useJapaneseSearch, useCollapsingHeader, useTrending } from '../../src/hooks';
+import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useJapaneseSearch, useCollapsingHeader, useDebouncedValue, useTrending } from '../../src/hooks';
 import { MOCK_PRICES, TRENDING_ARTISTS } from '../../src/mocks';
 import { CARD_SCORES } from '../../src/data/card-scores';
 import { getValuation } from '../../src/services/price-prediction';
@@ -44,8 +46,17 @@ function SearchScreen() {
   // just dismisses the overlay in-place.
   const [searchOrigin, setSearchOrigin] = useState<'home' | 'tab'>('tab');
   const searchInputRef = useRef<TextInput>(null);
-  const { recentSearches, addRecentSearch, removeRecentSearch } = useUserStore();
-  const { scrollHandler, headerAnimatedStyle, headerHeight, extraHideHeight } = useCollapsingHeader();
+  // Action-only selector: a whole-store destructure subscribed this
+  // 886-line screen to every user-store write (adding a recent search
+  // re-rendered the screen synchronously under the tap that navigates
+  // away). recentSearches is read inside SearchFocusOverlay, which only
+  // mounts while the search field is focused. Zustand actions are stable.
+  const addRecentSearch = useUserStore((s) => s.addRecentSearch);
+  const { scrollHandler, headerAnimatedStyle, scrimAnimatedStyle, headerHeight, extraHideHeight } = useCollapsingHeader();
+  // Network-facing queries trail the keystrokes; the input itself stays
+  // on the raw value. With keepPreviousData in the hooks, results update
+  // in place instead of blanking to a spinner per character.
+  const debouncedQuery = useDebouncedValue(query);
 
   // Hide the floating bottom tab bar while the focused search overlay is
   // open. FloatingTabBar in app/(tabs)/_layout.tsx checks this option and
@@ -79,7 +90,7 @@ function SearchScreen() {
   );
 
   // Card search
-  const cardSearch = useCardSearch(mode === 'cards' ? query : '', {});
+  const cardSearch = useCardSearch(mode === 'cards' ? debouncedQuery : '', {});
   const cardResults = cardSearch.data?.cards ?? [];
 
   // Sealed-product search — runs in parallel with the card search when the
@@ -87,24 +98,25 @@ function SearchScreen() {
   // free; we fold any hits into the Cards results list under a "Sealed
   // Products" section header so collectors find booster boxes / ETBs by
   // typing the set name into the same box they search singles with.
-  const sealedSearch = useSealedSearch(mode === 'cards' ? query : '');
+  const sealedSearch = useSealedSearch(mode === 'cards' ? debouncedQuery : '');
   const sealedResults = sealedSearch.data ?? [];
 
   // Japanese catalog (tcgdex) — runs alongside every card search, since
   // collectors won't type Japanese names: the bundled EN→JA species map
   // translates the query inside the service. Results render in their
   // own section below the English catalog.
-  const jpSearch = useJapaneseSearch(mode === 'cards' && query.length >= 2 ? query : '');
+  const jpSearch = useJapaneseSearch(mode === 'cards' && debouncedQuery.length >= 2 ? debouncedQuery : '');
   const jpResults = jpSearch.data ?? [];
 
-  // Set search (enabled always — shows recent sets on empty query)
-  const setSearch = useSetSearch(mode === 'sets' ? query : '');
+  // Set search — empty query shows recent sets, but only once the user is
+  // actually on the Sets tab (it used to fetch on Explore mount for everyone).
+  const setSearch = useSetSearch(mode === 'sets' ? debouncedQuery : '', mode === 'sets');
   const setResults = setSearch.data?.sets ?? [];
 
   // Artist search — requires ≥2 chars. Unlike sets, an empty query returns
   // nothing (there are thousands of artists and no meaningful default sort),
   // so the empty state prompts the user to type.
-  const artistSearch = useArtistSearch(mode === 'artists' ? query : '');
+  const artistSearch = useArtistSearch(mode === 'artists' ? debouncedQuery : '');
   const artistResults = artistSearch.data?.artists ?? [];
 
   const hasQuery = query.length >= 2;
@@ -118,8 +130,8 @@ function SearchScreen() {
   // yet (the picks rail is the empty-state filler — no point wasting a
   // request when search results are about to take its place).
   const enablePicks = mode === 'cards' && !hasQuery;
-  const undervalQuery = useTrending(enablePicks ? 'undervalued' : 'movers', 8);
-  const overvalQuery = useTrending(enablePicks ? 'overvalued' : 'movers', 8);
+  const undervalQuery = useTrending('undervalued', 8, enablePicks);
+  const overvalQuery = useTrending('overvalued', 8, enablePicks);
   // Both lists are split views on today's biggest movers (dod-change-pct).
   // Undervalued = today's dips, Overvalued = today's spikes. Display
   // gapPercent maps to the existing AIPicks renderer:
@@ -139,7 +151,7 @@ function SearchScreen() {
   // modes (filters out tiles without a baseline), so a defensive
   // fallback to percentChange covers the type system without ever
   // firing in practice.
-  const undervaluedPicks: AIPickItem[] = (undervalQuery.data?.items ?? []).map((t) => {
+  const undervaluedPicks: AIPickItem[] = useMemo(() => (undervalQuery.data?.items ?? []).map((t) => {
     const baseline = t.baselineChangePct ?? t.percentChange;
     return {
       cardId: t.cardId ?? `tcg-${t.productId}`,
@@ -153,8 +165,8 @@ function SearchScreen() {
       label: 'undervalued' as const,
       ...(t.cardId ? {} : { searchQuery: t.name }),
     };
-  });
-  const overvaluedPicks: AIPickItem[] = (overvalQuery.data?.items ?? []).map((t) => {
+  }), [undervalQuery.data]);
+  const overvaluedPicks: AIPickItem[] = useMemo(() => (overvalQuery.data?.items ?? []).map((t) => {
     const baseline = t.baselineChangePct ?? t.percentChange;
     return {
       cardId: t.cardId ?? `tcg-${t.productId}`,
@@ -168,28 +180,31 @@ function SearchScreen() {
       label: 'overvalued' as const,
       ...(t.cardId ? {} : { searchQuery: t.name }),
     };
-  });
+  }), [overvalQuery.data]);
   const showArtistResults = mode === 'artists' && hasQuery;
 
-  const handleCardPress = (card: PokemonCard) => {
-    addRecentSearch(card.name);
+  // Stable handlers: rows are memoized, and recreating these per keystroke
+  // re-rendered every visible result row. The store write happens after
+  // navigation is dispatched so it can't run under the tap.
+  const handleCardPress = useCallback((card: PokemonCard) => {
     router.push(`/card/${card.id}`);
-  };
+    addRecentSearch(card.name);
+  }, [addRecentSearch]);
 
-  const handleSealedPress = (product: SealedProduct) => {
-    addRecentSearch(product.name);
+  const handleSealedPress = useCallback((product: SealedProduct) => {
     router.push(`/sealed/${product.id}`);
-  };
+    addRecentSearch(product.name);
+  }, [addRecentSearch]);
 
-  const handleSetPress = (set: PokemonSet) => {
-    addRecentSearch(set.name);
+  const handleSetPress = useCallback((set: PokemonSet) => {
     router.push(`/set/${set.id}`);
-  };
+    addRecentSearch(set.name);
+  }, [addRecentSearch]);
 
-  const handleArtistPress = (artist: ArtistResult) => {
-    addRecentSearch(artist.name);
+  const handleArtistPress = useCallback((artist: ArtistResult) => {
     router.push(`/artist/${encodeURIComponent(artist.name)}`);
-  };
+    addRecentSearch(artist.name);
+  }, [addRecentSearch]);
 
   // X-style "Cancel" handler — blur the input, dismiss the keyboard, and
   // wipe the draft query so tapping back into search starts clean. If the
@@ -216,7 +231,11 @@ function SearchScreen() {
   };
 
   return (
-    <ScreenBackground>
+    // No top edge: CollapsingHeader is absolute at the true screen top and
+    // headerHeight already includes insets.top — a top-edge SafeAreaView
+    // would pad the scrollables down a second time (phantom gap under the
+    // search row on notched devices).
+    <ScreenBackground edges={[]}>
       <CollapsingHeader
         hideBack
         // Headline swaps to "Search" when the user arrived via the
@@ -235,6 +254,7 @@ function SearchScreen() {
         // header solid so the overlay panel reads as a single opaque
         // surface (matching X's Explore focus behavior).
         fill={searchFocused ? 'solid' : 'none'}
+        scrimStyle={scrimAnimatedStyle}
       />
       {/* Sticky controls — ride up with the header so the whole top area
           disappears/reappears as one, like X's Explore tab. */}
@@ -263,6 +283,24 @@ function SearchScreen() {
           headerAnimatedStyle,
         ]}
       >
+        {/* Scroll-fade scrim — same frosted surface as the header's, with
+            the panel's bottom hairline. Keeps rows from showing through
+            the transparent controls once content scrolls underneath. */}
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: withAlpha(colors.surface, 0.92),
+              borderBottomWidth: 1,
+              borderBottomColor: withAlpha(colors.outline, 0.08),
+            },
+            scrimAnimatedStyle,
+          ]}
+        />
         {/* Mode toggle — always visible at the top, even while the search
             overlay is open, so the layout matches the default Explore view. */}
         <SegmentedControl
@@ -387,12 +425,7 @@ function SearchScreen() {
             backgroundColor: colors.surface,
           }}
         >
-          <SearchFocusOverlay
-            mode={mode}
-            recentSearches={recentSearches}
-            onRecentPress={handleFocusedRecentPress}
-            onRemoveRecent={removeRecentSearch}
-          />
+          <SearchFocusOverlay mode={mode} onRecentPress={handleFocusedRecentPress} />
         </Animated.View>
       )}
     </ScreenBackground>
@@ -409,16 +442,16 @@ function SearchScreen() {
  */
 function SearchFocusOverlay({
   mode,
-  recentSearches,
   onRecentPress,
-  onRemoveRecent,
 }: {
   mode: Mode;
-  recentSearches: string[];
   onRecentPress: (term: string) => void;
-  onRemoveRecent: (term: string) => void;
 }) {
   const { colors } = useTheme();
+  // Subscribed here, not in SearchScreen — the overlay is the only reader
+  // and it unmounts on dismiss, so store writes never touch the parent.
+  const recentSearches = useUserStore((s) => s.recentSearches);
+  const onRemoveRecent = useUserStore((s) => s.removeRecentSearch);
 
   if (recentSearches.length === 0) {
     return (
@@ -687,7 +720,8 @@ function SetResults({
             {item.images.logo ? (
               <Image
                 source={{ uri: item.images.logo }}
-                style={{ width: 64, height: 40, resizeMode: 'contain' }}
+                style={{ width: 64, height: 40 }}
+                contentFit="contain"
               />
             ) : (
               <View
@@ -856,7 +890,8 @@ function ArtistResults({
                   {card.images.small ? (
                     <Image
                       source={{ uri: card.images.small }}
-                      style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                      style={{ width: '100%', height: '100%' }}
+                      contentFit="cover"
                     />
                   ) : null}
                 </View>

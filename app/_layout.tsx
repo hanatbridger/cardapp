@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
@@ -78,6 +78,18 @@ function AuthGate() {
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const isAuthenticated = useUserStore((s) => s.isAuthenticated);
   const hydrateFromSupabase = useUserStore((s) => s.hydrateFromSupabase);
+  // Routing decisions wait for zustand persist to finish rehydrating —
+  // before that, hasCompletedOnboarding/isAuthenticated are the store
+  // DEFAULTS (false), so a cold start briefly routed returning users to
+  // onboarding and then bounced them back once storage loaded. If
+  // hydration fails (safe-storage absorbs the error), persist still
+  // reports finished and the defaults route to onboarding as before.
+  const [hydrated, setHydrated] = useState(() => useUserStore.persist.hasHydrated());
+  useEffect(() => {
+    if (hydrated) return;
+    const unsub = useUserStore.persist.onFinishHydration(() => setHydrated(true));
+    return unsub;
+  }, [hydrated]);
 
   // On cold start, reflect the persisted Supabase session into local
   // state. Then subscribe to auth events so a sign-out triggered from
@@ -128,6 +140,7 @@ function AuthGate() {
     // un-authed web view shows empty fields rather than someone
     // else's name + email. OAuth-for-web is a future enhancement.
     if (Platform.OS === 'web') return;
+    if (!hydrated) return;
 
     const root = segments[0];
     const onOnboarding = root === 'onboarding';
@@ -145,7 +158,7 @@ function AuthGate() {
     if (onOnboarding || inAuth) {
       router.replace('/(tabs)');
     }
-  }, [hasCompletedOnboarding, isAuthenticated, segments, router]);
+  }, [hydrated, hasCompletedOnboarding, isAuthenticated, segments, router]);
 
   return null;
 }

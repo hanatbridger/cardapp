@@ -26,6 +26,60 @@ import type { CardPrice } from '../../src/types/card';
 import { useTrendingMovers, useBatchPrices } from '../../src/hooks';
 import type { TrendingTile } from '../../src/services/trending';
 
+/**
+ * Memoized card row — builds the fallbackPrice object HERE, keyed on the
+ * item's stamped price fields. Building it inline in renderItem minted a
+ * fresh object every Home render, which defeated WatchlistCard's
+ * React.memo and re-rendered every row (score + valuation + image) on
+ * any screen-level state change.
+ */
+const HomeCardRow = React.memo(function HomeCardRow({
+  item,
+  livePrice,
+}: {
+  item: Extract<WatchlistItem, { kind: 'card' }>;
+  livePrice: { currentPrice: number; percentChange: number } | null | undefined;
+}) {
+  const fallbackPrice = useMemo(
+    () =>
+      getPrice(item.cardId, item.grade) ??
+      (item.lastPrice && item.lastPriceChange !== undefined
+        ? {
+            cardName: item.cardName,
+            grade: item.grade,
+            currentPrice: item.lastPrice,
+            previousPrice: item.lastPrice,
+            percentChange: item.lastPriceChange,
+            lastSaleDate: '',
+            lastSalePrice: item.lastPrice,
+            averagePrice: item.lastPrice,
+            highPrice: item.lastPrice,
+            lowPrice: item.lastPrice,
+            salesCount: 0,
+          }
+        : undefined),
+    [item],
+  );
+  const rarity = useMemo(
+    () => item.rarity ?? MOCK_CARDS.find((c) => c.id === item.cardId)?.rarity,
+    [item],
+  );
+  return (
+    <WatchlistCard
+      cardId={item.cardId}
+      cardName={item.cardName}
+      cardImageUrl={item.cardImageUrl}
+      setName={item.setName}
+      setNumber={item.setNumber}
+      grade={item.grade}
+      language={item.language}
+      rarity={rarity}
+      livePrice={livePrice}
+      fallbackPrice={fallbackPrice}
+    />
+  );
+});
+
 // Floating tab bar occupies 64pt + safe-area bottom + offset. Pad the
 // list enough that the last card clears the glass pill — otherwise its
 // middle sits under the bar and the bar's Pressables steal the tap.
@@ -34,7 +88,11 @@ const TAB_BAR_CLEARANCE = 64 + 4;
 function WatchlistScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { items: rawItems, maxFreeItems } = useWatchlistStore();
+  // Field selectors, not a whole-store destructure — Home sits mounted
+  // behind every pushed screen, and any watchlist write re-rendered the
+  // entire tree mid-transition.
+  const rawItems = useWatchlistStore((s) => s.items);
+  const maxFreeItems = useWatchlistStore((s) => s.maxFreeItems);
   // PSA 10 tracking is gated until the eBay live proxy ships — hide
   // any previously-saved PSA 10 cards from the list and the count.
   // The store keeps the data intact, so they reappear automatically
@@ -311,38 +369,15 @@ function WatchlistScreen() {
                 fallbackPriceChange={item.lastPriceChange}
               />
             ) : (
-              <WatchlistCard
-                cardId={item.cardId}
-                cardName={item.cardName}
-                cardImageUrl={item.cardImageUrl}
-                setName={item.setName}
-                setNumber={item.setNumber}
-                grade={item.grade}
-                language={item.language}
-                rarity={item.rarity ?? MOCK_CARDS.find(c => c.id === item.cardId)?.rarity}
-                // Batched live price for this row. Passing null (batch
-                // loading, or no price for this card) keeps the row's
-                // internal per-row query DISABLED and renders the
-                // fallback — that's the whole point of the batch. If the
-                // batch request itself errored, pass undefined so rows
-                // fall back to their own per-row fetch as a safety net.
+              // Batched live price for this row. Passing null (batch
+              // loading, or no price for this card) keeps the row's
+              // internal per-row query DISABLED and renders the
+              // fallback — that's the whole point of the batch. If the
+              // batch request itself errored, pass undefined so rows
+              // fall back to their own per-row fetch as a safety net.
+              <HomeCardRow
+                item={item}
                 livePrice={batchQuery.isError ? undefined : batchPrices?.[item.cardId] ?? null}
-                // Fallback shown only briefly while the live query loads, or if it fails.
-                // The real price comes from useCardPrice inside WatchlistCard — same
-                // source as the detail screen, so numbers always agree.
-                fallbackPrice={getPrice(item.cardId, item.grade) ?? (item.lastPrice && item.lastPriceChange !== undefined ? {
-                  cardName: item.cardName,
-                  grade: item.grade,
-                  currentPrice: item.lastPrice,
-                  previousPrice: item.lastPrice,
-                  percentChange: item.lastPriceChange,
-                  lastSaleDate: '',
-                  lastSalePrice: item.lastPrice,
-                  averagePrice: item.lastPrice,
-                  highPrice: item.lastPrice,
-                  lowPrice: item.lastPrice,
-                  salesCount: 0,
-                } : undefined)}
               />
             )}
           </View>

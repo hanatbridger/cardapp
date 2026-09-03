@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo } from 'react';
 import { View, FlatList, RefreshControl } from 'react-native';
 import { IconNews } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -45,6 +45,15 @@ function NewsScreen() {
     refetch();
   }, [refetch]);
 
+  // Unique by URL so rows can key on it alone — the old `${url}-${index}`
+  // key remounted every row below an insertion whenever the feed updated.
+  const uniqueArticles = useMemo(() => {
+    const seen = new Set<string>();
+    return (articles ?? []).filter((a) =>
+      seen.has(a.url) ? false : (seen.add(a.url), true),
+    );
+  }, [articles]);
+
   return (
     <ScreenBackground>
       {/* Header */}
@@ -62,8 +71,8 @@ function NewsScreen() {
       </View>
 
       <FlatList
-        data={articles ?? []}
-        keyExtractor={(item, i) => `${item.url}-${i}`}
+        data={uniqueArticles}
+        keyExtractor={(item) => item.url}
         renderItem={({ item }) => (
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginBottom: spacing[2] }}>
             <NewsCard article={item} />

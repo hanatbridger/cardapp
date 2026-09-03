@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import { View, FlatList, Pressable } from 'react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { IconBell } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text, NotificationItem, EmptyState, ScreenBackground, withErrorBoundary } from '../../src/components';
@@ -38,27 +38,34 @@ function NotificationsScreen() {
 
   const unreadCount = triggered.filter((t) => !t.isRead).length;
 
-  // Mark everything read when the user views the screen.
-  useEffect(() => {
-    if (unreadCount > 0) {
+  // Mark everything read when the user views the screen — focus-scoped:
+  // expo-router keeps this tab mounted, so a plain effect fired while the
+  // user was on a DIFFERENT tab, silently clearing the unread dot for an
+  // alert they never saw.
+  useFocusEffect(
+    useCallback(() => {
+      if (unreadCount === 0) return;
       const timer = setTimeout(() => markAllTriggeredRead(), 1500);
       return () => clearTimeout(timer);
-    }
-  }, [unreadCount, markAllTriggeredRead]);
+    }, [unreadCount, markAllTriggeredRead]),
+  );
 
   // A price alert the user set has fired and they came to look at it —
   // the one moment in this app where something demonstrably went right
   // for them, and the only kind iOS's three-per-year cap is worth
   // spending on. Eligibility (launch count, cooldown, one prompt per
   // version) is decided inside maybeRequestReview. Delayed so it lands
-  // after the list has painted rather than on top of it.
-  useEffect(() => {
-    if (triggered.length === 0) return;
-    const timer = setTimeout(() => {
-      maybeRequestReview();
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, [triggered.length]);
+  // after the list has painted rather than on top of it — and focus-
+  // scoped so the prompt can't pop over some other tab.
+  useFocusEffect(
+    useCallback(() => {
+      if (triggered.length === 0) return;
+      const timer = setTimeout(() => {
+        maybeRequestReview();
+      }, 2500);
+      return () => clearTimeout(timer);
+    }, [triggered.length]),
+  );
 
   const handlePress = (notification: Notification) => {
     markTriggeredRead(notification.id);

@@ -45,7 +45,7 @@ function ArtistDetailScreen() {
   };
 
   return (
-    <ScreenBackground>
+    <ScreenBackground edges={[]}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <CollapsingHeader

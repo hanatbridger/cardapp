@@ -1,7 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal, Animated, Easing, StyleSheet } from 'react-native';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal, Animated, Easing, StyleSheet, InteractionManager } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { IconChevronLeft, IconShare, IconPlus, IconMinus, IconBellRinging, IconBellFilled, IconExternalLink, IconCirclePlus, IconCircleCheck, IconRefresh, IconAlertCircle, IconLock } from '@tabler/icons-react-native';
@@ -62,7 +62,14 @@ function CardDetailScreen() {
   // stale after rotation — it fed PriceChart a negative width.
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const formatMoney = useMoney();
-  const { items, addItem, removeItem, updatePrice, canAddMore, maxFreeItems } = useWatchlistStore();
+  // Field selectors — a whole-store destructure re-rendered this 1100-line
+  // screen (and every stacked copy of it) on any watchlist write anywhere.
+  const items = useWatchlistStore((s) => s.items);
+  const addItem = useWatchlistStore((s) => s.addItem);
+  const removeItem = useWatchlistStore((s) => s.removeItem);
+  const updatePrice = useWatchlistStore((s) => s.updatePrice);
+  const canAddMore = useWatchlistStore((s) => s.canAddMore);
+  const maxFreeItems = useWatchlistStore((s) => s.maxFreeItems);
   // Always open on Raw. PSA 10 only has real data for collectrics-
   // tracked cards, so landing there (as the old persisted defaultGrade
   // preference made many users do) could show a dead tab and hide
@@ -82,13 +89,29 @@ function CardDetailScreen() {
   const prevGradeRef = useRef(GRADE_OPTIONS[gradeIndex]);
   const [refreshing, setRefreshing] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
-  const { alerts: allAlerts, addAlert, removeAlert } = useAlertsStore();
+  const allAlerts = useAlertsStore((s) => s.alerts);
+  const addAlert = useAlertsStore((s) => s.addAlert);
+  const removeAlert = useAlertsStore((s) => s.removeAlert);
 
-  // Tick once a minute so the "Updated Xm ago" label stays fresh
+  // Below-the-fold sections mount after the push transition finishes
+  // (InteractionManager). Web has no push animation to protect.
+  const [belowFoldReady, setBelowFoldReady] = useState(Platform.OS === 'web');
   useEffect(() => {
-    const interval = setInterval(() => setNowTick(Date.now()), 60_000);
-    return () => clearInterval(interval);
-  }, []);
+    if (belowFoldReady) return;
+    const task = InteractionManager.runAfterInteractions(() => setBelowFoldReady(true));
+    return () => task.cancel();
+  }, [belowFoldReady]);
+
+  // Tick once a minute so the "Updated Xm ago" label stays fresh —
+  // focused screens only. An unconditional interval kept every card
+  // detail buried in the navigation stack re-rendering forever.
+  useFocusEffect(
+    useCallback(() => {
+      setNowTick(Date.now());
+      const interval = setInterval(() => setNowTick(Date.now()), 60_000);
+      return () => clearInterval(interval);
+    }, []),
+  );
 
   // Fetch card from API (checks mocks first, then Pokemon TCG API)
   const {
@@ -116,7 +139,7 @@ function CardDetailScreen() {
     tcgPlayerPrice: card?.tcgPlayerPrice,
     tcgPlayerMidPrice: card?.tcgPlayerMidPrice,
   });
-  const { data: history } = usePriceHistory({
+  const { data: history, isLoading: historyLoading } = usePriceHistory({
     cardName: card?.name ?? '',
     grade: selectedGrade,
     cardId: id,
@@ -688,7 +711,20 @@ function CardDetailScreen() {
               still bootstrapping (fewer than 3 snapshots accumulated for
               this card). Hidden on PSA 10 since the ComingSoonPanel
               above already explains that gate. */}
-          {selectedGrade !== 'PSA10' && price && (!history || history.length < 3) && (
+          {/* Chart-sized skeleton while the raw history query resolves —
+              holds the slot so the section doesn't pop in and shift
+              everything below it when data lands. */}
+          {selectedGrade !== 'PSA10' && price && historyLoading && (
+            <Card>
+              <Skeleton width="100%" height={200} borderRadius={radius.md} />
+            </Card>
+          )}
+
+          {/* Gated on the history query having SETTLED — rendering this
+              while the fetch was still in flight flashed "building" for a
+              beat and then swapped to the chart, a visible layout jump on
+              every card open. */}
+          {selectedGrade !== 'PSA10' && price && !historyLoading && (!history || history.length < 3) && (
             <Card>
               <View style={{ gap: spacing[2], alignItems: 'center', paddingVertical: spacing[4] }}>
                 <Text variant="labelLg">Price history is building</Text>
@@ -729,7 +765,7 @@ function CardDetailScreen() {
                         <Text
                           variant="labelSm"
                           color={i === timeRangeIndex ? colors.primary : colors.onSurfaceMuted}
-                          style={{ fontWeight: i === timeRangeIndex ? '600' : '400' }}
+                          style={{ fontWeight: i === timeRangeIndex ? '500' : '400' }}
                         >
                           {range}
                         </Text>
@@ -782,6 +818,15 @@ function CardDetailScreen() {
             </Card>
           )}
 
+          {/* Below-the-fold analysis — deferred until the push animation
+              settles. On a warm cache all of these mounted in the same
+              commit as the hero content, and that one big commit ran
+              during the transition — the main "slow open" cost. Each
+              section already self-hides while its data resolves, so the
+              one-frame-later mount is indistinguishable from a query
+              settling. */}
+          {belowFoldReady && (
+          <>
           {/* Price-derived sections — AI valuation, fundamentals,
               market dynamics. All hide on PSA 10 since their numbers
               would either be missing or, worse, mock data that
@@ -945,6 +990,8 @@ function CardDetailScreen() {
                 )}
               />
             </View>
+          )}
+          </>
           )}
 
         </View>

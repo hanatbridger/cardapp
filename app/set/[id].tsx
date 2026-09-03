@@ -56,7 +56,7 @@ function SetDetailScreen() {
   };
 
   return (
-    <ScreenBackground>
+    <ScreenBackground edges={[]}>
       <Stack.Screen options={{ headerShown: false }} />
 
       <CollapsingHeader

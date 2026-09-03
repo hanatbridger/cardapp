@@ -68,7 +68,6 @@ function buildPrice(
 
 export function useCardPrice(opts: UseCardPriceOptions) {
   const { cardName, grade, cardId, setName, cardNumber, language, tcgPlayerPrice } = opts;
-  const watchlistItems = useWatchlistStore((s) => s.items);
 
   return useQuery<CardPrice | null>({
     queryKey: ['prices', cardName, setName, cardNumber, grade, language],
@@ -96,9 +95,12 @@ export function useCardPrice(opts: UseCardPriceOptions) {
         // 3. Last-known price from the user's watchlist — keeps the row
         //    populated when offline / between sync cycles. Tagged as
         //    `tcgplayer` because that's where the value originally came
-        //    from when it was stored.
+        //    from when it was stored. Read via getState(), NOT a hook
+        //    subscription: this hook renders in every price row, and a
+        //    reactive items subscription re-rendered all of them on any
+        //    watchlist write, for a value only read inside this queryFn.
         if (cardId) {
-          const stored = watchlistItems.find(
+          const stored = useWatchlistStore.getState().items.find(
             (i) => i.kind === 'card' && i.cardId === cardId && i.grade === 'UNGRADED',
           );
           if (stored?.lastPrice) {
