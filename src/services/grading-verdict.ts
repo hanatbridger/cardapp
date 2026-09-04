@@ -24,31 +24,36 @@
  * No verdict is produced without a real PSA 10 price and a real raw price.
  */
 
-export type CardCondition = 'mint' | 'near_mint' | 'excellent' | 'good' | 'played';
+export type CardCondition =
+  | 'mint'
+  | 'near_mint'
+  | 'lightly_played'
+  | 'moderately_played'
+  | 'heavily_played';
 
 export const CONDITION_LABELS: Record<CardCondition, string> = {
   mint: 'Mint',
   near_mint: 'Near Mint',
-  excellent: 'Excellent',
-  good: 'Good',
-  played: 'Played',
+  lightly_played: 'Lightly Played',
+  moderately_played: 'Moderately Played',
+  heavily_played: 'Heavily Played',
 };
 
 export const CONDITION_ORDER: CardCondition[] = [
   'mint',
   'near_mint',
-  'excellent',
-  'good',
-  'played',
+  'lightly_played',
+  'moderately_played',
+  'heavily_played',
 ];
 
 /** One-line self-grading guidance per condition, shown under the picker. */
 export const CONDITION_HINTS: Record<CardCondition, string> = {
   mint: 'Sharp corners, centered, no whitening under bright light',
   near_mint: 'One tiny flaw you have to hunt for',
-  excellent: 'Light corner wear or whitening up close',
-  good: 'Visible wear, no creases',
-  played: 'Creases or heavy surface damage',
+  lightly_played: 'Light corner wear or whitening up close',
+  moderately_played: 'Visible wear, no creases',
+  heavily_played: 'Creases or heavy surface damage',
 };
 
 /** Grade buckets the distribution spans. `below` = PSA 7 and under. */
@@ -101,9 +106,9 @@ export const GRADING_FEE_LABEL = 'PSA Regular, ~$92 all-in';
 const BASE_DIST: Record<CardCondition, GradeDistribution> = {
   mint: { p10: 0.2, p9: 0.5, p8: 0.2, below: 0.1 },
   near_mint: { p10: 0.08, p9: 0.42, p8: 0.32, below: 0.18 },
-  excellent: { p10: 0.02, p9: 0.14, p8: 0.42, below: 0.42 },
-  good: { p10: 0, p9: 0.03, p8: 0.15, below: 0.82 },
-  played: { p10: 0, p9: 0, p8: 0.05, below: 0.95 },
+  lightly_played: { p10: 0.02, p9: 0.14, p8: 0.42, below: 0.42 },
+  moderately_played: { p10: 0, p9: 0.03, p8: 0.15, below: 0.82 },
+  heavily_played: { p10: 0, p9: 0, p8: 0.05, below: 0.95 },
 };
 
 /**
@@ -114,9 +119,9 @@ const BASE_DIST: Record<CardCondition, GradeDistribution> = {
 const POP_WEIGHT: Record<CardCondition, number> = {
   mint: 0.55,
   near_mint: 0.45,
-  excellent: 0.25,
-  good: 0.1,
-  played: 0.05,
+  lightly_played: 0.25,
+  moderately_played: 0.1,
+  heavily_played: 0.05,
 };
 
 /** PSA 9 modeled as a fraction of PSA 10; floored at the raw price. */

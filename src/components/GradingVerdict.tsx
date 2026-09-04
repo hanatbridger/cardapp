@@ -129,11 +129,8 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
           outcomes: {signedMoney(verdict.expectedNet)}.
         </Text>
 
-        {/* Condition picker */}
+        {/* Condition picker — TCG-standard condition scale */}
         <View style={{ gap: spacing[2] }}>
-          <Text variant="caption" color={colors.onSurfaceMuted}>
-            YOUR CARD'S CONDITION — BE HONEST, IT DRIVES THE ODDS
-          </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
             {CONDITION_ORDER.map((c) => {
               const selected = c === condition;
