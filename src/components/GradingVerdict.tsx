@@ -101,8 +101,7 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
       <View style={{ gap: spacing[4] }}>
         {/* Header: verdict + letter grade */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ gap: spacing[1], flex: 1 }}>
-            <Text variant="overline" color={colors.onSurfaceVariant}>WORTH GRADING?</Text>
+          <View style={{ flex: 1 }}>
             <Text variant="headingMd" color={verdictColor}>
               {verdict.worthGrading ? 'Grade it' : 'Sell it raw'}
             </Text>
