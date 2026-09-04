@@ -19,6 +19,7 @@ import {
   PriceAlertModal,
   WatchlistFullModal,
   CardDetailSkeleton,
+  GradingVerdict,
   Skeleton,
   ComingSoonPanel,
   withErrorBoundary,
@@ -834,11 +835,24 @@ function CardDetailScreen() {
               the user flips to Raw. */}
           {selectedGrade !== 'PSA10' && (
             <>
+              {/* Worth grading? — EV verdict over the PSA outcome
+                  distribution. Only for cards where BOTH sides of the
+                  trade are real: a live raw price and a live PSA 10
+                  sold price (collectrics-tracked). Untracked cards get
+                  nothing rather than a verdict built on guesses. */}
+              {price && psa10 && psa10.latestPrice > 0 && (
+                <GradingVerdict
+                  rawPrice={price.currentPrice}
+                  psa10Price={psa10.latestPrice}
+                  pop={psa10.pop}
+                />
+              )}
+
               {/* Prediction — AI valuation + market signals */}
               <AIValuation card={card} marketPrice={price?.currentPrice} liveDynamics={cardStats?.dynamics} />
 
               {/* Fundamentals — StockTwits-style data table */}
-              <CardFundamentals card={card} marketPrice={price?.currentPrice} />
+              <CardFundamentals card={card} marketPrice={price?.currentPrice} livePop={psa10?.pop ?? null} />
 
               {/* eBay Market Dynamics — demand pressure & supply saturation */}
               <MarketDynamics cardId={card.id} live={cardStats?.dynamics} />

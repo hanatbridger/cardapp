@@ -17,6 +17,7 @@ export { CardSearchResult } from './CardSearchResult';
 export { SealedSearchResult } from './SealedSearchResult';
 export { NotificationItem } from './NotificationItem';
 export { AIValuation } from './AIValuation';
+export { GradingVerdict } from './GradingVerdict';
 export { AIPicks, type AIPickItem } from './AIPicks';
 export { ScreenBackground } from './ScreenBackground';
 export { PriceAlertModal } from './PriceAlertModal';

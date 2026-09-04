@@ -16,6 +16,12 @@ import type { PokemonCard } from '../types/card';
 interface CardFundamentalsProps {
   card: PokemonCard;
   marketPrice?: number;
+  /**
+   * Live PSA census (card-stats proxy). When present it REPLACES the
+   * seeded psa-population row — the same screen was showing the real
+   * census in one card and a stale seed here.
+   */
+  livePop?: { psa10: number; total: number; gemPct: number } | null;
 }
 
 function FundamentalRow({
@@ -85,12 +91,15 @@ function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   );
 }
 
-export function CardFundamentals({ card, marketPrice }: CardFundamentalsProps) {
+export function CardFundamentals({ card, marketPrice, livePop }: CardFundamentalsProps) {
   const { colors } = useTheme();
 
   const score = getCardScore(card.id);
   const artistScore = card.artist ? getArtistScore(card.artist) : undefined;
-  const psaPop = getPSAPopulation(card.id);
+  const seedPop = getPSAPopulation(card.id);
+  const psaPop = livePop
+    ? { psa10Rate: livePop.gemPct, psa10Pop: livePop.psa10, totalPop: livePop.total }
+    : seedPop;
 
   // Compute desirability if we have a score
   let desirability: number | undefined;
