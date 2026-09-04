@@ -712,6 +712,13 @@ function CardDetailScreen() {
               still bootstrapping (fewer than 3 snapshots accumulated for
               this card). Hidden on PSA 10 since the ComingSoonPanel
               above already explains that gate. */}
+          {/* Prediction — AI valuation + market signals. Sits above the
+              chart: it's the takeaway, the chart is the evidence. Slim
+              enough to mount with the fold. */}
+          {selectedGrade !== 'PSA10' && (
+            <AIValuation card={card} marketPrice={price?.currentPrice} liveDynamics={cardStats?.dynamics} />
+          )}
+
           {/* Chart-sized skeleton while the raw history query resolves —
               holds the slot so the section doesn't pop in and shift
               everything below it when data lands. */}
@@ -828,16 +835,13 @@ function CardDetailScreen() {
               settling. */}
           {belowFoldReady && (
           <>
-          {/* Price-derived sections — AI valuation, fundamentals,
-              market dynamics. All hide on PSA 10 since their numbers
-              would either be missing or, worse, mock data that
-              contradicts the graded view above. They come back when
-              the user flips to Raw. */}
+          {/* Price-derived sections — fundamentals, market dynamics.
+              All hide on PSA 10 since their numbers would either be
+              missing or, worse, mock data that contradicts the graded
+              view above. They come back when the user flips to Raw.
+              (Prediction moved above the Price History chart.) */}
           {selectedGrade !== 'PSA10' && (
             <>
-              {/* Prediction — AI valuation + market signals */}
-              <AIValuation card={card} marketPrice={price?.currentPrice} liveDynamics={cardStats?.dynamics} />
-
               {/* Fundamentals — StockTwits-style data table */}
               <CardFundamentals card={card} marketPrice={price?.currentPrice} livePop={psa10?.pop ?? null} />
 

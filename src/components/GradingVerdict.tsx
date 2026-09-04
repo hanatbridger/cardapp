@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View, Pressable, ScrollView } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
@@ -128,9 +128,17 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
           outcomes: {signedMoney(verdict.expectedNet)}.
         </Text>
 
-        {/* Condition picker — TCG-standard condition scale */}
+        {/* Condition picker — TCG-standard condition scale. One
+            horizontal rail that bleeds under the card's own padding on
+            both sides (negative margins matching Card's default inset),
+            so chips scroll edge-to-edge instead of wrapping. */}
         <View style={{ gap: spacing[2] }}>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={{ marginHorizontal: -spacing[6] }}
+            contentContainerStyle={{ paddingHorizontal: spacing[6], gap: spacing[2] }}
+          >
             {CONDITION_ORDER.map((c) => {
               const selected = c === condition;
               return (
@@ -156,7 +164,7 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
                 </Pressable>
               );
             })}
-          </View>
+          </ScrollView>
           <Text variant="caption" color={colors.onSurfaceMuted}>
             {CONDITION_HINTS[condition]}
           </Text>
