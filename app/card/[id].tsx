@@ -835,19 +835,6 @@ function CardDetailScreen() {
               the user flips to Raw. */}
           {selectedGrade !== 'PSA10' && (
             <>
-              {/* Worth grading? — EV verdict over the PSA outcome
-                  distribution. Only for cards where BOTH sides of the
-                  trade are real: a live raw price and a live PSA 10
-                  sold price (collectrics-tracked). Untracked cards get
-                  nothing rather than a verdict built on guesses. */}
-              {price && psa10 && psa10.latestPrice > 0 && (
-                <GradingVerdict
-                  rawPrice={price.currentPrice}
-                  psa10Price={psa10.latestPrice}
-                  pop={psa10.pop}
-                />
-              )}
-
               {/* Prediction — AI valuation + market signals */}
               <AIValuation card={card} marketPrice={price?.currentPrice} liveDynamics={cardStats?.dynamics} />
 
@@ -957,6 +944,20 @@ function CardDetailScreen() {
                 </View>
               </View>
             </Card>
+          )}
+
+          {/* Worth grading? — EV verdict over the PSA outcome
+              distribution. Only for cards where BOTH sides of the trade
+              are real: a live raw price and a live PSA 10 sold price
+              (collectrics-tracked). Untracked cards get nothing rather
+              than a verdict built on guesses. Sits last before Similar
+              cards — it's a decision aid, not price data. */}
+          {selectedGrade !== 'PSA10' && price && psa10 && psa10.latestPrice > 0 && (
+            <GradingVerdict
+              rawPrice={price.currentPrice}
+              psa10Price={psa10.latestPrice}
+              pop={psa10.pop}
+            />
           )}
 
           {/* Similar cards — other printings of the same character, newest
