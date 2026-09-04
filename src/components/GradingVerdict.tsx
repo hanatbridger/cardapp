@@ -77,7 +77,7 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
       }}
     >
       <Text variant="caption" color={colors.onSurfaceMuted} style={{ width: 84 }}>
-        {heading.toUpperCase()}
+        {heading}
       </Text>
       <Text variant="labelMd" style={{ flex: 1 }}>
         {o.label}
