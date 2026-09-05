@@ -34,9 +34,9 @@ import {
   WatchlistFullModal,
   AnimatedListItem,
   AuthForm,
-  TokenEditorPanel,
   withErrorBoundary,
 } from '../components';
+import { TokenEditorPanel } from '../components/TokenEditorPanel';
 import { MOCK_CARDS } from '../mocks';
 import { MOCK_NOTIFICATIONS } from '../mocks';
 import { useTheme } from '../theme/ThemeProvider';

@@ -70,6 +70,15 @@ function SetDetailScreen() {
         numColumns={COLS}
         onScroll={scrollHandler}
         scrollEventThrottle={16}
+        // A full set is 200-250 image cells; stock virtualization mounts
+        // far too many up front and keeps a huge window alive. Tighter
+        // batching + clipping keeps the push animation and fast flicks
+        // smooth. memory-disk caching stops the re-decode flash when
+        // scrolling back up.
+        initialNumToRender={9}
+        maxToRenderPerBatch={9}
+        windowSize={7}
+        removeClippedSubviews
         contentContainerStyle={{
           paddingTop: headerHeight + spacing[3],
           paddingHorizontal: HORIZONTAL_PADDING + GRID_INSET,
@@ -178,6 +187,7 @@ function SetDetailScreen() {
                     backgroundColor: colors.surfaceVariant,
                   }}
                   contentFit="cover"
+                  cachePolicy="memory-disk"
                 />
                 <View style={{ marginTop: spacing[2], gap: spacing['0.5'] }}>
                   <Text variant="labelSm" numberOfLines={1}>

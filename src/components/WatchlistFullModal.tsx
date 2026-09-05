@@ -107,7 +107,15 @@ export function WatchlistFullModal({ visible, onClose, currentCount, maxCount }:
             Upgrade to Premium
           </Button>
 
-          <Pressable onPress={onClose}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={8}
+            style={({ pressed }) => ({
+              paddingVertical: spacing[2],
+              paddingHorizontal: spacing[3],
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
             <Text variant="labelMd" color={colors.onSurfaceMuted}>
               Maybe later
             </Text>

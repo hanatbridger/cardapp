@@ -48,6 +48,13 @@ export function useCollapsingHeader() {
       const y = event.contentOffset.y;
       scrollY.value = y;
       const delta = y - prevScrollY.value;
+      // Bottom rubber-band: the overscroll snapback reads as an upward
+      // delta and was un-hiding the bar at the very end of the list.
+      const maxY = event.contentSize.height - event.layoutMeasurement.height;
+      if (y > maxY && maxY > 0) {
+        prevScrollY.value = y;
+        return;
+      }
 
       if (y <= 0 || delta < -DELTA_THRESHOLD) {
         // At top (handles bounce) or scrolling up — show

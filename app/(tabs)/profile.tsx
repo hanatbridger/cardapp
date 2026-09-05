@@ -81,7 +81,12 @@ const THEME_VALUES = ['system', 'light', 'dark'] as const;
 
 function ProfileScreen() {
   const { colors } = useTheme();
-  const { profile, signOut, deleteAccount, isPremium } = useUserStore();
+  // Field selectors — the whole-store destructure re-rendered Profile on
+  // every user-store write (recent searches, premium sync) even blurred.
+  const profile = useUserStore((s) => s.profile);
+  const signOut = useUserStore((s) => s.signOut);
+  const deleteAccount = useUserStore((s) => s.deleteAccount);
+  const isPremium = useUserStore((s) => s.isPremium);
   const themePreference = useUserStore((s) => s.preferences.theme);
   const currency = useUserStore((s) => s.preferences.currency ?? DEFAULT_CURRENCY);
   const updatePreference = useUserStore((s) => s.updatePreference);

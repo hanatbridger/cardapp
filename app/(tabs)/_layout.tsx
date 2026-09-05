@@ -401,7 +401,10 @@ export default function TabLayout() {
   return (
     <Tabs
       tabBar={(props) => <FloatingTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      // freezeOnBlur: inactive tabs stop re-rendering on store/query
+      // writes until refocused (their focus-scoped effects already
+      // handle the wake-up). Keeps a busy Home from taxing tab switches.
+      screenOptions={{ headerShown: false, freezeOnBlur: true }}
     >
       <Tabs.Screen name="index" />
       <Tabs.Screen name="search" />

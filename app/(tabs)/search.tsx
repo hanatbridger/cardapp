@@ -56,7 +56,7 @@ function SearchScreen() {
   // Network-facing queries trail the keystrokes; the input itself stays
   // on the raw value. With keepPreviousData in the hooks, results update
   // in place instead of blanking to a spinner per character.
-  const debouncedQuery = useDebouncedValue(query);
+  const [debouncedQuery, flushQuery] = useDebouncedValue(query);
 
   // Hide the floating bottom tab bar while the focused search overlay is
   // open. FloatingTabBar in app/(tabs)/_layout.tsx checks this option and
@@ -80,10 +80,20 @@ function SearchScreen() {
         // tap to pre-fill the search box with the card name. Lets the
         // user pick the canonical record (Pokemon TCG cardId) since
         // the trending payload only carries TCGPlayer productIds.
-        if (params.q) setQuery(params.q);
+        if (params.q) {
+          setQuery(params.q);
+          flushQuery(params.q);
+        }
         // Small delay so the input is mounted before we call .focus().
-        const t = setTimeout(() => searchInputRef.current?.focus(), 50);
-        router.setParams({ focus: undefined, from: undefined, q: undefined });
+        // setParams is deferred INTO the timer: clearing the params
+        // synchronously re-ran this effect (new deps) and its cleanup
+        // killed the timer, so the keyboard auto-focus raced and often
+        // lost. Deferring also keeps the tap-to-keyboard window to one
+        // navigator update instead of three.
+        const t = setTimeout(() => {
+          searchInputRef.current?.focus();
+          router.setParams({ focus: undefined, from: undefined, q: undefined });
+        }, 50);
         return () => clearTimeout(t);
       }
     }, [params.focus, params.from, params.q]),
@@ -224,6 +234,10 @@ function SearchScreen() {
 
   const handleFocusedRecentPress = (term: string) => {
     setQuery(term);
+    // Skip the debounce — the overlay dismisses synchronously and the
+    // results list would otherwise render 250ms against the stale
+    // debounced value (a false "No results found" flash).
+    flushQuery(term);
     addRecentSearch(term);
     Keyboard.dismiss();
     searchInputRef.current?.blur();
@@ -328,6 +342,7 @@ function SearchScreen() {
               }
               onFocus={() => setSearchFocused(true)}
               onSubmit={() => {
+                flushQuery(query);
                 if (query.length >= 2) addRecentSearch(query);
                 Keyboard.dismiss();
                 searchInputRef.current?.blur();
@@ -362,7 +377,7 @@ function SearchScreen() {
         />
       ) : showCardResults ? (
         <CardResults
-          loading={cardSearch.isLoading}
+          loading={cardSearch.isLoading || debouncedQuery !== query}
           error={cardSearch.isError}
           results={cardResults}
           totalCount={cardSearch.data?.totalCount ?? 0}
@@ -378,7 +393,7 @@ function SearchScreen() {
 
       {showSetResults && (
         <SetResults
-          loading={setSearch.isLoading}
+          loading={setSearch.isLoading || debouncedQuery !== query}
           sets={setResults}
           query={query}
           onSetPress={handleSetPress}
@@ -389,7 +404,7 @@ function SearchScreen() {
 
       {mode === 'artists' && (
         <ArtistResults
-          loading={artistSearch.isLoading}
+          loading={artistSearch.isLoading || debouncedQuery !== query}
           error={artistSearch.isError}
           artists={artistResults}
           query={query}
@@ -584,7 +599,7 @@ function CardResults({
 
   if (loading) {
     return (
-      <View style={{ padding: spacing[8], alignItems: 'center' }}>
+      <View style={{ padding: spacing[8], paddingTop: topInset + spacing[8], alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text variant="bodySm" color={colors.onSurfaceMuted} style={{ marginTop: spacing[2] }}>
           Searching...
@@ -614,6 +629,11 @@ function CardResults({
     <Animated.FlatList
       data={feed}
       keyExtractor={(item: SearchFeedItem) => item.id}
+      // 100+ mixed rows on a busy screen — keep the render window tight.
+      initialNumToRender={10}
+      maxToRenderPerBatch={10}
+      windowSize={9}
+      removeClippedSubviews
       renderItem={({ item, index }: { item: SearchFeedItem; index: number }) => {
         if (item.kind === 'section') {
           return (
@@ -681,7 +701,7 @@ function SetResults({
 
   if (loading) {
     return (
-      <View style={{ padding: spacing[8], alignItems: 'center' }}>
+      <View style={{ padding: spacing[8], paddingTop: topInset + spacing[8], alignItems: 'center' }}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text variant="bodySm" color={colors.onSurfaceMuted} style={{ marginTop: spacing[2] }}>
           Loading sets...

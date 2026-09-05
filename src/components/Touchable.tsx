@@ -32,9 +32,11 @@ interface TouchableProps {
  * Keeping the choice in one place stops the two platforms from
  * drifting apart as new tap targets get added.
  */
-export function Touchable({ style, ...rest }: TouchableProps) {
+export function Touchable({ style, disabled, ...rest }: TouchableProps) {
   if (Platform.OS === 'web') {
-    return <Pressable style={style as any} {...rest} />;
+    return <Pressable style={style as any} disabled={disabled} {...rest} />;
   }
-  return <RectButton style={style as any} {...rest} />;
+  // RectButton's prop is `enabled` — passing `disabled` through was
+  // silently dropped on native, so disabled rows still fired.
+  return <RectButton style={style as any} enabled={!disabled} {...rest} />;
 }

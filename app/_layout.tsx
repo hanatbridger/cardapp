@@ -203,14 +203,26 @@ export default function RootLayout() {
     SpaceGrotesk_700Bold,
   });
 
+  // Splash waits for BOTH fonts and store rehydration: hiding on fonts
+  // alone uncovered the default route for a frame before AuthGate's
+  // hydration-gated redirect ran (a flash of Home for signed-out users).
+  const [storeHydrated, setStoreHydrated] = useState(() => useUserStore.persist.hasHydrated());
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync().catch(() => {});
+    if (storeHydrated) return;
+    return useUserStore.persist.onFinishHydration(() => setStoreHydrated(true));
+  }, [storeHydrated]);
+
+  useEffect(() => {
+    if ((fontsLoaded || fontError) && storeHydrated) {
+      // One tick so AuthGate's routing effect (same hydration gate) has
+      // dispatched its redirect before the native splash lifts.
+      const t = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 0);
       registerBackgroundAlertTask();
       // Gates the rating prompt so a first-run user is never asked.
       recordLaunch();
+      return () => clearTimeout(t);
     }
-  }, [fontsLoaded, fontError]);
+  }, [fontsLoaded, fontError, storeHydrated]);
 
   if (!fontsLoaded && !fontError) {
     return null;
@@ -228,7 +240,11 @@ export default function RootLayout() {
           <ThemeProvider>
             <AuthGate />
             <AlertCheckerHost />
-            <Stack screenOptions={{ headerShown: false }}>
+            {/* freezeOnBlur: screens buried in the stack stop re-rendering
+                on store/query writes entirely (react-navigation freeze).
+                Home behind a pushed card detail was the worst offender —
+                selector work already trimmed it, freeze zeroes it. */}
+            <Stack screenOptions={{ headerShown: false, freezeOnBlur: true }}>
               <Stack.Screen name="(tabs)" />
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="onboarding" />

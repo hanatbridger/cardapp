@@ -62,7 +62,9 @@ export function SegmentedControl({
             }}
             // No `disabled` prop on Pressable — we still want the tap
             // to fire so the caller can show a "coming soon" toast.
-            style={{
+            // Pressed opacity gives touch-down feedback before the
+            // parent's (sometimes heavy) onSelect state lands.
+            style={({ pressed }) => ({
               flex: 1,
               paddingVertical: spacing[2] + 2,
               borderRadius: radius.lg,
@@ -71,9 +73,9 @@ export function SegmentedControl({
               flexDirection: 'row',
               justifyContent: 'center',
               gap: spacing[1] + 2,
-              opacity: isDisabled ? 0.55 : 1,
+              opacity: isDisabled ? 0.55 : pressed ? 0.6 : 1,
               ...(isActive ? shadows.sm : {}),
-            }}
+            })}
           >
             <Text
               variant="labelLg"

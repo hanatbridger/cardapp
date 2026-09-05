@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal, Animated, Easing, StyleSheet, InteractionManager } from 'react-native';
+import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal, Animated, Easing, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -94,13 +94,16 @@ function CardDetailScreen() {
   const addAlert = useAlertsStore((s) => s.addAlert);
   const removeAlert = useAlertsStore((s) => s.removeAlert);
 
-  // Below-the-fold sections mount after the push transition finishes
-  // (InteractionManager). Web has no push animation to protect.
+  // Below-the-fold sections mount after the push transition finishes.
+  // A fixed delay, not InteractionManager: the native-stack push runs on
+  // the native side where InteractionManager sees no handle, so
+  // runAfterInteractions fired on the next tick and the deferral was
+  // ~zero. 350ms ≈ the iOS push animation. Web has no push to protect.
   const [belowFoldReady, setBelowFoldReady] = useState(Platform.OS === 'web');
   useEffect(() => {
     if (belowFoldReady) return;
-    const task = InteractionManager.runAfterInteractions(() => setBelowFoldReady(true));
-    return () => task.cancel();
+    const t = setTimeout(() => setBelowFoldReady(true), 350);
+    return () => clearTimeout(t);
   }, [belowFoldReady]);
 
   // Tick once a minute so the "Updated Xm ago" label stays fresh —
@@ -763,6 +766,9 @@ function CardDetailScreen() {
                       <Pressable
                         key={range}
                         onPress={() => setTimeRangeIndex(i)}
+                        // Visual chip is ~28x30pt; hitSlop brings the
+                        // effective target to the 44pt HIG minimum.
+                        hitSlop={8}
                         style={{
                           paddingHorizontal: spacing[2],
                           paddingVertical: spacing[1],
@@ -977,6 +983,7 @@ function CardDetailScreen() {
                 data={relatedCards}
                 keyExtractor={(item) => item.id}
                 showsHorizontalScrollIndicator={false}
+                removeClippedSubviews
                 // Full bleed: cancel the section's horizontal padding so
                 // cards scroll under the screen edges; inset the content
                 // so the first card still aligns with the page grid.

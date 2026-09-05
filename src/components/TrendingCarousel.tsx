@@ -218,7 +218,10 @@ export const TrendingCarousel = React.memo(function TrendingCarousel({
       scrollEventThrottle={16}
       getItemLayout={(_, index) => ({
         length: ITEM_WIDTH + ITEM_GAP,
-        offset: (ITEM_WIDTH + ITEM_GAP) * index,
+        // Offsets are in content coordinates, which start before the
+        // 16pt leading padding — omitting it made scrollToIndex and
+        // clipping land one card-gap short.
+        offset: spacing[4] + (ITEM_WIDTH + ITEM_GAP) * index,
         index,
       })}
     />

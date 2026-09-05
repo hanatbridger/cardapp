@@ -43,7 +43,11 @@ function SealedDetailScreen() {
   const { width: screenWidth } = useWindowDimensions();
   const price = priceQuery.data ?? null;
 
-  const { items, addItem, removeItem } = useWatchlistStore();
+  // Field selectors — whole-store destructure re-rendered this screen on
+  // any watchlist write anywhere (including mid-push price stamps).
+  const items = useWatchlistStore((s) => s.items);
+  const addItem = useWatchlistStore((s) => s.addItem);
+  const removeItem = useWatchlistStore((s) => s.removeItem);
   const isWatched = product ? items.some((i) => i.kind === 'sealed' && i.productId === product.id) : false;
 
   const handleToggleWatch = () => {

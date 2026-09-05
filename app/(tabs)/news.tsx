@@ -73,6 +73,12 @@ function NewsScreen() {
       <FlatList
         data={uniqueArticles}
         keyExtractor={(item) => item.url}
+        // 50-60 image rows — tighter window + clipping keeps tab
+        // switches onto News smooth.
+        initialNumToRender={8}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews
         renderItem={({ item }) => (
           <View style={{ paddingHorizontal: HORIZONTAL_PADDING, marginBottom: spacing[2] }}>
             <NewsCard article={item} />
