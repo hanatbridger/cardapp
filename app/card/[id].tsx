@@ -1171,20 +1171,7 @@ function CardDetailScreen() {
                 We’re shipping live raw prices from TCGPlayer first. Graded card tracking lights up after our eBay sales pipeline launches — stay tuned.
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', gap: spacing[2], alignSelf: 'stretch' }}>
-              <Button
-                variant="outlined"
-                fullWidth
-                onPress={() => {
-                  // Switch back to Raw and close the modal — the
-                  // most useful next action since PSA 10 is empty.
-                  const ungradedIdx = GRADE_OPTIONS.indexOf('UNGRADED');
-                  setGradeIndex(ungradedIdx);
-                  setPsaModalVisible(false);
-                }}
-              >
-                See Raw price
-              </Button>
+            <View style={{ alignSelf: 'stretch' }}>
               <Button
                 variant="filled"
                 fullWidth
