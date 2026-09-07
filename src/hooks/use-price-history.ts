@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchPriceHistory } from '../services/ebay-proxy';
 import { fetchRawCardPriceHistory } from '../services/tcgplayer';
-import { getMockPriceHistory } from '../mocks/prices';
 import type { GradeType } from '../constants/grades';
 
 interface UsePriceHistoryOptions {
@@ -17,20 +16,17 @@ interface UsePriceHistoryOptions {
  * Same source-of-truth split as `useCardPrice`:
  *
  *   UNGRADED → TCGPlayer Market Price history via Supabase-backed
- *              /api/tcgplayer/history. May return [] while the
- *              snapshot DB is still accumulating data for this card
- *              — the card detail screen renders a "Building history"
- *              placeholder in that case rather than misleading mock.
- *   PSA10    → eBay sold listings history (live not yet wired —
- *              falls back to mock so chart isn't blank).
+ *              /api/tcgplayer/history. The endpoint backfills 90 days
+ *              of real TCGPlayer buckets on a card's first view, so
+ *              [] is now rare (resolver miss) — the card detail screen
+ *              renders a "Building history" placeholder in that case.
+ *   PSA10    → collectrics history rendered directly by the detail
+ *              screen (psa10.history) — this hook returns [] for
+ *              PSA10 rather than fetching anything.
  *
- * Behavior split:
- *   - UNGRADED + empty live response → pass through [] (no mock).
- *   - UNGRADED + thrown error        → fall back to mock so a
- *                                      transient network blip doesn't
- *                                      blank the chart.
- *   - PSA10                          → previous mock-on-empty behavior
- *                                      kept until eBay history ships.
+ * No mock fallbacks in any path: fabricated series in a price chart is
+ * exactly what App Review guideline 4.1 calls fake data presented as
+ * real, and a blank state is recoverable while a fake chart is not.
  */
 export function usePriceHistory(opts: UsePriceHistoryOptions) {
   const { cardName, grade, cardId, setName, cardNumber, language } = opts;
@@ -40,20 +36,15 @@ export function usePriceHistory(opts: UsePriceHistoryOptions) {
     queryFn: async () => {
       if (grade === 'UNGRADED') {
         try {
-          // Pass through whatever the Supabase-backed history endpoint
-          // returns — including []. Bootstrap window (no snapshots yet
-          // for this card) is a legitimate empty state, not a fallback
-          // trigger. The detail screen handles the empty case.
           return await fetchRawCardPriceHistory(cardId ?? cardName);
         } catch {
-          // True network/parse error — fall back to mock so the chart
-          // doesn't disappear from a transient blip.
-          if (cardId) return getMockPriceHistory(cardId, grade);
+          // Transient failure — empty renders the "building" card; the
+          // 1h staleTime means the next visit retries.
           return [];
         }
       }
-      // PSA10 path — eBay live history isn't shipped yet; keep the
-      // mock-on-empty behavior so the graded chart isn't blank.
+      // PSA10 — live eBay sold history isn't wired; the detail screen
+      // charts collectrics' psa10.history instead. Empty, never mock.
       try {
         const history = await fetchPriceHistory({
           cardName,
@@ -62,10 +53,8 @@ export function usePriceHistory(opts: UsePriceHistoryOptions) {
           setName,
           cardNumber,
         });
-        if (history.length > 0) return history;
-        throw new Error('Empty history');
+        return history;
       } catch {
-        if (cardId) return getMockPriceHistory(cardId, grade);
         return [];
       }
     },

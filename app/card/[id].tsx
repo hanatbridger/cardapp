@@ -562,8 +562,8 @@ function CardDetailScreen() {
             ) : (
               <ComingSoonPanel
                 reanimateKey={selectedGrade}
-                title="PSA 10 prices — coming soon"
-                body="We’re shipping live raw prices first. Graded card tracking lights up after our eBay sales pipeline launches. Tap Raw above to see the live TCGPlayer Market Price."
+                title="PSA 10 — not tracked for this card yet"
+                body="Graded price tracking covers a growing set of cards, focused on recent sets. Tap Raw above for the live TCGPlayer price, or check sold PSA 10 listings on eBay from the Recent sales section."
               />
             )
           ) : priceLoading ? (
@@ -582,8 +582,21 @@ function CardDetailScreen() {
                 <View style={{ gap: spacing[3] }}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] }}>
                     <Text variant="displaySm">{formatMoney(price.currentPrice)}</Text>
-                    <PriceChange percent={price.percentChange} size="md" />
+                    {/* A snapshot price has no movement data — a hard
+                        0.00% read as a fabricated number, the one fake-
+                        looking figure on the screen. Show the chip only
+                        when there is real change data behind it. */}
+                    {!(price.percentChange === 0 && price.salesCount === 0) && (
+                      <PriceChange percent={price.percentChange} size="md" />
+                    )}
                   </View>
+                  {/* Real listed-price spread from the card payload —
+                      present for virtually every card, tracked or not. */}
+                  {card.tcgPlayerLowPrice !== undefined && card.tcgPlayerHighPrice !== undefined && (
+                    <Text variant="caption" color={colors.onSurfaceMuted}>
+                      Listed {formatMoney(card.tcgPlayerLowPrice)} – {formatMoney(card.tcgPlayerHighPrice)} on TCGPlayer
+                    </Text>
+                  )}
                   <Text variant="caption" color={colors.onSurfaceMuted}>
                     {price.lastSaleDate
                       ? `Last sale ${formatMoney(price.lastSalePrice)} on ${price.lastSaleDate} via `
@@ -1161,14 +1174,14 @@ function CardDetailScreen() {
             </View>
             <View style={{ alignItems: 'center', gap: spacing[2] }}>
               <Text variant="headingMd" style={{ textAlign: 'center' }}>
-                PSA 10 prices — coming soon
+                PSA 10 — not tracked for this card
               </Text>
               <Text
                 variant="bodySm"
                 color={colors.onSurfaceVariant}
                 style={{ textAlign: 'center', lineHeight: 20 }}
               >
-                We’re shipping live raw prices from TCGPlayer first. Graded card tracking lights up after our eBay sales pipeline launches — stay tuned.
+                Graded price tracking covers a growing set of cards, focused on recent sets — this one isn’t tracked yet. Raw prices are live for every card.
               </Text>
             </View>
             <View style={{ alignSelf: 'stretch' }}>

@@ -101,30 +101,42 @@ function normNumber(n: string): string {
   return n.replace(/^0+(?=\d)/, '').toLowerCase();
 }
 
-async function resolveCollectricsId(
-  name: string,
-  number: string,
-): Promise<number | null> {
-  const q = encodeURIComponent(`${name} ${number}`);
+async function searchCollectrics(query: string): Promise<any[]> {
   const res = await fetchWithTimeout(
-    `${UPSTREAM}/search/cards?q=${q}&limit=8`,
+    `${UPSTREAM}/search/cards?q=${encodeURIComponent(query)}&limit=8`,
     { headers: UA },
   );
   if (!res.ok) throw new Error(`search ${res.status}`);
   const data = await res.json();
-  const rows: any[] = data?.results ?? data?.cards ?? data ?? [];
-  if (!Array.isArray(rows) || rows.length === 0) return null;
+  const rows = data?.results ?? data?.cards ?? data ?? [];
+  return Array.isArray(rows) ? rows : [];
+}
 
+async function resolveCollectricsId(
+  name: string,
+  number: string,
+): Promise<number | null> {
   const wantNum = normNumber(number);
   const firstToken = name.split(/\s+/)[0]?.toLowerCase() ?? '';
   // The number must match — name search alone happily returns other
   // printings, and wrong-card stats are worse than none.
-  const hit = rows.find((r) => {
-    const rNum = normNumber(String(r?.['card-number'] ?? ''));
-    const rName = String(r?.['product-name'] ?? '').toLowerCase();
-    return rNum === wantNum && (!firstToken || rName.includes(firstToken));
-  });
-  return hit?.id ?? null;
+  const pick = (rows: any[]) =>
+    rows.find((r) => {
+      const rNum = normNumber(String(r?.['card-number'] ?? ''));
+      const rName = String(r?.['product-name'] ?? '').toLowerCase();
+      return rNum === wantNum && (!firstToken || rName.includes(firstToken));
+    })?.id ?? null;
+
+  // Collectrics ANDs every token, so a single mismatched token — a
+  // hyphenated "Zoroark-GX" vs "Zoroark GX", an "&", a form suffix —
+  // zeroed the whole query and marked a TRACKED card as untracked.
+  // Retry with just "{firstToken} {number}", which keeps the strict
+  // number+name filter above doing the real disambiguation.
+  const full = pick(await searchCollectrics(`${name} ${number}`));
+  if (full !== null) return full;
+  const loose = `${firstToken} ${number}`.trim();
+  if (!firstToken || loose === `${name} ${number}`.toLowerCase()) return null;
+  return pick(await searchCollectrics(loose));
 }
 
 function avg(nums: number[]): number | null {

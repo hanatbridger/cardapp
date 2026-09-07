@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchCardPrice } from '../services/ebay-proxy';
 import { fetchRawCardPrice } from '../services/tcgplayer';
-import { getPrice } from '../mocks/prices';
 import { useWatchlistStore } from '../stores/watchlist-store';
 import type { GradeType } from '../constants/grades';
 import type { CardPrice } from '../types/card';
@@ -104,7 +103,10 @@ export function useCardPrice(opts: UseCardPriceOptions) {
             (i) => i.kind === 'card' && i.cardId === cardId && i.grade === 'UNGRADED',
           );
           if (stored?.lastPrice) {
-            return buildPrice(cardName, grade, stored.lastPrice, 'tcgplayer', stored.lastPrice * 0.95);
+            // Real stored day-change only — deriving previousPrice as
+            // lastPrice * 0.95 fabricated a permanent +5.26% chip.
+            const p = buildPrice(cardName, grade, stored.lastPrice, 'tcgplayer');
+            return { ...p, percentChange: stored.lastPriceChange ?? 0 };
           }
         }
 
@@ -113,14 +115,12 @@ export function useCardPrice(opts: UseCardPriceOptions) {
 
       // === PSA 10 — eBay / PriceCharting ONLY ===
       if (grade === 'PSA10') {
-        // 1. Mock fallback first (instant) — labelled as eBay since the
-        //    mock seed values are calibrated against eBay sold medians.
-        if (cardId) {
-          const mock = getPrice(cardId, 'PSA10');
-          if (mock) return { ...mock, source: 'ebay' };
-        }
+        // No mock-first: seeded values presented under an 'ebay' source
+        // label are fabricated data (App Review 4.1). The detail screen
+        // prices PSA 10 from the collectrics feed; this path returns
+        // real eBay data or nothing.
 
-        // 2. Live eBay sold listings via server proxy.
+        // 1. Live eBay sold listings via server proxy.
         try {
           const ebayPrice = await fetchCardPrice({ cardName, grade, language, setName, cardNumber });
           return { ...ebayPrice, source: 'ebay' };

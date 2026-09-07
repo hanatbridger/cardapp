@@ -46,15 +46,19 @@ const CORS = {
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
 };
 
-function json(status: number, body: unknown): Response {
+function json(status: number, body: unknown, cacheable = true): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json',
       // 1h CDN cache, 1h SWR. History updates once a day via cron, so
       // an hourly cache lets the chart feel fresh without hammering
-      // Supabase on every detail-screen open.
-      'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=3600',
+      // Supabase on every detail-screen open. Empty results are NOT
+      // cached: a transient resolver 502 used to pin "history is
+      // building" for a full hour and skip that day's enrollment.
+      'Cache-Control': cacheable
+        ? 'public, s-maxage=3600, stale-while-revalidate=3600'
+        : 'no-store',
       ...CORS,
     },
   });
@@ -152,7 +156,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   if (!productId) {
-    return json(200, { history: [] });
+    return json(200, { history: [] }, false);
   }
 
   // 3. Fetch every snapshot for that product_id, ordered by date.
@@ -179,6 +183,84 @@ export default async function handler(req: Request): Promise<Response> {
   const rows = snapshots ?? [];
   const hasToday = rows.some((s: SnapshotRow) => s.snapshot_date === today);
   const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const knownCardIdForWrites =
+    confirmedViaApi || rows.some((s: SnapshotRow) => s.card_id === cardId)
+      ? cardId
+      : null;
+
+  // 3a. First-view backfill: a card outside the collectrics leaderboard
+  // used to accrue exactly one snapshot per viewed day, so its chart
+  // said "history is building" for at least three separate days.
+  // TCGPlayer's public price-history endpoint serves REAL market-price
+  // buckets for any product — 90 days at 3-day resolution — so a card
+  // with a thin series gets a genuine chart on the very first open.
+  // Real data only: buckets are TCGPlayer's own numbers, never derived.
+  if (rows.length < 3 && SERVICE_ROLE_KEY) {
+    try {
+      const ctl = new AbortController();
+      const timer = setTimeout(() => ctl.abort(), 4000);
+      const histRes = await fetch(
+        `https://infinite-api.tcgplayer.com/price/history/${productId}/detailed?range=quarter`,
+        { headers: { 'user-agent': 'CardPulse History Backfill' }, signal: ctl.signal },
+      );
+      clearTimeout(timer);
+      if (histRes.ok) {
+        const hist = (await histRes.json()) as {
+          result?: Array<{
+            variant?: string;
+            condition?: string;
+            buckets?: Array<{ marketPrice?: string; bucketStartDate?: string }>;
+          }>;
+        };
+        const variants = hist.result ?? [];
+        // Near Mint is the condition every other price in the app quotes.
+        // Among printings prefer Holofoil (the chase printing TCGPlayer's
+        // own product page leads with), then whatever exists.
+        const nm = variants.filter((v) => v.condition === 'Near Mint');
+        const chosen =
+          nm.find((v) => v.variant === 'Holofoil') ?? nm[0] ?? variants[0];
+        const existingDates = new Set(rows.map((s: SnapshotRow) => s.snapshot_date));
+        const backfill = (chosen?.buckets ?? [])
+          .map((b) => ({
+            date: (b.bucketStartDate ?? '').slice(0, 10),
+            price: Number(b.marketPrice),
+          }))
+          .filter(
+            (b) =>
+              b.date.length === 10 &&
+              Number.isFinite(b.price) &&
+              b.price > 0 &&
+              !existingDates.has(b.date),
+          );
+        if (backfill.length > 0) {
+          const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          });
+          await admin.from('price_snapshots').upsert(
+            backfill.map((b) => ({
+              product_id: productId,
+              card_id: knownCardIdForWrites,
+              snapshot_date: b.date,
+              raw_price: b.price,
+              source: 'tcgplayer',
+            })),
+            { onConflict: 'product_id,snapshot_date,source', ignoreDuplicates: true },
+          );
+          for (const b of backfill) {
+            rows.push({
+              product_id: productId,
+              card_id: knownCardIdForWrites,
+              snapshot_date: b.date,
+              raw_price: b.price,
+            } as SnapshotRow);
+          }
+          rows.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+        }
+      }
+    } catch {
+      // Backfill is best-effort — the chart renders whatever exists.
+    }
+  }
   if (!hasToday && SERVICE_ROLE_KEY) {
     try {
       const ctl = new AbortController();
@@ -197,14 +279,10 @@ export default async function handler(req: Request): Promise<Response> {
           });
           // card_id only when the mapping is trusted (resolved via the
           // Pokemon TCG API path or already present on prior rows).
-          const knownCardId =
-            confirmedViaApi || rows.some((s: SnapshotRow) => s.card_id === cardId)
-              ? cardId
-              : null;
           await admin.from('price_snapshots').upsert(
             {
               product_id: productId,
-              card_id: knownCardId,
+              card_id: knownCardIdForWrites,
               snapshot_date: today,
               raw_price: marketPrice,
               source: 'tcgplayer',
@@ -213,10 +291,11 @@ export default async function handler(req: Request): Promise<Response> {
           );
           rows.push({
             product_id: productId,
-            card_id: knownCardId,
+            card_id: knownCardIdForWrites,
             snapshot_date: today,
             raw_price: marketPrice,
           } as SnapshotRow);
+          rows.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
         }
       }
     } catch {

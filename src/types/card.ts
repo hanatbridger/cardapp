@@ -31,6 +31,12 @@ export interface PokemonCard {
   tcgPlayerPrice?: number;
   /** TCGPlayer mid/median price — used to calculate % change vs market */
   tcgPlayerMidPrice?: number;
+  /** Lowest listed price on TCGPlayer for the primary printing */
+  tcgPlayerLowPrice?: number;
+  /** Highest listed price on TCGPlayer for the primary printing */
+  tcgPlayerHighPrice?: number;
+  /** Date TCGPlayer last refreshed the bundled prices (YYYY/MM/DD) */
+  tcgPlayerUpdatedAt?: string;
   /** TCGPlayer product page URL */
   tcgPlayerUrl?: string;
 }

@@ -87,11 +87,17 @@ function mapCard(raw: any): PokemonCard {
     // Extract TCGPlayer market price and URL if available
     tcgPlayerPrice: extractTcgPrice(raw.tcgplayer, 'market'),
     tcgPlayerMidPrice: extractTcgPrice(raw.tcgplayer, 'mid'),
+    // Listed-price range — real TCGPlayer data bundled with every card,
+    // so even cards with no tracked stats can show an honest market
+    // range instead of nothing.
+    tcgPlayerLowPrice: extractTcgPrice(raw.tcgplayer, 'low'),
+    tcgPlayerHighPrice: extractTcgPrice(raw.tcgplayer, 'high'),
+    tcgPlayerUpdatedAt: raw.tcgplayer?.updatedAt || undefined,
     tcgPlayerUrl: raw.tcgplayer?.url || undefined,
   };
 }
 
-function extractTcgPrice(tcgplayer: any, field: 'market' | 'mid' = 'market'): number | undefined {
+function extractTcgPrice(tcgplayer: any, field: 'market' | 'mid' | 'low' | 'high' = 'market'): number | undefined {
   if (!tcgplayer?.prices) return undefined;
   const variants = ['holofoil', 'reverseHolofoil', 'normal', '1stEditionHolofoil', '1stEditionNormal'];
   for (const v of variants) {
