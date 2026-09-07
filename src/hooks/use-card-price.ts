@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchCardPrice } from '../services/ebay-proxy';
 import { fetchRawCardPrice } from '../services/tcgplayer';
 import { useWatchlistStore } from '../stores/watchlist-store';
 import type { GradeType } from '../constants/grades';
@@ -12,9 +11,10 @@ import type { CardPrice } from '../types/card';
  *              → fetchRawCardPrice (TCGPlayer server proxy, mock fallback)
  *              → watchlist-stored last price (offline tertiary)
  *
- *   PSA10    → fetchCardPrice (eBay sold listings server proxy)
- *              → PriceCharting (TODO once API key obtained)
- *              → null (we don't show estimated PSA 10 prices)
+ *   PSA10    → null here. Graded prices come from the collectrics feed
+ *              on the detail screen, or live eBay asking prices via
+ *              /api/ebay-listings for untracked cards. PriceCharting
+ *              is a TODO once an API key is obtained.
  *
  * This split exists because TCGPlayer Market Price tracks raw/sealed
  * marketplace movement well, but graded cards trade through eBay/
@@ -113,28 +113,15 @@ export function useCardPrice(opts: UseCardPriceOptions) {
         return null;
       }
 
-      // === PSA 10 — eBay / PriceCharting ONLY ===
-      if (grade === 'PSA10') {
-        // No mock-first: seeded values presented under an 'ebay' source
-        // label are fabricated data (App Review 4.1). The detail screen
-        // prices PSA 10 from the collectrics feed; this path returns
-        // real eBay data or nothing.
-
-        // 1. Live eBay sold listings via server proxy.
-        try {
-          const ebayPrice = await fetchCardPrice({ cardName, grade, language, setName, cardNumber });
-          return { ...ebayPrice, source: 'ebay' };
-        } catch {}
-
-        // 3. PriceCharting (TODO: enable when API key obtained).
-        // const pc = await fetchPriceChartingPrice(cardName, setName);
-        // if (pc?.gradedPrice) return buildPrice(cardName, grade, pc.gradedPrice, 'pricecharting');
-
-        // No estimate fallback for PSA 10 — graded prices need a real
-        // source or we return null and let the UI show "—".
-        return null;
-      }
-
+      // === PSA 10 ===
+      // No client-side PSA 10 price source. The detail screen prices
+      // PSA 10 from the collectrics feed (cardStats.psa10) and, for
+      // untracked cards, shows live eBay ASKING prices via
+      // /api/ebay-listings — never a sold figure this hook could vouch
+      // for. The old eBay sold-listings proxy (Finding API) was
+      // decommissioned upstream; seeded mock PSA 10 prices were removed
+      // as fabricated data (App Review 4.1). PriceCharting stays a TODO
+      // pending an API key.
       return null;
     },
     enabled: cardName.length > 0,

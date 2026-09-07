@@ -10,11 +10,11 @@ import type { CardPrice, PriceHistory } from '../types/card';
  *
  * Pricing source-of-truth is TCGPlayer's Market Price (rolling average
  * of recent TCGPlayer marketplace sales). For graded cards we go to
- * eBay sold listings or PriceCharting instead — see `ebay-proxy.ts`.
+ * the collectrics feed or live eBay asking prices (api/ebay-listings).
  * The split is enforced in `useCardPrice`:
  *
  *   UNGRADED → TCGPlayer (this file)
- *   PSA10    → eBay sold / PriceCharting (ebay-proxy.ts)
+ *   PSA10    → collectrics feed / eBay asking prices (api/ebay-listings)
  *
  * The live path goes through Vercel serverless functions in `/api/`:
  *

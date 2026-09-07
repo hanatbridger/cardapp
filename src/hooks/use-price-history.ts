@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchPriceHistory } from '../services/ebay-proxy';
 import { fetchRawCardPriceHistory } from '../services/tcgplayer';
 import type { GradeType } from '../constants/grades';
 
@@ -20,9 +19,9 @@ interface UsePriceHistoryOptions {
  *              of real TCGPlayer buckets on a card's first view, so
  *              [] is now rare (resolver miss) — the card detail screen
  *              renders a "Building history" placeholder in that case.
- *   PSA10    → collectrics history rendered directly by the detail
- *              screen (psa10.history) — this hook returns [] for
- *              PSA10 rather than fetching anything.
+ *   PSA10    → [] here, no request. The detail screen charts the
+ *              collectrics series (psa10.history) directly; the old
+ *              eBay sold-history proxy was decommissioned upstream.
  *
  * No mock fallbacks in any path: fabricated series in a price chart is
  * exactly what App Review guideline 4.1 calls fake data presented as
@@ -34,27 +33,12 @@ export function usePriceHistory(opts: UsePriceHistoryOptions) {
   return useQuery({
     queryKey: ['priceHistory', cardName, setName, cardNumber, grade, language],
     queryFn: async () => {
-      if (grade === 'UNGRADED') {
-        try {
-          return await fetchRawCardPriceHistory(cardId ?? cardName);
-        } catch {
-          // Transient failure — empty renders the "building" card; the
-          // 1h staleTime means the next visit retries.
-          return [];
-        }
-      }
-      // PSA10 — live eBay sold history isn't wired; the detail screen
-      // charts collectrics' psa10.history instead. Empty, never mock.
+      if (grade !== 'UNGRADED') return [];
       try {
-        const history = await fetchPriceHistory({
-          cardName,
-          grade,
-          language,
-          setName,
-          cardNumber,
-        });
-        return history;
+        return await fetchRawCardPriceHistory(cardId ?? cardName);
       } catch {
+        // Transient failure — empty renders the "building" card; the
+        // 1h staleTime means the next visit retries.
         return [];
       }
     },
