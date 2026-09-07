@@ -34,6 +34,34 @@ import { createClient } from '@supabase/supabase-js';
 
 export const config = { runtime: 'edge' };
 
+/**
+ * Fetch JSON from TCGPlayer's infinite-api, which sends a
+ * `content-encoding: gzip` header but an UNCOMPRESSED body. The Edge
+ * runtime believes the header and throws "Gzip decompression failed" on
+ * a plain-JSON body. Setting accept-encoding explicitly stops the
+ * runtime auto-decoding; we then sniff the real gzip magic bytes
+ * (0x1f 0x8b) and only decompress when the body is genuinely gzipped —
+ * so we survive both the lying header today and a real gzip tomorrow.
+ */
+async function fetchJsonAllowGzip(input: string, signal: AbortSignal): Promise<any> {
+  const res = await fetch(input, {
+    headers: {
+      'user-agent': 'CardPulse History Backfill',
+      'accept-encoding': 'gzip',
+    },
+    signal,
+  });
+  if (!res.ok) throw new Error(`fetch ${res.status}`);
+  const buf = new Uint8Array(await res.arrayBuffer());
+  const isGzip = buf[0] === 0x1f && buf[1] === 0x8b;
+  const text = isGzip
+    ? await new Response(
+        new Response(buf).body!.pipeThrough(new DecompressionStream('gzip')),
+      ).text()
+    : new TextDecoder().decode(buf);
+  return JSON.parse(text);
+}
+
 interface SnapshotRow {
   product_id: string;
   card_id: string | null;
@@ -132,32 +160,40 @@ export default async function handler(req: Request): Promise<Response> {
   // id — so parsing that (the old approach) never resolved anything and
   // every chart came back empty even though the snapshot rows existed.
   if (!productId && cardId) {
-    try {
-      const ctl = new AbortController();
-      const timer = setTimeout(() => ctl.abort(), 2500);
-      const res = await fetch(
-        `https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`,
-        {
-          redirect: 'manual',
-          headers: { 'user-agent': 'CardPulse History Resolver' },
-          signal: ctl.signal,
-        },
-      );
-      clearTimeout(timer);
-      const location = res.headers.get('location') ?? '';
-      const m = location.match(/tcgplayer\.com\/product\/(\d+)/);
-      if (m) {
-        productId = m[1];
-        confirmedViaApi = true;
+    // prices.pokemontcg.io 502s intermittently (~2 in 3 during load), so
+    // a single attempt left many first views with no chart. Retry a
+    // couple of times; an empty response is no-store, so a genuine miss
+    // still recovers on the next view.
+    for (let attempt = 0; attempt < 3 && !productId; attempt++) {
+      try {
+        const ctl = new AbortController();
+        const timer = setTimeout(() => ctl.abort(), 2500);
+        const res = await fetch(
+          `https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`,
+          {
+            redirect: 'manual',
+            headers: { 'user-agent': 'CardPulse History Resolver' },
+            signal: ctl.signal,
+          },
+        );
+        clearTimeout(timer);
+        const location = res.headers.get('location') ?? '';
+        const m = location.match(/tcgplayer\.com\/product\/(\d+)/);
+        if (m) {
+          productId = m[1];
+          confirmedViaApi = true;
+        }
+      } catch {
+        // Retry, then fall through to the empty (no-store) response.
       }
-    } catch {
-      // Resolver miss is fine — we'll return empty below.
     }
   }
 
   if (!productId) {
     return json(200, { history: [] }, false);
   }
+
+
 
   // 3. Fetch every snapshot for that product_id, ordered by date.
   const { data: snapshots, error } = await sb
@@ -199,19 +235,18 @@ export default async function handler(req: Request): Promise<Response> {
     try {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 4000);
-      const histRes = await fetch(
+      const hist = (await fetchJsonAllowGzip(
         `https://infinite-api.tcgplayer.com/price/history/${productId}/detailed?range=quarter`,
-        { headers: { 'user-agent': 'CardPulse History Backfill' }, signal: ctl.signal },
-      );
+        ctl.signal,
+      )) as {
+        result?: Array<{
+          variant?: string;
+          condition?: string;
+          buckets?: Array<{ marketPrice?: string; bucketStartDate?: string }>;
+        }>;
+      };
       clearTimeout(timer);
-      if (histRes.ok) {
-        const hist = (await histRes.json()) as {
-          result?: Array<{
-            variant?: string;
-            condition?: string;
-            buckets?: Array<{ marketPrice?: string; bucketStartDate?: string }>;
-          }>;
-        };
+      {
         const variants = hist.result ?? [];
         // Near Mint is the condition every other price in the app quotes.
         // Among printings prefer Holofoil (the chase printing TCGPlayer's
