@@ -16,5 +16,6 @@ export {
 } from './use-sealed';
 export { useTrending, useTrendingMovers } from './use-trending';
 export { useCardStats } from './use-card-stats';
+export { useEbayListings } from './use-ebay-listings';
 export { useFxRates } from './use-fx-rates';
 export { useMoney } from './use-money';

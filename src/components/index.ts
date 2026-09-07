@@ -18,6 +18,7 @@ export { SealedSearchResult } from './SealedSearchResult';
 export { NotificationItem } from './NotificationItem';
 export { AIValuation } from './AIValuation';
 export { GradingVerdict } from './GradingVerdict';
+export { EbayListingsBlock } from './EbayListingsBlock';
 export { AIPicks, type AIPickItem } from './AIPicks';
 export { ScreenBackground } from './ScreenBackground';
 export { PriceAlertModal } from './PriceAlertModal';

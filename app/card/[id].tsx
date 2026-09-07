@@ -20,6 +20,7 @@ import {
   WatchlistFullModal,
   CardDetailSkeleton,
   GradingVerdict,
+  EbayListingsBlock,
   Skeleton,
   ComingSoonPanel,
   withErrorBoundary,
@@ -34,7 +35,7 @@ import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
 import { useWatchlistStore } from '../../src/stores';
 import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
-import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards, useCardStats } from '../../src/hooks';
+import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards, useCardStats, useEbayListings } from '../../src/hooks';
 
 // No 1D: history is one snapshot per day, so a 1-day window can never
 // hold the 3 points the chart needs — it only ever showed the
@@ -162,6 +163,25 @@ function CardDetailScreen() {
   const psa10 = cardStats?.psa10 ?? null;
   // undefined = query still resolving; null = settled with no stats.
   const statsSettled = cardStats !== undefined;
+
+  // Live eBay asking prices, fetched ONLY where the tracked feed has
+  // nothing: raw listings when there are no sold aggregates, PSA 10
+  // listings when the card has no graded feed. Real listings, labeled
+  // as asking prices — never presented as sales.
+  const ebayArgs = {
+    name: card?.name,
+    number: card?.number,
+    setName: card?.set.name,
+    language: card?.language,
+  };
+  const { data: rawListings } = useEbayListings(
+    { ...ebayArgs, grade: 'raw' },
+    Boolean(card) && statsSettled && recentSales.length === 0 && selectedGrade !== 'PSA10',
+  );
+  const { data: psaListings } = useEbayListings(
+    { ...ebayArgs, grade: 'psa10' },
+    Boolean(card) && statsSettled && !psa10 && selectedGrade === 'PSA10',
+  );
 
   // Fire the coming-soon popup when the toggle transitions UNGRADED →
   // PSA10 — but only for cards with no real graded data. While the
@@ -560,11 +580,22 @@ function CardDetailScreen() {
                 </View>
               </Card>
             ) : (
-              <ComingSoonPanel
-                reanimateKey={selectedGrade}
-                title="PSA 10 — not tracked for this card yet"
-                body="Graded price tracking covers a growing set of cards, focused on recent sets. Tap Raw above for the live TCGPlayer price, or check sold PSA 10 listings on eBay from the Recent sales section."
-              />
+              <View style={{ gap: spacing[3] }}>
+                <ComingSoonPanel
+                  reanimateKey={selectedGrade}
+                  title="PSA 10 — not tracked for this card yet"
+                  body={
+                    psaListings && psaListings.count > 0
+                      ? 'No graded sold-price feed for this card yet, but PSA 10 copies are listed on eBay right now — asking prices below.'
+                      : 'Graded price tracking covers a growing set of cards, focused on recent sets. Tap Raw above for the live TCGPlayer price, or check sold PSA 10 listings on eBay from the Recent sales section.'
+                  }
+                />
+                {psaListings && psaListings.count > 0 && (
+                  <Card>
+                    <EbayListingsBlock heading="PSA 10 listed on eBay now" data={psaListings} />
+                  </Card>
+                )}
+              </View>
             )
           ) : priceLoading ? (
             <Card elevated>
@@ -917,6 +948,11 @@ function CardDetailScreen() {
                       Daily averages from ended eBay raw listings, adjusted for outliers.
                     </Text>
                   </View>
+                ) : rawListings && rawListings.count > 0 ? (
+                  // No sold aggregates for this card — show what IS
+                  // real right now: live raw listings, labeled as asking
+                  // prices.
+                  <EbayListingsBlock heading="Listed on eBay now" data={rawListings} />
                 ) : (
                   <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ lineHeight: 20 }}>
                     No tracked sales for this card yet. Browse the latest {card.name} #{card.number} sales on eBay or TCGPlayer.
