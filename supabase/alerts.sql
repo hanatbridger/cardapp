@@ -53,6 +53,9 @@ alter table public.alert_targets add constraint alert_targets_kind_check
   check (kind in ('price', 'grading'));
 
 -- Each kind carries its own inputs; nothing else is nullable-by-accident.
+-- Every branch must evaluate to true or false, never NULL: a CHECK that
+-- evaluates to NULL PASSES, so a bare `condition in (...)` would have let
+-- a grading row through with a null condition.
 alter table public.alert_targets drop constraint if exists alert_targets_kind_shape_check;
 alter table public.alert_targets add constraint alert_targets_kind_shape_check check (
   (kind = 'price' and target_price is not null)
@@ -60,6 +63,7 @@ alter table public.alert_targets add constraint alert_targets_kind_shape_check c
     kind = 'grading'
     and threshold_net is not null
     and card_number is not null
+    and condition is not null
     and condition in ('mint', 'near_mint', 'lightly_played', 'moderately_played', 'heavily_played')
   )
 );
