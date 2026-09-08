@@ -52,6 +52,9 @@ Use for empty lists (Watchlist, Search, Alerts).
 ### `<Skeleton width height radius variant>` / `<SkeletonText lines>` / `<CardDetailSkeleton>`
 Animated opacity pulse. Use during data fetches.
 
+### `<BottomSheet visible onClose title onOpened>`
+Form-style bottom sheet: fading backdrop + sliding sheet (self-animated, `Modal animationType="none"`), handle bar, title + close, `KeyboardAvoidingView`. Children stack with `gap: spacing[4]`. `onOpened` fires when the entry animation lands — focus inputs there, never earlier. Used by `PriceAlertModal` and `GradingAlertModal`.
+
 ### `<SearchBar value onChange placeholder>`
 Glass background, leading `IconSearch`.
 
@@ -94,6 +97,7 @@ Liquid-glass floating tab bar (Apple-style frosted capsule). Not exported from b
 | `NotificationItem` | Notification row with typed icon |
 | `FeedPostCard` | Feed post (deferred to v2) |
 | `PriceAlertModal` | Set/edit price alerts |
+| `GradingAlertModal` | Arm/edit a grading-ROI alert (expected-net line + direction); opened from `GradingVerdict` |
 | `WatchlistFullModal` | Full watchlist sheet |
 | `AuthForm` | Sign in / sign up (Apple HIG colors) |
 | `ErrorBoundary` / `withErrorBoundary` | Class boundary, HOC for screens |

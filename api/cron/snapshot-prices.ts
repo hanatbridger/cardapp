@@ -29,8 +29,22 @@
 //                                 header on each cron invocation.
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import {
+  CONDITION_ORDER,
+  computeGradingVerdict,
+  formatGradingAlertMessage,
+  gradingAlertHit,
+  type CardCondition,
+} from '../../src/services/grading-verdict';
+import { fetchCollectricsStats } from '../_lib/collectrics';
+import { fetchTcgMarketPrice } from '../_lib/tcgplayer';
 
 export const config = { runtime: 'edge' };
+
+// The whole handler has to answer inside the edge budget; the grading
+// sweep stops starting new lookups once this much wall-clock has gone.
+// Cards it didn't reach wait, un-triggered, for tomorrow's run.
+const HANDLER_BUDGET_MS = 20_000;
 
 interface SparklinePoint {
   date: string; // YYYY-MM-DD
@@ -66,11 +80,24 @@ interface SnapshotRow {
 interface AlertTargetRow {
   id: string;
   push_token: string;
+  /** 'price' | 'grading' — see supabase/alerts.sql. */
+  kind: string | null;
   card_id: string;
   card_name: string;
   grade: string;
-  target_price: number | string;
+  /** price rows only */
+  target_price: number | string | null;
   direction: 'above' | 'below';
+  /** grading rows only */
+  card_number: string | null;
+  condition: string | null;
+  threshold_net: number | string | null;
+}
+
+interface FiredAlert {
+  target: AlertTargetRow;
+  title: string;
+  body: string;
 }
 
 // Per-message ticket from exp.host — one per message, in message order.
@@ -86,26 +113,106 @@ function extractProductId(url: string): string | null {
   return m ? m[1] : null;
 }
 
-// Server-side price-alert sweep, riding inside this cron because Vercel
-// Hobby caps us at 2 cron jobs. Honest limits: it runs ONCE daily at the
-// cron hour and only covers cards present in the collectrics leaderboard
-// just ingested; the in-app checker (use-alert-checker) remains the
-// real-time path while the app is open. Snapshot prices are RAW, so only
-// UNGRADED targets can match — graded targets are skipped untouched.
+// Grading-ROI sweep: re-runs the same verdict the card screen shows —
+// live TCGPlayer raw price + collectrics PSA 10 price and gem rate —
+// for every card with an armed grading target, then checks each rule's
+// line and direction (gradingAlertHit). One pair of upstream lookups
+// per distinct card, shared by every user watching it; a card whose
+// raw price or PSA 10 price is unavailable today is skipped untouched.
+const GRADING_LOOKUP_CHUNK = 6;
+
+async function evaluateGradingTargets(
+  targets: AlertTargetRow[],
+  deadline: number,
+): Promise<FiredAlert[]> {
+  const byCard = new Map<string, AlertTargetRow[]>();
+  for (const t of targets) {
+    if (!t.card_number || !t.condition) continue;
+    const rows = byCard.get(t.card_id) ?? [];
+    rows.push(t);
+    byCard.set(t.card_id, rows);
+  }
+  const cards = [...byCard.entries()];
+  const fired: FiredAlert[] = [];
+
+  for (let i = 0; i < cards.length; i += GRADING_LOOKUP_CHUNK) {
+    if (Date.now() > deadline) {
+      console.warn(
+        `[snapshot-prices] grading sweep out of time: ${cards.length - i} card(s) deferred`,
+      );
+      break;
+    }
+    await Promise.all(
+      cards.slice(i, i + GRADING_LOOKUP_CHUNK).map(async ([cardId, rows]) => {
+        const sample = rows[0];
+        const [rawPrice, stats] = await Promise.all([
+          fetchTcgMarketPrice(cardId).catch(() => null),
+          fetchCollectricsStats(sample.card_name, sample.card_number ?? '').catch(
+            () => null,
+          ),
+        ]);
+        const psa10 = stats?.psa10;
+        if (rawPrice === null || !psa10 || !(psa10.latestPrice > 0)) return;
+
+        for (const t of rows) {
+          // The DB check constraint pins condition to the known set; the
+          // includes() keeps a hand-edited row from crashing the sweep.
+          const condition = t.condition as CardCondition;
+          if (!CONDITION_ORDER.includes(condition)) continue;
+          const thresholdNet = Number(t.threshold_net);
+          if (!Number.isFinite(thresholdNet)) continue;
+
+          const verdict = computeGradingVerdict({
+            rawPrice,
+            psa10Price: psa10.latestPrice,
+            gemRatePct: psa10.pop ? psa10.pop.gemPct : null,
+            condition,
+          });
+          if (!verdict) continue;
+          if (!gradingAlertHit(verdict.expectedNet, t.direction, thresholdNet)) continue;
+
+          const { title, body } = formatGradingAlertMessage(
+            { cardName: t.card_name, condition, direction: t.direction, thresholdNet },
+            verdict.expectedNet,
+            verdict.letter,
+          );
+          fired.push({ target: t, title, body });
+        }
+      }),
+    );
+  }
+  return fired;
+}
+
+// Server-side alert sweep, riding inside this cron because Vercel Hobby
+// caps us at 2 cron jobs. Honest limits: it runs ONCE daily at the cron
+// hour; the in-app checker (use-alert-checker) remains the real-time
+// path while the app is open. Price targets match against the
+// collectrics leaderboard just ingested, so they only cover cards on it
+// and only RAW prices (graded price targets are skipped untouched).
+// Grading targets get live per-card lookups — see evaluateGradingTargets.
 async function checkAlerts(
   // Schema-less client — same loose typing the rest of the file uses.
   admin: SupabaseClient<any, any, any>,
   snapshots: SnapshotRow[],
+  deadline: number,
 ): Promise<{ checked: number; fired: number }> {
   const { data: targetRows, error } = await admin
     .from('alert_targets')
-    .select('id, push_token, card_id, card_name, grade, target_price, direction')
+    .select(
+      'id, push_token, kind, card_id, card_name, grade, target_price, direction, card_number, condition, threshold_net',
+    )
     .is('triggered_at', null);
   if (error) throw new Error(`alert_targets load failed: ${error.message}`);
   const targets = (targetRows ?? []) as unknown as AlertTargetRow[];
   if (targets.length === 0) return { checked: 0, fired: 0 };
 
-  const ungraded = targets.filter((t) => t.grade === 'UNGRADED');
+  // `kind` defaults to 'price' server-side; null only if a row predates
+  // the column somehow, which reads the same way.
+  const ungraded = targets.filter(
+    (t) => (t.kind ?? 'price') === 'price' && t.grade === 'UNGRADED',
+  );
+  const grading = targets.filter((t) => t.kind === 'grading');
 
   // Latest ingested price per product. Each sparkline series ends at (or
   // near) today, so the newest point is today's raw price.
@@ -143,7 +250,7 @@ async function checkAlerts(
 
   // A target whose card has no mapping yet (chart never opened) or no
   // fresh price simply waits, un-triggered, for a future run.
-  const fired: { target: AlertTargetRow; price: number }[] = [];
+  const fired: FiredAlert[] = [];
   for (const t of ungraded) {
     const pid = productByCard.get(t.card_id);
     if (!pid) continue;
@@ -155,22 +262,30 @@ async function checkAlerts(
       t.direction === 'below'
         ? latest.price <= targetPrice
         : latest.price >= targetPrice;
-    if (hit) fired.push({ target: t, price: latest.price });
+    if (hit) {
+      // Copy mirrors formatAlertMessage in src/services/alert-checker.ts.
+      fired.push({
+        target: t,
+        title: `${t.card_name} hit your target`,
+        body: `Raw is now ${t.direction} $${targetPrice.toFixed(2)} — currently $${latest.price.toFixed(2)}.`,
+      });
+    }
   }
+
+  fired.push(...(await evaluateGradingTargets(grading, deadline)));
   if (fired.length === 0) return { checked: targets.length, fired: 0 };
 
   // Fan out Expo pushes (batched ≤100) — same ticket handling as
-  // api/cron/news-push.ts. Copy mirrors formatAlertMessage in
-  // src/services/alert-checker.ts.
+  // api/cron/news-push.ts. Tapping a push opens the card either way.
   const firedOkIds: string[] = [];
   const staleTokens: string[] = [];
   for (let i = 0; i < fired.length; i += 100) {
     const batch = fired.slice(i, i + 100);
-    const messages = batch.map(({ target, price }) => ({
+    const messages = batch.map(({ target, title, body }) => ({
       to: target.push_token,
       sound: 'default',
-      title: `${target.card_name} hit your target`,
-      body: `Raw is now ${target.direction} $${Number(target.target_price).toFixed(2)} — currently $${price.toFixed(2)}.`,
+      title,
+      body,
       data: { type: 'alert', cardId: target.card_id },
     }));
     try {
@@ -232,6 +347,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 }
 
 export default async function handler(req: Request): Promise<Response> {
+  const startedAt = Date.now();
   // Vercel injects Authorization: Bearer ${CRON_SECRET} on every cron
   // invocation when CRON_SECRET is set in the project env. Reject any
   // request without it so randos can't trigger ingest. Constant-time
@@ -379,7 +495,7 @@ export default async function handler(req: Request): Promise<Response> {
   let alertsChecked = -1;
   let alertsFired = -1;
   try {
-    const result = await checkAlerts(admin, snapshots);
+    const result = await checkAlerts(admin, snapshots, startedAt + HANDLER_BUDGET_MS);
     alertsChecked = result.checked;
     alertsFired = result.fired;
   } catch (err) {

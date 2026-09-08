@@ -7,11 +7,25 @@ import { Text, NotificationItem, EmptyState, ScreenBackground, withErrorBoundary
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useAlertsStore } from '../../src/stores/alerts-store';
+import { CONDITION_LABELS, formatSignedUsd } from '../../src/services/grading-verdict';
 import { maybeRequestReview } from '../../src/utils/review-prompt';
 import type { Notification } from '../../src/types/social';
 import type { TriggeredAlert } from '../../src/stores/alerts-store';
 
 function triggeredToNotification(t: TriggeredAlert): Notification {
+  if (t.kind === 'grading') {
+    const verdict =
+      t.direction === 'above' ? 'is worth grading now' : 'is no longer worth grading';
+    return {
+      id: t.id,
+      type: 'grading_alert',
+      title: 'Grading Alert',
+      message: `${t.cardName} at ${CONDITION_LABELS[t.condition]} ${verdict} — expected ${formatSignedUsd(t.expectedNet)} after fees (grade ${t.letter}).`,
+      cardId: t.cardId,
+      isRead: t.isRead,
+      createdAt: t.triggeredAt,
+    };
+  }
   const direction = t.type === 'above' ? 'is now above' : 'dropped below';
   const gradeLabel = t.grade === 'PSA10' ? 'PSA 10' : 'Raw';
   return {
@@ -111,7 +125,7 @@ function NotificationsScreen() {
           <EmptyState
             icon={<IconBell size={40} color={colors.onSurfaceMuted} />}
             title="No notifications yet"
-            description="Set a price alert on any card and we'll notify you when it hits your target."
+            description="Set a price or grading alert on any card and we'll notify you when it crosses your line."
           />
         }
         showsVerticalScrollIndicator={false}

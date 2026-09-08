@@ -44,13 +44,10 @@ export function defineBackgroundAlertTask() {
 
       let firedAny = false;
       for (const evaluation of toFire) {
-        const entry = recordTriggered(evaluation.alert, evaluation.currentPrice);
+        const entry = recordTriggered(evaluation);
         // null = already recorded by a concurrent (e.g. foreground) check.
         if (!entry) continue;
-        const { title, body } = formatAlertMessage(
-          evaluation.alert,
-          evaluation.currentPrice,
-        );
+        const { title, body } = formatAlertMessage(evaluation);
         await presentLocalNotification(title, body, {
           cardId: entry.cardId,
           triggeredAlertId: entry.id,

@@ -1,6 +1,12 @@
 import React from 'react';
 import { View, Pressable } from 'react-native';
-import { IconTrendingUp, IconHeart, IconMessageCircle, IconUserPlus } from '@tabler/icons-react-native';
+import {
+  IconTrendingUp,
+  IconCertificate,
+  IconHeart,
+  IconMessageCircle,
+  IconUserPlus,
+} from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -18,6 +24,8 @@ function timeAgo(date: string): string {
 
 const ICON_TYPES = {
   price_alert: { Icon: IconTrendingUp, colorKey: 'primary' as const },
+  // Amber = grading, matching the PSA 10 grade colour elsewhere.
+  grading_alert: { Icon: IconCertificate, colorKey: 'warning' as const },
   like: { Icon: IconHeart, colorKey: 'danger' as const },
   comment: { Icon: IconMessageCircle, colorKey: 'success' as const },
   follow: { Icon: IconUserPlus, colorKey: 'warning' as const },

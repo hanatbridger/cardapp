@@ -33,7 +33,12 @@ import { cardShareUrl } from '../../src/constants/links';
 // Card data/valuation handled internally by AIValuation component
 import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
 import { useWatchlistStore } from '../../src/stores';
-import { useAlertsStore, MAX_FREE_ALERTS } from '../../src/stores/alerts-store';
+import {
+  useAlertsStore,
+  MAX_FREE_ALERTS,
+  isPriceAlert,
+  type PriceAlert,
+} from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
 import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards, useCardStats, useEbayListings } from '../../src/hooks';
 
@@ -262,11 +267,13 @@ function CardDetailScreen() {
     [psa10, timeRangeIndex],
   );
 
-  // Bell reflects whether the *current grade tab* has an active alert.
-  // A triggered alert is treated as inactive (filled bell only means
-  // "watching" — once it's fired the user needs to reset it).
+  // Bell reflects whether the *current grade tab* has an active PRICE
+  // alert. A triggered alert is treated as inactive (filled bell only
+  // means "watching" — once it's fired the user needs to reset it).
+  // Grading alerts live on the GradingVerdict card, not the bell.
   const existingAlert = allAlerts.find(
-    (a) => a.cardId === id && a.grade === selectedGrade && !a.triggered,
+    (a): a is PriceAlert =>
+      isPriceAlert(a) && a.cardId === id && a.grade === selectedGrade && !a.triggered,
   );
   const hasAlert = Boolean(existingAlert);
 
@@ -1013,6 +1020,9 @@ function CardDetailScreen() {
               cards — it's a decision aid, not price data. */}
           {selectedGrade !== 'PSA10' && price && psa10 && psa10.latestPrice > 0 && (
             <GradingVerdict
+              cardId={card.id}
+              cardName={card.name}
+              cardNumber={card.number}
               rawPrice={price.currentPrice}
               psa10Price={psa10.latestPrice}
               pop={psa10.pop}

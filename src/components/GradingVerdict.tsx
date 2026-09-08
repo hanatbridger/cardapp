@@ -1,11 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { View, Pressable, ScrollView } from 'react-native';
+import { View, Pressable, ScrollView, Alert, Platform } from 'react-native';
+import { router } from 'expo-router';
+import { IconBellPlus, IconBellRinging } from '@tabler/icons-react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
 import { useMoney } from '../hooks/use-money';
 import { Text } from './Text';
 import { Card } from './Card';
+import { Button } from './Button';
+import { GradingAlertModal } from './GradingAlertModal';
+import {
+  useAlertsStore,
+  isGradingAlert,
+  MAX_FREE_ALERTS,
+  type GradingAlert,
+} from '../stores/alerts-store';
+import { requestNotificationPermission } from '../services/notifications';
 import {
   computeGradingVerdict,
   CONDITION_ORDER,
@@ -14,10 +25,15 @@ import {
   GRADING_FEE_LABEL,
   type CardCondition,
   type GradingOutcome,
+  type GradingAlertDirection,
 } from '../services/grading-verdict';
 import type { Psa10Population } from '../services/card-stats';
 
 interface GradingVerdictProps {
+  cardId: string;
+  cardName: string;
+  /** Collector number — with cardName, keys the collectrics stats lookup. */
+  cardNumber: string;
   /** Live raw market price (same number the price section shows). */
   rawPrice: number;
   /** Live PSA 10 sold price from the card-stats proxy. */
@@ -30,12 +46,31 @@ interface GradingVerdictProps {
  * "Worth grading?" — expected-value verdict for sending the raw card to
  * PSA. Renders only when both a real raw price and a real PSA 10 sold
  * price exist (the caller gates); PSA 9/8 prices are modeled and labeled
- * as estimates. Math lives in services/grading-verdict.ts.
+ * as estimates. Math lives in services/grading-verdict.ts. The footer
+ * arms a grading-ROI alert that re-runs this verdict on live data.
  */
-export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProps) {
+export function GradingVerdict({
+  cardId,
+  cardName,
+  cardNumber,
+  rawPrice,
+  psa10Price,
+  pop,
+}: GradingVerdictProps) {
   const { colors } = useTheme();
   const formatMoney = useMoney();
   const [condition, setCondition] = useState<CardCondition>('near_mint');
+  const [alertVisible, setAlertVisible] = useState(false);
+
+  // The find returns the same object while the rule is unchanged, so
+  // the selector is reference-stable across unrelated store writes.
+  const activeAlert = useAlertsStore((s) =>
+    s.alerts.find(
+      (a): a is GradingAlert => isGradingAlert(a) && a.cardId === cardId && !a.triggered,
+    ),
+  );
+  const addGradingAlert = useAlertsStore((s) => s.addGradingAlert);
+  const removeAlert = useAlertsStore((s) => s.removeAlert);
 
   const verdict = useMemo(
     () =>
@@ -58,6 +93,63 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
         : colors.danger;
 
   const signedMoney = (n: number) => `${n >= 0 ? '+' : '−'}${formatMoney(Math.abs(n))}`;
+
+  // Mirrors the card screen's price-alert gate: editing an existing rule
+  // is always allowed; a NEW one beyond the free cap goes to the upsell.
+  const openAlert = () => {
+    if (activeAlert || useAlertsStore.getState().canAddAlert()) {
+      setAlertVisible(true);
+      return;
+    }
+    Alert.alert(
+      'Alert limit reached',
+      `Free accounts can keep ${MAX_FREE_ALERTS} active alerts. Upgrade to Premium for unlimited alerts, or remove an existing alert first.`,
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Upgrade', onPress: () => router.push('/paywall') },
+      ],
+    );
+  };
+
+  const submitAlert = async (direction: GradingAlertDirection, thresholdNet: number) => {
+    // Re-check the cap at submit time in case state changed while the
+    // sheet was open (e.g. an alert fired). Upsert on card, so editing
+    // never trips the cap.
+    const result = addGradingAlert({
+      cardId,
+      cardName,
+      cardNumber,
+      condition,
+      direction,
+      thresholdNet,
+    });
+    if (!result.ok) {
+      Alert.alert(
+        'Alert limit reached',
+        `Free accounts can keep ${MAX_FREE_ALERTS} active alerts. Upgrade to Premium for unlimited alerts.`,
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/paywall') },
+        ],
+      );
+      return;
+    }
+    // Ask for OS permission the first time the user creates an alert.
+    // The alert is kept even if denied — the in-app notifications screen
+    // works without OS permission.
+    const granted = await requestNotificationPermission();
+    if (!granted && Platform.OS !== 'web') {
+      Alert.alert(
+        'Notifications disabled',
+        "We saved your alert, but you'll only see it inside the app. Enable notifications in Settings to get banners.",
+      );
+    }
+  };
+
+  const describeAlert = (a: GradingAlert) =>
+    `Alerts when expected value ${a.direction === 'above' ? 'reaches' : 'drops under'} ${
+      a.thresholdNet === 0 ? 'break-even' : signedMoney(a.thresholdNet)
+    } at ${CONDITION_LABELS[a.condition]}.`;
 
   const oddsRows: Array<{ label: string; p: number }> = [
     { label: 'PSA 10', p: verdict.dist.p10 },
@@ -220,6 +312,40 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
           ))}
         </View>
 
+        {/* Grading alert — arm / show the rule that re-runs this verdict
+            on live data. Amber bell = grading, matching the PSA 10 grade
+            colour elsewhere. */}
+        <View style={{ height: 1, backgroundColor: colors.outlineVariant }} />
+        {activeAlert ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+            <IconBellRinging size={16} color={colors.warning} />
+            <Text variant="caption" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+              {describeAlert(activeAlert)}
+            </Text>
+            <Pressable
+              onPress={openAlert}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="Edit grading alert"
+              style={{ paddingVertical: spacing[1], paddingLeft: spacing[2] }}
+            >
+              <Text variant="labelMd" color={colors.primary}>Edit</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={{ flexDirection: 'row' }}>
+            <Button
+              variant="tonal"
+              size="sm"
+              icon={<IconBellPlus size={16} color={colors.onPrimaryContainer} />}
+              onPress={openAlert}
+              accessibilityLabel="Alert me when this verdict flips"
+            >
+              Alert me when this flips
+            </Button>
+          </View>
+        )}
+
         {/* Provenance footer */}
         <Text variant="caption" color={colors.onSurfaceMuted}>
           {pop
@@ -230,6 +356,24 @@ export function GradingVerdict({ rawPrice, psa10Price, pop }: GradingVerdictProp
           guaranteed.
         </Text>
       </View>
+
+      <GradingAlertModal
+        visible={alertVisible}
+        onClose={() => setAlertVisible(false)}
+        onSubmit={submitAlert}
+        cardName={cardName}
+        condition={condition}
+        currentNet={verdict.expectedNet}
+        existingAlert={activeAlert}
+        onRemove={
+          activeAlert
+            ? () => {
+                removeAlert(activeAlert.id);
+                setAlertVisible(false);
+              }
+            : undefined
+        }
+      />
     </Card>
   );
 }

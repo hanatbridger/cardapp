@@ -200,3 +200,61 @@ export function computeGradingVerdict(opts: {
     fee,
   };
 }
+
+// ── Grading alerts ────────────────────────────────────────────────────
+// "Tell me when this becomes (or stops being) worth grading." Shared by
+// the in-app checker (services/alert-checker.ts) and the daily server
+// sweep (api/cron/snapshot-prices.ts) so both sides agree on what a
+// flip is and how it is worded. Pure — no RN imports — so the edge
+// runtime can bundle it.
+
+export type GradingLetter = GradingVerdict['letter'];
+export type GradingAlertDirection = 'above' | 'below';
+
+/**
+ * "Worth grading at the user's line" ⇔ expectedNet >= thresholdNet
+ * (thresholdNet 0 is the verdict's own worthGrading flip).
+ *   above → fires once that becomes true
+ *   below → fires once it becomes false
+ */
+export function gradingAlertHit(
+  expectedNet: number,
+  direction: GradingAlertDirection,
+  thresholdNet: number,
+): boolean {
+  return direction === 'above'
+    ? expectedNet >= thresholdNet
+    : expectedNet < thresholdNet;
+}
+
+/** Alerts are stored and matched in USD; copy uses plain USD too. */
+export function formatSignedUsd(n: number): string {
+  return `${n < 0 ? '-' : '+'}$${Math.abs(n).toFixed(2)}`;
+}
+
+export function describeGradingLine(thresholdNet: number): string {
+  return thresholdNet === 0 ? 'break-even' : `your ${formatSignedUsd(thresholdNet)} line`;
+}
+
+/**
+ * Notification copy for a fired grading alert. One source for the
+ * foreground checker, the background task, and the server cron.
+ */
+export function formatGradingAlertMessage(
+  alert: {
+    cardName: string;
+    condition: CardCondition;
+    direction: GradingAlertDirection;
+    thresholdNet: number;
+  },
+  expectedNet: number,
+  letter: GradingLetter,
+): { title: string; body: string } {
+  const worthIt = alert.direction === 'above';
+  return {
+    title: worthIt
+      ? `${alert.cardName} is worth grading now`
+      : `${alert.cardName} is no longer worth grading`,
+    body: `Expected value at ${CONDITION_LABELS[alert.condition]} is ${formatSignedUsd(expectedNet)} after fees (grade ${letter}), ${worthIt ? 'above' : 'below'} ${describeGradingLine(alert.thresholdNet)}.`,
+  };
+}

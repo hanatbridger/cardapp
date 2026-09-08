@@ -52,16 +52,10 @@ export function useAlertChecker() {
       try {
         const toFire = await findAlertsToTrigger(alertsRef.current);
         for (const evaluation of toFire) {
-          const entry = recordTriggered(
-            evaluation.alert,
-            evaluation.currentPrice,
-          );
+          const entry = recordTriggered(evaluation);
           // null = a concurrent check already recorded this fire.
           if (!entry) continue;
-          const { title, body } = formatAlertMessage(
-            evaluation.alert,
-            evaluation.currentPrice,
-          );
+          const { title, body } = formatAlertMessage(evaluation);
           presentLocalNotification(title, body, {
             cardId: entry.cardId,
             triggeredAlertId: entry.id,

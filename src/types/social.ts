@@ -35,7 +35,7 @@ export interface Comment {
   createdAt: string;
 }
 
-export type NotificationType = 'price_alert' | 'like' | 'comment' | 'follow';
+export type NotificationType = 'price_alert' | 'grading_alert' | 'like' | 'comment' | 'follow';
 
 export interface Notification {
   id: string;
