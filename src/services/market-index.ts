@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
 
 /**
- * Client for /api/market-index — a matched-basket index over the ~1,800
- * cards our daily cron snapshots. Computed from our own price_snapshots
- * table, so it holds up regardless of upstream provider access.
- * Returns null on any failure; the index strip hides itself.
+ * Client for /api/market-index — matched-basket card and sealed indices.
+ * The card side is computed from our own price_snapshots table, so it
+ * holds up regardless of upstream provider access. Returns null on any
+ * failure; the trends strip hides itself.
  */
 
 // Same origin resolution as card-stats.ts: the Vercel function only
@@ -26,15 +26,18 @@ export interface IndexWindow {
   from: string;
 }
 
-export interface MarketIndex {
+export type IndexWindowKey = 'd1' | 'd7' | 'd30';
+
+export interface IndexSeries {
   /** Latest snapshot date with full coverage */
-  asOf: string | null;
+  asOf: string;
   basketSize: number;
-  windows: {
-    d1: IndexWindow | null;
-    d7: IndexWindow | null;
-    d30: IndexWindow | null;
-  };
+  windows: Record<IndexWindowKey, IndexWindow | null>;
+}
+
+export interface MarketIndex {
+  card: IndexSeries | null;
+  sealed: IndexSeries | null;
 }
 
 export async function fetchMarketIndex(): Promise<MarketIndex | null> {
@@ -44,7 +47,7 @@ export async function fetchMarketIndex(): Promise<MarketIndex | null> {
     const res = await fetch(`${PROXY_ORIGIN}/api/market-index`, { signal: ctl.signal });
     if (!res.ok) return null;
     const data = (await res.json()) as MarketIndex;
-    if (!data || !data.windows) return null;
+    if (!data || (!data.card && !data.sealed)) return null;
     return data;
   } catch {
     return null;
