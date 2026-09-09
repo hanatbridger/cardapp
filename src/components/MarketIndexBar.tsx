@@ -34,6 +34,14 @@ export function MarketIndexBar() {
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const active = WINDOWS.find((w) => w.key === windowKey) ?? WINDOWS[0];
+  // Every series shares one anchor date; surface it so "1D" is never
+  // mistaken for "since yesterday" when the source lags a day.
+  const asOf = data?.market?.asOf ?? data?.card?.asOf ?? data?.sealed?.asOf ?? null;
+  const asOfLabel = asOf
+    ? new Date(`${asOf}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    : '';
+  const cardBasket = (data?.card?.basketSize ?? 0).toLocaleString();
+  const sealedBasket = (data?.sealed?.basketSize ?? 0).toLocaleString();
   const series: { label: string; spoken: string; value: IndexSeries | null }[] = [
     { label: 'INDEX', spoken: 'Index', value: data?.market ?? null },
     { label: 'CARDS', spoken: 'Cards', value: data?.card ?? null },
@@ -83,7 +91,7 @@ export function MarketIndexBar() {
           onPress={() => setPickerOpen(true)}
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel={`Market trends window, ${active.spoken}. Change`}
+          accessibilityLabel={`Market trends window, ${active.spoken}${asOfLabel ? `, prices through ${asOfLabel}` : ''}. Change`}
           style={({ pressed }) => ({
             flexDirection: 'row',
             alignItems: 'center',
@@ -105,6 +113,12 @@ export function MarketIndexBar() {
         onClose={() => setPickerOpen(false)}
         title="Market trends"
       >
+        {asOf ? (
+          <Text variant="caption" color={colors.onSurfaceMuted}>
+            Prices through {asOfLabel}. Cards: {cardBasket} tracked singles, value-weighted.
+            Sealed: {sealedBasket} products. Index: both combined.
+          </Text>
+        ) : null}
         {WINDOWS.map((w) => {
           const selected = w.key === windowKey;
           return (
