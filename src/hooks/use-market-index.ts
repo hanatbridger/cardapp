@@ -7,7 +7,10 @@ import { fetchMarketIndex, type MarketIndex } from '../services/market-index';
  */
 export function useMarketIndex() {
   return useQuery<MarketIndex | null>({
-    queryKey: ['market-index'],
+    // Versioned: the payload gained `market` after the first release of
+    // this hook, and cached entries from the old shape rendered the
+    // combined index as an em dash for the full 6h staleTime.
+    queryKey: ['market-index', 'v2'],
     queryFn: fetchMarketIndex,
     staleTime: 6 * 60 * 60 * 1000,
     gcTime: 12 * 60 * 60 * 1000,
