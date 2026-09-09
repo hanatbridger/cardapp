@@ -14,6 +14,7 @@ import {
   EmptyState,
   ScreenBackground,
   BrandMark,
+  MarketIndexBar,
   Touchable,
   withErrorBoundary,
 } from '../../src/components';
@@ -287,6 +288,11 @@ function WatchlistScreen() {
                 <IconSearch size={20} color={colors.onSurfaceVariant} />
               </Touchable>
             </View>
+
+            {/* Market index — three horizons on one matched basket of
+                the cards our daily cron tracks. Sits under the header
+                like a broker app's index tickers. */}
+            <MarketIndexBar />
 
             {/* Trending — raw card movers */}
             <View style={{ gap: spacing[2] }}>
