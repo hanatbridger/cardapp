@@ -266,19 +266,24 @@ export default async function handler(req: Request): Promise<Response> {
     // Value-weighted total. Ids are namespaced because a card
     // product_id and a sealed id are both bare numbers and would
     // otherwise collide in the merged basket.
-    const mergedFor = (date: string): DayMap => {
-      const m: DayMap = new Map();
+    // A comparison day is only eligible when BOTH sides priced it —
+    // otherwise the window probes the next offset. Returning a
+    // cards-only map here is how the 30d "index" silently became the
+    // card index (sealed history starts two days later).
+    const mergedFor = (date: string): DayMap | undefined => {
       const c = cardCache.get(date);
-      if (c) for (const [id, price] of c) m.set(`c:${id}`, price);
       const s = sealedDays.get(date);
-      if (s) for (const [id, price] of s) m.set(`s:${id}`, price);
+      if (!c?.size || !s?.size) return undefined;
+      const m: DayMap = new Map();
+      for (const [id, price] of c) m.set(`c:${id}`, price);
+      for (const [id, price] of s) m.set(`s:${id}`, price);
       return m;
     };
     let market: IndexSeries | null = null;
     if (card && sealed) {
       market = buildSeries(
         anchor,
-        mergedFor(anchor),
+        mergedFor(anchor)!,
         mergedFor,
         MIN_CARD_MATCHED + MIN_SEALED_MATCHED,
       );
