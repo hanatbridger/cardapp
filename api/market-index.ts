@@ -1,13 +1,14 @@
 // Vercel serverless function (Edge runtime) — CardPulse market trends.
 //
 // Request:  GET /api/market-index
-// Response: { card: IndexSeries | null, sealed: IndexSeries | null }
+// Response: { market, card, sealed } — each IndexSeries | null
 //           IndexSeries: { asOf, basketSize, windows: { d1, d7, d30 } }
 //
-// Two matched-basket, equal-dollar indices. Both ends of every
+// Three matched-basket, equal-dollar indices. Both ends of every
 // comparison use the SAME set of products: composition drift (a product
 // entering or leaving the source list) would otherwise read as a market
-// move.
+// move. All three share one anchor date so the row is internally
+// comparable.
 //
 //   card   — the ~1,800 singles our daily cron snapshots into
 //            public.price_snapshots. Computed from our own table, so it
@@ -18,6 +19,9 @@
 //   sealed — the sealed leaderboard's 30-day per-product sparklines.
 //            Our cron only ingests singles, so there is no local sealed
 //            history to read yet.
+//   market — both baskets summed, i.e. value-weighted across everything
+//            we track. Null unless both sides resolve: a "market" that
+//            is secretly just one side would read as a real number.
 
 import { createClient } from '@supabase/supabase-js';
 import { fetchWithTimeout } from './_lib/http';
@@ -28,16 +32,18 @@ export const config = { runtime: 'edge' };
 const MIN_CARD_ANCHOR = 800;
 /** A card window needs this many products on BOTH days. */
 const MIN_CARD_MATCHED = 400;
-/** Sealed is a 410-product universe, so both bars sit lower. */
+/** Sealed is a ~410-product universe, so both bars sit lower. */
 const MIN_SEALED_ANCHOR = 100;
 const MIN_SEALED_MATCHED = 60;
 /** Today's cron may not have landed; walk back this far for an anchor. */
-const MAX_ANCHOR_LOOKBACK = 6;
+const MAX_ANCHOR_LOOKBACK = 8;
 const DAY_MS = 86400000;
 /** PostgREST hard-caps a response at 1000 rows. */
 const PAGE_SIZE = 1000;
 /** Bounds the per-day cost; the card basket is ~1,900 products. */
 const MAX_PAGES = 4;
+/** Comparison days each window probes, in order. */
+const WINDOW_DAYS = [1, 7, 30];
 
 const SEALED_URL = 'https://mycollectrics.com/api/sealed_leaderboard';
 const UA = { 'user-agent': 'Mozilla/5.0 (CardPulse Index Proxy)' };
@@ -71,7 +77,7 @@ export interface IndexWindow {
 }
 
 export interface IndexSeries {
-  /** Latest date with full coverage — every window ends here */
+  /** Latest date with coverage — every window ends here */
   asOf: string;
   basketSize: number;
   windows: {
@@ -82,9 +88,12 @@ export interface IndexSeries {
 }
 
 export interface MarketIndexResponse {
+  market: IndexSeries | null;
   card: IndexSeries | null;
   sealed: IndexSeries | null;
 }
+
+type DayMap = Map<string, number>;
 
 function dayKey(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
@@ -92,17 +101,20 @@ function dayKey(ms: number): string {
 
 /**
  * Matched-basket percent change between two priced days. Offsets are
- * tried in order so a missed source day falls back to its neighbour.
+ * tried in order so a missing source day falls back to a neighbour.
  */
 function buildSeries(
   anchorDate: string,
-  anchor: Map<string, number>,
-  dayFor: (date: string) => Map<string, number> | undefined,
+  anchor: DayMap,
+  dayFor: (date: string) => DayMap | undefined,
   minMatched: number,
 ): IndexSeries {
   const anchorMs = Date.parse(anchorDate);
   const windowChange = (days: number): IndexWindow | null => {
-    for (const offset of [days, days + 1, days - 1]) {
+    // A 30-point sparkline cannot reach a true 30-day offset from an
+    // anchor two days inside it, so probe outward a little. The window
+    // it actually used is reported in `from`.
+    for (const offset of [days, days + 1, days - 1, days + 2, days - 2]) {
       if (offset <= 0) continue;
       const from = dayKey(anchorMs - offset * DAY_MS);
       const prev = dayFor(from);
@@ -131,23 +143,60 @@ function buildSeries(
   return {
     asOf: anchorDate,
     basketSize: anchor.size,
-    windows: { d1: windowChange(1), d7: windowChange(7), d30: windowChange(30) },
+    windows: {
+      d1: windowChange(1),
+      d7: windowChange(7),
+      d30: windowChange(30),
+    },
   };
 }
 
-/** Singles index, read from our own snapshot table. */
-async function cardSeries(
-  supabaseUrl: string,
-  supabaseKey: string,
-): Promise<IndexSeries | null> {
-  const sb = createClient(supabaseUrl, supabaseKey, {
+/** date -> (sealed product id -> price), from the leaderboard sparklines. */
+async function loadSealedDays(): Promise<Map<string, DayMap>> {
+  const byDate = new Map<string, DayMap>();
+  const res = await fetchWithTimeout(SEALED_URL, { headers: UA }, 8000);
+  if (!res.ok) return byDate;
+  const data = (await res.json()) as {
+    'rows-global'?: {
+      id: string;
+      sparkline?: { 'raw-price'?: { date: string; value: number }[] };
+    }[];
+  };
+  for (const row of data['rows-global'] ?? []) {
+    for (const point of row.sparkline?.['raw-price'] ?? []) {
+      const price = Number(point.value);
+      if (!Number.isFinite(price) || price <= 0) continue;
+      let day = byDate.get(point.date);
+      if (!day) {
+        day = new Map();
+        byDate.set(point.date, day);
+      }
+      day.set(row.id, price);
+    }
+  }
+  return byDate;
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  if (req.method === 'OPTIONS')
+    return new Response(null, { status: 204, headers: CORS });
+  if (req.method !== 'GET') return json(405, { error: 'method not allowed' }, false);
+
+  const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
+  const SUPABASE_ANON_KEY =
+    process.env.SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    return json(500, { error: 'Server misconfigured' }, false);
+  }
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const cache = new Map<string, Map<string, number>>();
-  const fetchDay = async (date: string): Promise<Map<string, number>> => {
-    const hit = cache.get(date);
+
+  const cardCache = new Map<string, DayMap>();
+  const loadCardDay = async (date: string): Promise<DayMap> => {
+    const hit = cardCache.get(date);
     if (hit) return hit;
-    const out = new Map<string, number>();
+    const out: DayMap = new Map();
     // Page, and ORDER BY product_id — without an explicit order each day
     // returns a different arbitrary 1000-row slice and the matched
     // basket silently shrinks and skews.
@@ -167,85 +216,85 @@ async function cardSeries(
       }
       if (data.length < PAGE_SIZE) break;
     }
-    cache.set(date, out);
+    cardCache.set(date, out);
     return out;
   };
 
-  const todayMs = Date.parse(dayKey(Date.now()));
-  for (let i = 0; i <= MAX_ANCHOR_LOOKBACK; i++) {
-    const date = dayKey(todayMs - i * DAY_MS);
-    const day = await fetchDay(date);
-    if (day.size >= MIN_CARD_ANCHOR) {
-      // Warm the comparison days before building (buildSeries is sync).
-      const anchorMs = Date.parse(date);
-      for (const n of [1, 2, 7, 8, 6, 30, 31, 29]) {
-        await fetchDay(dayKey(anchorMs - n * DAY_MS));
+  try {
+    const sealedDays = await loadSealedDays().catch(() => new Map<string, DayMap>());
+
+    // One anchor for all three series, so the row compares like for
+    // like. Prefer a day both sides cover; fall back to the newest day
+    // the cards alone cover.
+    const todayMs = Date.parse(dayKey(Date.now()));
+    let anchorDate: string | null = null;
+    let cardOnlyAnchor: string | null = null;
+    for (let i = 0; i <= MAX_ANCHOR_LOOKBACK; i++) {
+      const date = dayKey(todayMs - i * DAY_MS);
+      const cardDay = await loadCardDay(date);
+      const cardOk = cardDay.size >= MIN_CARD_ANCHOR;
+      const sealedOk = (sealedDays.get(date)?.size ?? 0) >= MIN_SEALED_ANCHOR;
+      if (cardOk && !cardOnlyAnchor) cardOnlyAnchor = date;
+      if (cardOk && sealedOk) {
+        anchorDate = date;
+        break;
       }
-      return buildSeries(date, day, (d) => cache.get(d), MIN_CARD_MATCHED);
     }
-  }
-  return null;
-}
+    const anchor = anchorDate ?? cardOnlyAnchor;
+    if (!anchor) {
+      return json(200, { market: null, card: null, sealed: null }, false);
+    }
 
-interface SealedRow {
-  id: string;
-  sparkline?: { 'raw-price'?: { date: string; value: number }[] };
-}
+    // Warm every comparison day the windows can probe.
+    const anchorMs = Date.parse(anchor);
+    await Promise.all(
+      WINDOW_DAYS.flatMap((n) => [n - 1, n, n + 1])
+        .filter((n) => n > 0)
+        .map((n) => loadCardDay(dayKey(anchorMs - n * DAY_MS))),
+    );
 
-/** Sealed index, from the leaderboard's per-product 30-day sparklines. */
-async function sealedSeries(): Promise<IndexSeries | null> {
-  const res = await fetchWithTimeout(SEALED_URL, { headers: UA }, 8000);
-  if (!res.ok) return null;
-  const data = (await res.json()) as { 'rows-global'?: SealedRow[] };
-  const rows = data['rows-global'] ?? [];
-  if (rows.length === 0) return null;
+    const cardAnchor = cardCache.get(anchor) ?? new Map();
+    const sealedAnchor = sealedDays.get(anchor);
 
-  const byDate = new Map<string, Map<string, number>>();
-  for (const row of rows) {
-    for (const point of row.sparkline?.['raw-price'] ?? []) {
-      const price = Number(point.value);
-      if (!Number.isFinite(price) || price <= 0) continue;
-      let day = byDate.get(point.date);
-      if (!day) {
-        day = new Map();
-        byDate.set(point.date, day);
+    const card = cardAnchor.size
+      ? buildSeries(anchor, cardAnchor, (d) => cardCache.get(d), MIN_CARD_MATCHED)
+      : null;
+    const sealed = sealedAnchor?.size
+      ? buildSeries(anchor, sealedAnchor, (d) => sealedDays.get(d), MIN_SEALED_MATCHED)
+      : null;
+
+    // Value-weighted total. Ids are namespaced because a card
+    // product_id and a sealed id are both bare numbers and would
+    // otherwise collide in the merged basket.
+    const mergedFor = (date: string): DayMap => {
+      const m: DayMap = new Map();
+      const c = cardCache.get(date);
+      if (c) for (const [id, price] of c) m.set(`c:${id}`, price);
+      const s = sealedDays.get(date);
+      if (s) for (const [id, price] of s) m.set(`s:${id}`, price);
+      return m;
+    };
+    let market: IndexSeries | null = null;
+    if (card && sealed) {
+      market = buildSeries(
+        anchor,
+        mergedFor(anchor),
+        mergedFor,
+        MIN_CARD_MATCHED + MIN_SEALED_MATCHED,
+      );
+      // A merged window whose comparison day only has cards silently
+      // becomes the card index under a "market" label. Drop any window
+      // either side cannot cover on its own.
+      for (const key of ['d1', 'd7', 'd30'] as const) {
+        if (!card.windows[key] || !sealed.windows[key]) market.windows[key] = null;
       }
-      day.set(row.id, price);
+      if (!market.windows.d1 && !market.windows.d7 && !market.windows.d30) {
+        market = null;
+      }
     }
+
+    return json(200, { market, card, sealed } satisfies MarketIndexResponse);
+  } catch {
+    return json(502, { error: 'index unavailable' }, false);
   }
-
-  const anchorDate = [...byDate.keys()]
-    .filter((d) => (byDate.get(d)?.size ?? 0) >= MIN_SEALED_ANCHOR)
-    .sort()
-    .pop();
-  if (!anchorDate) return null;
-
-  return buildSeries(
-    anchorDate,
-    byDate.get(anchorDate)!,
-    (d) => byDate.get(d),
-    MIN_SEALED_MATCHED,
-  );
-}
-
-export default async function handler(req: Request): Promise<Response> {
-  if (req.method === 'OPTIONS')
-    return new Response(null, { status: 204, headers: CORS });
-  if (req.method !== 'GET') return json(405, { error: 'method not allowed' }, false);
-
-  const SUPABASE_URL = process.env.SUPABASE_URL ?? process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const SUPABASE_ANON_KEY =
-    process.env.SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-    return json(500, { error: 'Server misconfigured' }, false);
-  }
-  // One side failing must not blank the other — the strip renders
-  // whichever index resolved.
-  const [card, sealed] = await Promise.all([
-    cardSeries(SUPABASE_URL, SUPABASE_ANON_KEY).catch(() => null),
-    sealedSeries().catch(() => null),
-  ]);
-
-  if (!card && !sealed) return json(200, { card: null, sealed: null }, false);
-  return json(200, { card, sealed } satisfies MarketIndexResponse);
 }
