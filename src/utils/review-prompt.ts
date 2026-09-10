@@ -76,10 +76,12 @@ function withinCooldown(lastPromptedAt: string | null): boolean {
 /**
  * Ask for a rating if this is a moment worth spending one on.
  *
- * Call it only after something went WELL for the user — a price alert
- * they set actually fired. Never after an error, and never from a button
- * press: Apple's guidance is that the prompt must not be a response to a
- * user action, and `requestReview` is a no-op the user may never see.
+ * Call it only after something went WELL for the user. Two moments
+ * qualify today: a price alert they set actually fired (Notifications),
+ * and an engaged user looking at a watchlist that is up (Home). Never
+ * after an error, and never from a button press: Apple's guidance is
+ * that the prompt must not be a response to a user action, and
+ * `requestReview` is a no-op the user may never see.
  *
  * Resolves to whether a prompt was actually requested. Never throws.
  */

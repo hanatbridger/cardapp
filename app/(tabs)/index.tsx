@@ -3,7 +3,7 @@ import { View, FlatList, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
 import { IconSearch } from '@tabler/icons-react-native';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import {
@@ -25,6 +25,7 @@ import type { WatchlistItem } from '../../src/stores';
 import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
 import { useTrendingMovers, useBatchPrices } from '../../src/hooks';
+import { maybeRequestReview } from '../../src/utils/review-prompt';
 import type { TrendingTile } from '../../src/services/trending';
 
 /**
@@ -116,6 +117,26 @@ function WatchlistScreen() {
   );
   const batchQuery = useBatchPrices(watchlistCardIds);
   const batchPrices = batchQuery.data;
+
+  // Rating prompt — second trigger. The alert-fired moment in
+  // Notifications is the better one but most users never reach it, so a
+  // user who has committed a real watchlist AND is looking at a gain
+  // counts too: engaged, and the screen is showing good news.
+  // maybeRequestReview owns every throttle (launch count, 120-day
+  // cooldown, once per version) and iOS caps it again at three a year,
+  // so extra call sites cannot turn into prompt spam.
+  useFocusEffect(
+    useCallback(() => {
+      if (items.length < 3) return;
+      const hasGainer = items.some((i) => (i.lastPriceChange ?? 0) > 0);
+      if (!hasGainer) return;
+      // Never mid-task: let the list settle first.
+      const timer = setTimeout(() => {
+        maybeRequestReview();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }, [items]),
+  );
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
