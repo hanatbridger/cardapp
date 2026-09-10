@@ -119,23 +119,29 @@ function WatchlistScreen() {
   const batchPrices = batchQuery.data;
 
   // Rating prompt — second trigger. The alert-fired moment in
-  // Notifications is the better one but most users never reach it, so a
-  // user who has committed a real watchlist AND is looking at a gain
-  // counts too: engaged, and the screen is showing good news.
+  // Notifications is the better one but most users never reach it, so
+  // an engaged user opening Home counts too.
+  //
+  // Engagement is the whole gate: three or more tracked items. An
+  // earlier version also required a card to be UP, which would have
+  // meant never — raw prices come from TCGPlayer's bundled market
+  // price, which carries no prior value, so percentChange is 0 for
+  // every card and lastPriceChange is only ever stamped from card
+  // detail. Re-add a "good news" condition only when a real
+  // day-over-day change exists to test.
+  //
   // maybeRequestReview owns every throttle (launch count, 120-day
   // cooldown, once per version) and iOS caps it again at three a year,
   // so extra call sites cannot turn into prompt spam.
   useFocusEffect(
     useCallback(() => {
       if (items.length < 3) return;
-      const hasGainer = items.some((i) => (i.lastPriceChange ?? 0) > 0);
-      if (!hasGainer) return;
       // Never mid-task: let the list settle first.
       const timer = setTimeout(() => {
         maybeRequestReview();
       }, 3000);
       return () => clearTimeout(timer);
-    }, [items]),
+    }, [items.length]),
   );
 
   const onRefresh = useCallback(async () => {
