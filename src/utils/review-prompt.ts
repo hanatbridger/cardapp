@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as StoreReview from 'expo-store-review';
 import Constants from 'expo-constants';
@@ -23,6 +23,41 @@ const MIN_LAUNCHES = 3;
 
 /** Days between prompts, independent of iOS's own throttle. */
 const COOLDOWN_DAYS = 120;
+
+/**
+ * Foreground time the user must accumulate THIS session before the
+ * prompt is allowed. Asking on arrival reads as a toll gate; asking
+ * once someone has actually been using the app reads as a check-in.
+ */
+export const MIN_SESSION_ACTIVE_MS = 150_000; // 2.5 minutes
+
+// Foreground clock. Background time does not count — an app left open
+// in a pocket overnight has not been "used" for eight hours.
+let activeSince: number | null = null;
+let accumulatedMs = 0;
+let appStateSub: { remove: () => void } | null = null;
+
+/** Starts the foreground clock. Called once, from the root layout. */
+export function startSessionClock(): void {
+  if (Platform.OS === 'web' || appStateSub) return;
+  activeSince = Date.now();
+  accumulatedMs = 0;
+  appStateSub = AppState.addEventListener('change', (next) => {
+    if (next === 'active') {
+      if (activeSince === null) activeSince = Date.now();
+      return;
+    }
+    if (activeSince !== null) {
+      accumulatedMs += Date.now() - activeSince;
+      activeSince = null;
+    }
+  });
+}
+
+/** Foreground milliseconds accumulated since launch. */
+export function sessionActiveMs(): number {
+  return accumulatedMs + (activeSince === null ? 0 : Date.now() - activeSince);
+}
 
 interface ReviewState {
   launches: number;
@@ -88,6 +123,10 @@ function withinCooldown(lastPromptedAt: string | null): boolean {
 export async function maybeRequestReview(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
   try {
+    // Enforced here as well as at the call site, so a new trigger
+    // cannot accidentally ask the moment the app opens.
+    if (sessionActiveMs() < MIN_SESSION_ACTIVE_MS) return false;
+
     const state = await read();
     if (state.launches < MIN_LAUNCHES) return false;
     if (withinCooldown(state.lastPromptedAt)) return false;

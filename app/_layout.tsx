@@ -26,7 +26,7 @@ import {
 } from '../src/services/revenue-cat';
 import { configureGoogleSignin } from '../src/services/google-auth';
 import { registerForPushNotifications } from '../src/services/push';
-import { recordLaunch } from '../src/utils/review-prompt';
+import { recordLaunch, startSessionClock } from '../src/utils/review-prompt';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
   useFonts,
@@ -220,6 +220,8 @@ export default function RootLayout() {
       registerBackgroundAlertTask();
       // Gates the rating prompt so a first-run user is never asked.
       recordLaunch();
+      // Foreground clock for the rating prompt's session minimum.
+      startSessionClock();
       return () => clearTimeout(t);
     }
   }, [fontsLoaded, fontError, storeHydrated]);

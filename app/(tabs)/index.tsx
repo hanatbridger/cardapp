@@ -25,7 +25,11 @@ import type { WatchlistItem } from '../../src/stores';
 import { MOCK_CARDS, getPrice } from '../../src/mocks';
 import type { CardPrice } from '../../src/types/card';
 import { useTrendingMovers, useBatchPrices } from '../../src/hooks';
-import { maybeRequestReview } from '../../src/utils/review-prompt';
+import {
+  maybeRequestReview,
+  sessionActiveMs,
+  MIN_SESSION_ACTIVE_MS,
+} from '../../src/utils/review-prompt';
 import type { TrendingTile } from '../../src/services/trending';
 
 /**
@@ -120,7 +124,8 @@ function WatchlistScreen() {
 
   // Rating prompt — second trigger. The alert-fired moment in
   // Notifications is the better one but most users never reach it, so
-  // an engaged user opening Home counts too.
+  // an engaged user who has been in the app a couple of minutes counts
+  // too.
   //
   // Engagement is the whole gate: three or more tracked items. An
   // earlier version also required a card to be UP, which would have
@@ -136,10 +141,14 @@ function WatchlistScreen() {
   useFocusEffect(
     useCallback(() => {
       if (items.length < 3) return;
-      // Never mid-task: let the list settle first.
+      // Wait out the rest of the session minimum rather than asking on
+      // arrival. Leaving Home cancels the timer and returning
+      // re-schedules it against the updated clock, so the prompt always
+      // lands on Home rather than mid-task on another screen.
+      const remaining = Math.max(0, MIN_SESSION_ACTIVE_MS - sessionActiveMs());
       const timer = setTimeout(() => {
         maybeRequestReview();
-      }, 3000);
+      }, remaining + 1000);
       return () => clearTimeout(timer);
     }, [items.length]),
   );
