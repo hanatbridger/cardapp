@@ -17,6 +17,7 @@ export {
   type TriggeredAlert,
   type TriggeredPriceAlert,
   type TriggeredGradingAlert,
+  type TriggeredReturnAlert,
 } from './alerts-store';
 export { useUserStore } from './user-store';
 export {

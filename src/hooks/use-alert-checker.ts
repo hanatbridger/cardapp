@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useAlertsStore } from '../stores/alerts-store';
 import { useUserStore } from '../stores/user-store';
+import { useWatchlistStore } from '../stores/watchlist-store';
+import { findReturnAlerts, deliverReturnAlerts } from '../services/return-alerts';
 import { findAlertsToTrigger, formatAlertMessage } from '../services/alert-checker';
 import { presentLocalNotification } from '../services/notifications';
 
@@ -50,19 +52,32 @@ export function useAlertChecker() {
       if (runningRef.current) return;
       runningRef.current = true;
       try {
-        const toFire = await findAlertsToTrigger(alertsRef.current);
-        for (const evaluation of toFire) {
-          const entry = recordTriggered(evaluation);
-          // null = a concurrent check already recorded this fire.
-          if (!entry) continue;
-          const { title, body } = formatAlertMessage(evaluation);
-          presentLocalNotification(title, body, {
-            cardId: entry.cardId,
-            triggeredAlertId: entry.id,
-          });
+        try {
+          const toFire = await findAlertsToTrigger(alertsRef.current);
+          for (const evaluation of toFire) {
+            const entry = recordTriggered(evaluation);
+            // null = a concurrent check already recorded this fire.
+            if (!entry) continue;
+            const { title, body } = formatAlertMessage(evaluation);
+            presentLocalNotification(title, body, {
+              cardId: entry.cardId,
+              triggeredAlertId: entry.id,
+            });
+          }
+        } catch {
+          // Live-price fetch failed for every alert; skip this cycle.
         }
-      } catch {
-        // Live-price fetch failed for every alert; skip this cycle.
+        // Since-added ±20% (Premium): same cadence, same notifications
+        // gate. Its own try so neither kind can cost the other a cycle.
+        if (useUserStore.getState().isPremium) {
+          try {
+            await deliverReturnAlerts(
+              await findReturnAlerts(useWatchlistStore.getState().items),
+            );
+          } catch {
+            // Prices unavailable this cycle; the next one retries.
+          }
+        }
       } finally {
         runningRef.current = false;
       }

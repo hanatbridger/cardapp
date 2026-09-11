@@ -8,11 +8,26 @@ import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useAlertsStore } from '../../src/stores/alerts-store';
 import { CONDITION_LABELS, formatSignedUsd } from '../../src/services/grading-verdict';
+import { formatReturnAlertMessage } from '../../src/services/since-added';
 import { maybeRequestReview } from '../../src/utils/review-prompt';
 import type { Notification } from '../../src/types/social';
 import type { TriggeredAlert } from '../../src/stores/alerts-store';
 
 function triggeredToNotification(t: TriggeredAlert): Notification {
+  if (t.kind === 'return') {
+    // Same copy as the push, so the feed row reads like the banner did.
+    const { title, body } = formatReturnAlertMessage(t.cardName, t.direction, t.pct, t.currentPrice);
+    return {
+      id: t.id,
+      type: t.direction === 'up' ? 'return_up' : 'return_down',
+      title,
+      message: body,
+      cardId: t.cardId,
+      productId: t.productId,
+      isRead: t.isRead,
+      createdAt: t.triggeredAt,
+    };
+  }
   if (t.kind === 'grading') {
     const verdict =
       t.direction === 'above' ? 'is worth grading now' : 'is no longer worth grading';
@@ -85,6 +100,8 @@ function NotificationsScreen() {
     markTriggeredRead(notification.id);
     if (notification.cardId) {
       router.push(`/card/${notification.cardId}`);
+    } else if (notification.productId) {
+      router.push(`/sealed/${notification.productId}`);
     }
   };
 

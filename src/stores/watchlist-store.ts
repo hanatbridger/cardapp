@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage } from './safe-storage';
 import type { GradeType } from '../constants/grades';
 import type { SealedType } from '../types/sealed';
+import type { BaselineFields, ReturnDirection } from '../services/since-added';
 // Direct import (not via stores/index) to keep the dependency edge
 // one-way: watchlist-store → user-store. user-store does not import
 // this module, so there is no cycle.
@@ -21,7 +22,7 @@ import { useUserStore } from './user-store';
  *        survive the upgrade with no user action.
  */
 
-export interface CardWatchlistItem {
+export interface CardWatchlistItem extends BaselineFields {
   kind: 'card';
   cardId: string;
   cardName: string;
@@ -37,7 +38,7 @@ export interface CardWatchlistItem {
   language?: 'EN' | 'JP';
 }
 
-export interface SealedWatchlistItem {
+export interface SealedWatchlistItem extends BaselineFields {
   kind: 'sealed';
   productId: string;
   productName: string;
@@ -54,6 +55,17 @@ export type WatchlistItem = CardWatchlistItem | SealedWatchlistItem;
 // Narrow-by-kind helpers — shorter than inlining the type guard everywhere.
 export const isCardItem = (i: WatchlistItem): i is CardWatchlistItem => i.kind === 'card';
 export const isSealedItem = (i: WatchlistItem): i is SealedWatchlistItem => i.kind === 'sealed';
+
+/** `id` is the cardId for cards and the productId for sealed; `grade` scopes cards. */
+function matchesItem(i: WatchlistItem, id: string, grade?: GradeType): boolean {
+  return (
+    (i.kind === 'sealed' && i.productId === id) ||
+    (i.kind === 'card' && i.cardId === id && (grade === undefined || i.grade === grade))
+  );
+}
+
+const isLivePrice = (p: unknown): p is number =>
+  typeof p === 'number' && Number.isFinite(p) && p > 0;
 
 // Seeded with two highly-recognisable movers so a brand-new user lands
 // on a non-empty Home (empty lists feel broken at first open) without
@@ -115,6 +127,20 @@ interface WatchlistStore {
    * number. Omitting grade falls back to matching every grade (legacy).
    */
   updatePrice: (id: string, price: number, priceChange: number, grade?: GradeType) => void;
+  /**
+   * Give items without a since-added baseline one, at `price`, dated now.
+   * Covers rows added before baselines existed and rows added before
+   * their price loaded. Pass LIVE prices only: a baseline taken from
+   * seeded sample data would make every later return fiction. Items that
+   * already have a baseline are left alone.
+   */
+  stampBaselines: (entries: { id: string; grade?: GradeType; price: number }[]) => void;
+  /**
+   * Flag that the since-added push fired for this item in `direction`.
+   * Returns false when it was already flagged, so overlapping foreground
+   * and background checks cannot notify twice for one crossing.
+   */
+  markReturnAlerted: (id: string, grade: GradeType | undefined, direction: ReturnDirection) => boolean;
   canAddMore: () => boolean;
 }
 
@@ -127,19 +153,31 @@ export const useWatchlistStore = create<WatchlistStore>()(
       addItem: (item) => {
         if (!get().canAddMore()) return false;
         const now = new Date().toISOString();
+        // Since-added baseline: the LIVE price on screen when the user
+        // tapped add. Callers pass baselinePrice only when the price is
+        // live; when it is missing (not loaded yet, or sample data)
+        // stampBaselines fills it on the first live price and dates it
+        // then, so the row never claims a start it did not observe.
+        const baseline = isLivePrice(item.baselinePrice)
+          ? { baselinePrice: item.baselinePrice, baselineAt: now }
+          : { baselinePrice: undefined, baselineAt: undefined };
         if (item.kind === 'sealed') {
           const exists = get().items.some(
             (i) => i.kind === 'sealed' && i.productId === item.productId,
           );
           if (exists) return false;
-          set((state) => ({ items: [...state.items, { ...item, addedAt: now }] }));
+          set((state) => ({
+          items: [...state.items, { ...item, ...baseline, returnAlerted: undefined, addedAt: now }],
+        }));
           return true;
         }
         const exists = get().items.some(
           (i) => i.kind === 'card' && i.cardId === item.cardId && i.grade === item.grade,
         );
         if (exists) return false;
-        set((state) => ({ items: [...state.items, { ...item, addedAt: now }] }));
+        set((state) => ({
+          items: [...state.items, { ...item, ...baseline, returnAlerted: undefined, addedAt: now }],
+        }));
         return true;
       },
 
@@ -158,7 +196,15 @@ export const useWatchlistStore = create<WatchlistStore>()(
         set((state) => ({
           items: state.items.map((i) =>
             i.kind === 'card' && i.cardId === cardId && i.grade === oldGrade
-              ? { ...i, grade: newGrade }
+              ? {
+                  ...i,
+                  grade: newGrade,
+                  // Raw and PSA 10 are different price series — a baseline
+                  // from one grade measured against the other is noise.
+                  baselinePrice: undefined,
+                  baselineAt: undefined,
+                  returnAlerted: undefined,
+                }
               : i,
           ),
         })),
@@ -188,6 +234,35 @@ export const useWatchlistStore = create<WatchlistStore>()(
             ),
           };
         }),
+
+      stampBaselines: (entries) =>
+        set((state) => {
+          const now = new Date().toISOString();
+          let changed = false;
+          const items = state.items.map((i) => {
+            if (i.baselineAt && isLivePrice(i.baselinePrice)) return i;
+            const hit = entries.find((e) => isLivePrice(e.price) && matchesItem(i, e.id, e.grade));
+            if (!hit) return i;
+            changed = true;
+            return { ...i, baselinePrice: hit.price, baselineAt: now, returnAlerted: undefined };
+          });
+          // Same bail as updatePrice: Home calls this on every batch
+          // resolve, and a fresh array re-renders every subscriber.
+          return changed ? { items } : state;
+        }),
+
+      markReturnAlerted: (id, grade, direction) => {
+        const target = get().items.find((i) => matchesItem(i, id, grade));
+        if (!target || target.returnAlerted?.[direction]) return false;
+        set((state) => ({
+          items: state.items.map((i) =>
+            matchesItem(i, id, grade)
+              ? { ...i, returnAlerted: { ...i.returnAlerted, [direction]: true } }
+              : i,
+          ),
+        }));
+        return true;
+      },
 
       canAddMore: () => {
         const { items, maxFreeItems } = get();

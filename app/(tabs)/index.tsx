@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, FlatList, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
-import { IconSearch } from '@tabler/icons-react-native';
+import { IconSearch, IconLock } from '@tabler/icons-react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -15,6 +15,7 @@ import {
   ScreenBackground,
   BrandMark,
   MarketIndexBar,
+  SinceAddedLabel,
   Touchable,
   withErrorBoundary,
 } from '../../src/components';
@@ -30,6 +31,8 @@ import {
   sessionActiveMs,
   MIN_SESSION_ACTIVE_MS,
 } from '../../src/utils/review-prompt';
+import { sinceAddedReturn, averageSinceAdded } from '../../src/services/since-added';
+import { isSealedPriceLive } from '../../src/services/tcgplayer';
 import type { TrendingTile } from '../../src/services/trending';
 
 /**
@@ -42,9 +45,11 @@ import type { TrendingTile } from '../../src/services/trending';
 const HomeCardRow = React.memo(function HomeCardRow({
   item,
   livePrice,
+  showSinceAdded,
 }: {
   item: Extract<WatchlistItem, { kind: 'card' }>;
   livePrice: { currentPrice: number; percentChange: number } | null | undefined;
+  showSinceAdded: boolean;
 }) {
   const fallbackPrice = useMemo(
     () =>
@@ -82,6 +87,9 @@ const HomeCardRow = React.memo(function HomeCardRow({
       rarity={rarity}
       livePrice={livePrice}
       fallbackPrice={fallbackPrice}
+      baselinePrice={item.baselinePrice}
+      baselineAt={item.baselineAt}
+      showSinceAdded={showSinceAdded}
     />
   );
 });
@@ -121,6 +129,36 @@ function WatchlistScreen() {
   );
   const batchQuery = useBatchPrices(watchlistCardIds);
   const batchPrices = batchQuery.data;
+
+  // Since-added baselines for rows that have none — added before the
+  // feature shipped, or before their price loaded. Batch prices are live
+  // TCGPlayer only (no sample fallback), so they are safe to anchor on.
+  const stampBaselines = useWatchlistStore((s) => s.stampBaselines);
+  useEffect(() => {
+    if (!batchPrices) return;
+    const entries = items.flatMap((i) => {
+      if (i.kind !== 'card' || i.baselineAt) return [];
+      const p = batchPrices[i.cardId]?.currentPrice;
+      return typeof p === 'number' && p > 0 ? [{ id: i.cardId, grade: i.grade, price: p }] : [];
+    });
+    if (entries.length > 0) stampBaselines(entries);
+  }, [batchPrices, items, stampBaselines]);
+
+  // Watchlist return since added (Premium): equal-weighted mean of the
+  // rows that have one. Cards read the live batch; sealed read their
+  // live-refreshed stamp, and only for live-priced products.
+  const avgSinceAdded = useMemo(() => {
+    if (!isPremium) return null;
+    return averageSinceAdded(
+      items.map((i) =>
+        i.kind === 'card'
+          ? sinceAddedReturn(i, batchPrices?.[i.cardId]?.currentPrice)
+          : isSealedPriceLive(i.productId)
+            ? sinceAddedReturn(i, i.lastPrice)
+            : null,
+      ),
+    );
+  }, [isPremium, items, batchPrices]);
 
   // Rating prompt — second trigger. The alert-fired moment in
   // Notifications is the better one but most users never reach it, so
@@ -368,10 +406,29 @@ function WatchlistScreen() {
                   <Text variant="labelLg" color={colors.onSurfaceVariant}>
                     {items.length} {noun} tracked
                   </Text>
-                  {!isPremium && (
-                    <Text variant="caption" color={colors.onSurfaceMuted}>
-                      {items.length}/{maxFreeItems}
-                    </Text>
+                  {isPremium ? (
+                    avgSinceAdded !== null ? (
+                      <SinceAddedLabel pct={avgSinceAdded} prefix="Avg" />
+                    ) : null
+                  ) : (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+                      {/* Premium teaser for the since-added return. */}
+                      <Touchable
+                        onPress={() => router.push('/paywall')}
+                        hitSlop={12}
+                        accessibilityRole="button"
+                        accessibilityLabel="Return since added, a Premium feature"
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}
+                      >
+                        <IconLock size={12} color={colors.primary} />
+                        <Text variant="labelSm" color={colors.primary}>
+                          Since added
+                        </Text>
+                      </Touchable>
+                      <Text variant="caption" color={colors.onSurfaceMuted}>
+                        {items.length}/{maxFreeItems}
+                      </Text>
+                    </View>
                   )}
                 </View>
               );
@@ -409,6 +466,9 @@ function WatchlistScreen() {
                 imageUrl={item.imageUrl}
                 fallbackPrice={item.lastPrice}
                 fallbackPriceChange={item.lastPriceChange}
+                baselinePrice={item.baselinePrice}
+                baselineAt={item.baselineAt}
+                showSinceAdded={isPremium}
               />
             ) : (
               // Batched live price for this row. Passing null (batch
@@ -420,6 +480,7 @@ function WatchlistScreen() {
               <HomeCardRow
                 item={item}
                 livePrice={batchQuery.isError ? undefined : batchPrices?.[item.cardId] ?? null}
+                showSinceAdded={isPremium}
               />
             )}
           </View>

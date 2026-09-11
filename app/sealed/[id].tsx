@@ -64,6 +64,9 @@ function SealedDetailScreen() {
         imageUrl: product.imageUrl,
         lastPrice: price?.currentPrice,
         lastPriceChange: price?.percentChange,
+        // Since-added baseline only from a live price — catalog products
+        // price from seeds, and a seeded start makes every return fiction.
+        baselinePrice: isSealedPriceLive(product.id) ? price?.currentPrice : undefined,
       });
     }
   };

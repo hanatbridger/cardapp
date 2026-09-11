@@ -7,6 +7,7 @@ import {
   IconSparkles,
   IconInfinity,
   IconBellRinging,
+  IconChartLine,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import {
@@ -71,6 +72,11 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
     icon: IconBellRinging,
     title: 'Unlimited price alerts',
     body: 'Free keeps 3 active alerts. Premium removes the cap — track every threshold, raw or graded.',
+  },
+  {
+    icon: IconChartLine,
+    title: 'Return since added',
+    body: 'See how every card has moved since you added it, and get a push when it is up or down 20%.',
   },
 ];
 

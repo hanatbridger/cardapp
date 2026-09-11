@@ -105,7 +105,33 @@ export interface TriggeredGradingAlert {
   isRead: boolean;
 }
 
-export type TriggeredAlert = TriggeredPriceAlert | TriggeredGradingAlert;
+/**
+ * A since-added crossing (Premium): a watchlist item moved 20% or more
+ * from the price it had when the user added it. Not backed by a rule the
+ * user created — the watchlist item carries the baseline and the
+ * fired-once flags (watchlist-store `returnAlerted`), so dedupe lives
+ * there rather than in this feed.
+ */
+export interface TriggeredReturnAlert {
+  kind: 'return';
+  id: string;
+  /** Stable per item + direction. */
+  alertId: string;
+  /** Set for cards; the notification opens the card. */
+  cardId?: string;
+  /** Set for sealed products; the notification opens the product. */
+  productId?: string;
+  cardName: string;
+  direction: 'up' | 'down';
+  pct: number;
+  baselinePrice: number;
+  currentPrice: number;
+  baselineAt: string;
+  triggeredAt: string;
+  isRead: boolean;
+}
+
+export type TriggeredAlert = TriggeredPriceAlert | TriggeredGradingAlert | TriggeredReturnAlert;
 
 /** What a checker hands the store when an alert crosses its line. */
 export type AlertFire =
@@ -157,6 +183,10 @@ interface AlertsStore {
    * pre-trigger snapshot can't double-record or fire two banners.
    */
   recordTriggered: (fire: AlertFire) => TriggeredAlert | null;
+  /** Prepend a since-added crossing to the feed. Callers dedupe first. */
+  recordReturnAlert: (
+    fire: Omit<TriggeredReturnAlert, 'id' | 'kind' | 'triggeredAt' | 'isRead'>,
+  ) => TriggeredReturnAlert;
   markTriggeredRead: (id: string) => void;
   markAllTriggeredRead: () => void;
   clearTriggered: () => void;
@@ -367,6 +397,18 @@ export const useAlertsStore = create<AlertsStore>()(
         // Spent — clear the server row so the daily cron can't push a
         // duplicate for an alert that already fired in-app.
         dropTarget(fire.alert);
+        return entry;
+      },
+
+      recordReturnAlert: (fire) => {
+        const entry: TriggeredReturnAlert = {
+          ...fire,
+          kind: 'return',
+          id: newId('t'),
+          triggeredAt: new Date().toISOString(),
+          isRead: false,
+        };
+        set((state) => ({ triggered: [entry, ...state.triggered].slice(0, 100) }));
         return entry;
       },
 

@@ -7,6 +7,8 @@ import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { GradeBadge } from './GradeBadge';
 import { PriceChange } from './PriceChange';
+import { SinceAddedLabel } from './SinceAddedLabel';
+import { sinceAddedReturn } from '../services/since-added';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { CARD_BORDER_RADIUS } from '../constants/layout';
@@ -38,6 +40,11 @@ interface WatchlistCardProps {
    * to keep the legacy per-row fetch.
    */
   livePrice?: { currentPrice: number; percentChange: number } | null;
+  /** Since-added baseline (Premium); see services/since-added.ts. */
+  baselinePrice?: number;
+  baselineAt?: string;
+  /** Premium gate for the since-added line. */
+  showSinceAdded?: boolean;
 }
 
 export const WatchlistCard = React.memo(function WatchlistCard({
@@ -51,6 +58,9 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   language,
   fallbackPrice,
   livePrice,
+  baselinePrice,
+  baselineAt,
+  showSinceAdded,
 }: WatchlistCardProps) {
   const { colors, isDark } = useTheme();
   const formatMoney = useMoney();
@@ -89,6 +99,14 @@ export const WatchlistCard = React.memo(function WatchlistCard({
         }
       : fallbackPrice
     : internalPrice ?? fallbackPrice;
+
+  // Since-added return (Premium), measured only against the batched LIVE
+  // price. The fallback can be seeded sample data or a days-old stamp,
+  // and a return against either would be fiction.
+  const sinceAdded =
+    showSinceAdded && livePrice
+      ? sinceAddedReturn({ baselinePrice, baselineAt }, livePrice.currentPrice)
+      : null;
 
   // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
   // from every watchlist surface until the eBay live proxy ships.
@@ -191,6 +209,9 @@ export const WatchlistCard = React.memo(function WatchlistCard({
               {formatMoney(price.currentPrice)}
             </Text>
             <PriceChange percent={price.percentChange} size="sm" />
+            {sinceAdded ? (
+              <SinceAddedLabel pct={sinceAdded.pct} baselineAt={sinceAdded.baselineAt} />
+            ) : null}
           </>
         ) : (
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>

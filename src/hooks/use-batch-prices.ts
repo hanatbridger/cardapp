@@ -52,22 +52,36 @@ async function fetchBatch(ids: string[]): Promise<BatchPrices> {
   return out;
 }
 
+/**
+ * Live TCGPlayer Market Price for many cards, chunked to the server's
+ * 20-id limit. Throws on a failed chunk and never substitutes seeded
+ * sample prices (fetchRawCardPrice does), which is why the since-added
+ * alert checker prices through here too.
+ */
+export async function fetchBatchPrices(ids: string[]): Promise<BatchPrices> {
+  const chunks: string[][] = [];
+  for (let i = 0; i < ids.length; i += BATCH_LIMIT) {
+    chunks.push(ids.slice(i, i + BATCH_LIMIT));
+  }
+  const results = await Promise.all(chunks.map(fetchBatch));
+  return Object.assign({}, ...results) as BatchPrices;
+}
+
+/** Sorted + deduped, so the query key is order-insensitive. */
+export function batchPriceKey(cardIds: string[]): string[] {
+  return [...new Set(cardIds)].sort();
+}
+
+export const BATCH_PRICE_STALE_MS = 30 * 60 * 1000;
+
 export function useBatchPrices(cardIds: string[]) {
-  // Sorted + deduped so the key is order-insensitive — reordering the
-  // watchlist doesn't refetch.
-  const sortedIds = [...new Set(cardIds)].sort();
+  // Order-insensitive key — reordering the watchlist doesn't refetch.
+  const sortedIds = batchPriceKey(cardIds);
 
   return useQuery<BatchPrices>({
     queryKey: ['batch-prices', sortedIds],
-    queryFn: async () => {
-      const chunks: string[][] = [];
-      for (let i = 0; i < sortedIds.length; i += BATCH_LIMIT) {
-        chunks.push(sortedIds.slice(i, i + BATCH_LIMIT));
-      }
-      const results = await Promise.all(chunks.map(fetchBatch));
-      return Object.assign({}, ...results) as BatchPrices;
-    },
+    queryFn: () => fetchBatchPrices(sortedIds),
     enabled: sortedIds.length > 0,
-    staleTime: 30 * 60 * 1000,
+    staleTime: BATCH_PRICE_STALE_MS,
   });
 }

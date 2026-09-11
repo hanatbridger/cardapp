@@ -182,6 +182,8 @@ function AlertCheckerHost() {
       if (!data) return;
       if (data.type === 'news') router.push('/(tabs)/news');
       else if (typeof data.cardId === 'string') router.push(`/card/${data.cardId}`);
+      // Since-added alerts on sealed products carry the product instead.
+      else if (typeof data.productId === 'string') router.push(`/sealed/${data.productId}`);
     };
     const sub = Notifications.addNotificationResponseReceivedListener((r) =>
       route(r.notification.request.content.data as Record<string, unknown>),

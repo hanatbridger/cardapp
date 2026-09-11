@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Pressable } from 'react-native';
 import {
   IconTrendingUp,
+  IconTrendingDown,
   IconCertificate,
   IconHeart,
   IconMessageCircle,
@@ -26,6 +27,9 @@ const ICON_TYPES = {
   price_alert: { Icon: IconTrendingUp, colorKey: 'primary' as const },
   // Amber = grading, matching the PSA 10 grade colour elsewhere.
   grading_alert: { Icon: IconCertificate, colorKey: 'warning' as const },
+  // Since-added crossings: direction carries the colour, like PriceChange.
+  return_up: { Icon: IconTrendingUp, colorKey: 'success' as const },
+  return_down: { Icon: IconTrendingDown, colorKey: 'danger' as const },
   like: { Icon: IconHeart, colorKey: 'danger' as const },
   comment: { Icon: IconMessageCircle, colorKey: 'success' as const },
   follow: { Icon: IconUserPlus, colorKey: 'warning' as const },

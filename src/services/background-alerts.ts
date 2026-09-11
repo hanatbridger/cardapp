@@ -3,6 +3,8 @@ import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import { useAlertsStore } from '../stores/alerts-store';
 import { useUserStore } from '../stores/user-store';
+import { useWatchlistStore } from '../stores/watchlist-store';
+import { findReturnAlerts, deliverReturnAlerts } from './return-alerts';
 import { findAlertsToTrigger, formatAlertMessage } from './alert-checker';
 import { presentLocalNotification } from './notifications';
 import { maybeNotifyDailyNews } from './news-notify';
@@ -25,6 +27,7 @@ export function defineBackgroundAlertTask() {
       // middleware exposes rehydrate() so background runs see fresh data.
       await useAlertsStore.persist.rehydrate();
       await useUserStore.persist.rehydrate();
+      await useWatchlistStore.persist.rehydrate();
 
       // Honor the notifications preference here too. The foreground
       // checker gates on it (use-alert-checker.ts); without the same
@@ -53,6 +56,19 @@ export function defineBackgroundAlertTask() {
           triggeredAlertId: entry.id,
         });
         firedAny = true;
+      }
+
+      // Since-added ±20% (Premium). Delivery dedupes against the
+      // foreground checker through the item's returnAlerted flag.
+      if (useUserStore.getState().isPremium) {
+        try {
+          const delivered = await deliverReturnAlerts(
+            await findReturnAlerts(useWatchlistStore.getState().items),
+          );
+          if (delivered > 0) firedAny = true;
+        } catch {
+          // Prices unavailable on this wake; the next one retries.
+        }
       }
 
       // Daily news push — at most one per calendar day, only on a new top

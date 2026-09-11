@@ -35,7 +35,14 @@ export interface Comment {
   createdAt: string;
 }
 
-export type NotificationType = 'price_alert' | 'grading_alert' | 'like' | 'comment' | 'follow';
+export type NotificationType =
+  | 'price_alert'
+  | 'grading_alert'
+  | 'return_up'
+  | 'return_down'
+  | 'like'
+  | 'comment'
+  | 'follow';
 
 export interface Notification {
   id: string;
@@ -44,6 +51,8 @@ export interface Notification {
   message: string;
   avatarUrl?: string;
   cardId?: string;
+  /** Sealed product the notification opens (since-added alerts). */
+  productId?: string;
   postId?: string;
   isRead: boolean;
   createdAt: string;

@@ -5,6 +5,7 @@ export { Input } from './Input';
 export { Badge } from './Badge';
 export { GradeBadge } from './GradeBadge';
 export { PriceChange } from './PriceChange';
+export { SinceAddedLabel } from './SinceAddedLabel';
 export { PriceChart } from './PriceChart';
 export { Avatar } from './Avatar';
 export { SegmentedControl } from './SegmentedControl';
