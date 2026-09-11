@@ -16,11 +16,18 @@
 
 import {
   fetchMarketPrice,
-  fetchPriceForCard,
   priceResponse,
+  resolveCardPrice,
   resolveProductId,
   type PriceResponse,
+  type TcgDetails,
 } from '../_lib/tcgplayer';
+import {
+  dayKey,
+  previousCloses,
+  recordTodayCloses,
+  type PreviousClose,
+} from '../_lib/snapshots';
 
 export const config = { runtime: 'edge' };
 
@@ -30,17 +37,50 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-function json(status: number, body: unknown): Response {
+// 30min CDN cache, 5min stale-while-revalidate for complete answers —
+// same Market Price for everyone, no per-user variance. Any answer that
+// carries a miss gets one minute: a miss is usually a transient upstream
+// failure, and pinning it for 30 minutes blanked that card for every
+// user whose watchlist hashes to the same URL.
+const LONG_CACHE = 'public, s-maxage=1800, stale-while-revalidate=300';
+const SHORT_CACHE = 'public, s-maxage=60';
+
+function json(status: number, body: unknown, cache: string = LONG_CACHE): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      // 30min CDN cache, 5min stale-while-revalidate. Same Market
-      // Price for everyone — no per-user variance — so this is safe.
-      'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=300',
+      'Cache-Control': cache,
       ...CORS,
     },
   });
+}
+
+/**
+ * Real day-over-day change: previous close from our own daily TCGPlayer
+ * series, plus today's point recorded so tomorrow has one. Best-effort —
+ * a database hiccup costs the day change, never the price. The response
+ * used to hard-code percentChange 0, so every raw card read 0.00%.
+ */
+async function dailyCloses(
+  priced: { cardId: string; productId: string; details: TcgDetails }[],
+): Promise<Map<string, PreviousClose>> {
+  if (priced.length === 0) return new Map();
+  const today = dayKey(Date.now());
+  const [prev] = await Promise.all([
+    previousCloses(priced.map((p) => p.productId), today).catch(
+      () => new Map<string, PreviousClose>(),
+    ),
+    recordTodayCloses(
+      priced.map((p) => ({
+        productId: p.productId,
+        cardId: p.cardId,
+        price: p.details.marketPrice ?? 0,
+      })),
+      today,
+    ).catch(() => {}),
+  ]);
+  return prev;
 }
 
 const MAX_BATCH_IDS = 20;
@@ -67,12 +107,15 @@ export default async function handler(req: Request): Promise<Response> {
       return json(400, { error: `too many ids (max ${MAX_BATCH_IDS})` });
     }
 
-    const results = await Promise.all(ids.map(fetchPriceForCard));
+    const resolved = await Promise.all(ids.map(resolveCardPrice));
+    const priced = resolved.flatMap((r, i) => (r ? [{ cardId: ids[i], ...r }] : []));
+    const prev = await dailyCloses(priced);
     const prices: Record<string, PriceResponse | null> = {};
     ids.forEach((id, i) => {
-      prices[id] = results[i];
+      const r = resolved[i];
+      prices[id] = r ? priceResponse(r.productId, r.details, prev.get(r.productId)) : null;
     });
-    return json(200, { prices });
+    return json(200, { prices }, resolved.every(Boolean) ? LONG_CACHE : SHORT_CACHE);
   }
 
   // `id` is the Pokemon TCG card id (e.g. "me2pt5-277"). We accept the
@@ -83,18 +126,21 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const productId = await resolveProductId(cardId);
-    if (!productId) return json(404, { error: 'productId not found for card', cardId });
+    if (!productId) {
+      return json(404, { error: 'productId not found for card', cardId }, SHORT_CACHE);
+    }
 
     const details = await fetchMarketPrice(productId);
     if (!details?.marketPrice) {
-      return json(404, { error: 'no market price', cardId, productId });
+      return json(404, { error: 'no market price', cardId, productId }, SHORT_CACHE);
     }
-    return json(200, priceResponse(productId, details));
+    const prev = await dailyCloses([{ cardId, productId, details }]);
+    return json(200, priceResponse(productId, details, prev.get(productId)));
   } catch (err) {
     // Log the detail server-side (Vercel logs); return a generic
     // message so internal error strings / stack info aren't echoed
     // to clients.
     console.error('[tcgplayer/price] failure:', err);
-    return json(500, { error: 'tcgplayer proxy failure' });
+    return json(500, { error: 'tcgplayer proxy failure' }, 'no-store');
   }
 }

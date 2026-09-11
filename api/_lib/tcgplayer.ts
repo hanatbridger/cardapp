@@ -28,17 +28,31 @@ export interface PriceResponse {
   salesCount: number;
   lastSaleDate: string;
   lastSalePrice: number;
+  /** Date of the previous close percentChange is measured from; null = none recorded. */
+  previousDate: string | null;
 }
 
 export async function resolveProductId(cardId: string): Promise<string | null> {
-  // Don't follow the redirect — read the Location header directly.
-  const res = await fetchWithTimeout(
-    `https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`,
-    { redirect: 'manual' },
-  );
-  const location = res.headers.get('location') ?? '';
-  const match = location.match(/tcgplayer\.com\/product\/(\d+)/);
-  return match ? match[1] : null;
+  // prices.pokemontcg.io intermittently 5xxs or stalls. A single attempt
+  // turned one blip into a null price the CDN then served for 30
+  // minutes. Up to 3 attempts on transient failures; a 4xx (the card is
+  // not on TCGPlayer) is final.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      // Don't follow the redirect — read the Location header directly.
+      const res = await fetchWithTimeout(
+        `https://prices.pokemontcg.io/tcgplayer/${encodeURIComponent(cardId)}`,
+        { redirect: 'manual' },
+      );
+      const location = res.headers.get('location') ?? '';
+      const match = location.match(/tcgplayer\.com\/product\/(\d+)/);
+      if (match) return match[1];
+      if (res.status >= 400 && res.status < 500) return null;
+    } catch {
+      // Timeout or network error — retry.
+    }
+  }
+  return null;
 }
 
 export async function fetchMarketPrice(productId: string): Promise<TcgDetails | null> {
@@ -61,13 +75,19 @@ export async function fetchMarketPrice(productId: string): Promise<TcgDetails | 
  * renders cleanly; previousPrice equals it (0% change) until history
  * is wired.
  */
-export function priceResponse(productId: string, details: TcgDetails): PriceResponse {
+export function priceResponse(
+  productId: string,
+  details: TcgDetails,
+  previous?: { date: string; price: number } | null,
+): PriceResponse {
   const price = details.marketPrice ?? 0;
+  const prev = previous && previous.price > 0 ? previous : null;
   return {
     productId,
     currentPrice: price,
-    previousPrice: price,
-    percentChange: 0,
+    previousPrice: prev ? prev.price : price,
+    percentChange: prev ? Math.round(((price - prev.price) / prev.price) * 10000) / 100 : 0,
+    previousDate: prev ? prev.date : null,
     averagePrice: price,
     highPrice: price,
     lowPrice: price,
@@ -77,24 +97,24 @@ export function priceResponse(productId: string, details: TcgDetails): PriceResp
   };
 }
 
-/**
- * Whole pipeline for one card. Failures collapse to null rather than
- * throwing — batch callers render their fallback for that row.
- */
-export async function fetchPriceForCard(cardId: string): Promise<PriceResponse | null> {
+/** Resolve + price one card; null when TCGPlayer has no price for it. */
+export async function resolveCardPrice(
+  cardId: string,
+): Promise<{ productId: string; details: TcgDetails } | null> {
   try {
     const productId = await resolveProductId(cardId);
     if (!productId) return null;
     const details = await fetchMarketPrice(productId);
     if (!details?.marketPrice) return null;
-    return priceResponse(productId, details);
+    return { productId, details };
   } catch {
     return null;
   }
 }
 
+
 /** Just the live Market Price, USD; null when unavailable. */
 export async function fetchTcgMarketPrice(cardId: string): Promise<number | null> {
-  const price = (await fetchPriceForCard(cardId))?.currentPrice;
+  const price = (await resolveCardPrice(cardId))?.details.marketPrice;
   return typeof price === 'number' && price > 0 ? price : null;
 }
