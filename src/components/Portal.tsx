@@ -17,6 +17,10 @@ import { StyleSheet, View } from 'react-native';
  * expo-router's SafeAreaProvider, so portal content keeps those. It is
  * outside the navigator, so navigation hooks (useNavigation, useFocusEffect)
  * are unavailable in portal content — the imperative `router` still works.
+ *
+ * Caveat: content stays mounted while its owning screen is blurred and
+ * frozen by react-native-screens, and a frozen screen's state updates do
+ * not commit. Owners must close their overlay on blur — BottomSheet does.
  */
 
 interface Entry {
@@ -73,8 +77,12 @@ export function PortalHost() {
   const snapshot = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   if (snapshot.length === 0) return null;
   return (
-    // box-none: an empty host must never eat touches meant for the app.
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    // box-none: the host itself never eats touches meant for the app.
+    // accessibilityViewIsModal: the host's sibling is the navigator, so
+    // VoiceOver ignores the screen underneath while an overlay is up —
+    // the isolation RN's Modal used to provide. The host only renders
+    // while it has entries, so it never hides the app otherwise.
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" accessibilityViewIsModal>
       {snapshot.map((e) => (
         <React.Fragment key={e.key}>{e.node}</React.Fragment>
       ))}

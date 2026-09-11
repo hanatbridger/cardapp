@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Pressable,
@@ -18,6 +18,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from 'expo-router';
 import { IconX } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Portal } from './Portal';
@@ -64,18 +65,53 @@ export function BottomSheet({
 }: BottomSheetProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const onOpenedRef = useRef(onOpened);
   onOpenedRef.current = onOpened;
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
+  // Built once: fresh builders every render made Reanimated re-serialize
+  // both configs to the UI runtime on each keystroke inside a form sheet.
+  const anim = useMemo(() => {
+    const fireOpened = () => onOpenedRef.current?.();
+    return {
+      backdropIn: FadeIn.duration(ENTER_MS),
+      backdropOut: FadeOut.duration(EXIT_MS),
+      sheetIn: SlideInDown.duration(ENTER_MS)
+        .easing(Easing.out(Easing.cubic))
+        .withCallback((finished) => {
+          'worklet';
+          // Callers focus inputs here, only once the sheet has landed.
+          // Raising the keyboard mid-slide makes KeyboardAvoidingView
+          // shove the sheet, which reads as a jump.
+          if (finished) runOnJS(fireOpened)();
+        }),
+      sheetOut: SlideOutDown.duration(EXIT_MS).easing(Easing.in(Easing.cubic)),
+    };
+  }, []);
+
+  // Dismiss only on an open → closed transition. Running it whenever the
+  // sheet is hidden also fired on MOUNT, so a hidden sheet mounting under
+  // another sheet (card detail mounts several) killed that sheet's
+  // keyboard mid-typing.
+  const wasVisible = useRef(visible);
   useEffect(() => {
-    if (!visible) {
-      // Without this the keyboard stays up over the sheet for the whole
-      // exit and hides the slide-down entirely.
-      Keyboard.dismiss();
-      return;
-    }
+    // Without this the keyboard stays up over the sheet for the whole
+    // exit and hides the slide-down entirely.
+    if (wasVisible.current && !visible) Keyboard.dismiss();
+    wasVisible.current = visible;
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    // The sheet renders in the root PortalHost, outside its screen. A
+    // navigation away while it is open (a notification tap, a deep link)
+    // would leave it over the next screen, and once react-native-screens
+    // freezes the blurred screen its state updates stop committing, so
+    // the sheet could never close. Close it as its screen loses focus —
+    // blur fires at the start of the transition, before the freeze.
+    const unsubscribeBlur = navigation.addListener('blur', () => onCloseRef.current());
     // Modal used to give us hardware-back and Escape for free.
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
       onCloseRef.current();
@@ -89,50 +125,49 @@ export function BottomSheet({
       document.addEventListener('keydown', onKey);
     }
     return () => {
+      unsubscribeBlur();
       back.remove();
       if (onKey) document.removeEventListener('keydown', onKey);
     };
-  }, [visible]);
+  }, [visible, navigation]);
 
   if (!visible) return null;
 
-  const fireOpened = () => onOpenedRef.current?.();
-
   return (
     <Portal>
-      {/* accessibilityViewIsModal: VoiceOver treats the sheet as the only
-          content on screen, as Modal did. */}
-      <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+      {/* VoiceOver's two-finger scrub closes the sheet, as it would a
+          native modal. Modality itself is set on the PortalHost, whose
+          sibling is the navigator. */}
+      <View style={StyleSheet.absoluteFill} onAccessibilityEscape={onClose}>
         {/* Backdrop is a sibling, not an ancestor, so its fade never bleeds
             into the sheet. */}
         <Animated.View
-          entering={FadeIn.duration(ENTER_MS)}
-          exiting={FadeOut.duration(EXIT_MS)}
+          entering={anim.backdropIn}
+          exiting={anim.backdropOut}
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          {/* No accessibilityRole here: on web a role="button" Pressable
-              renders <button>, and the sheet's own buttons inside it would
-              be nested buttons (invalid HTML, hydration error). */}
-          <Pressable style={{ flex: 1, justifyContent: 'flex-end' }} onPress={onClose}>
+          {/* accessible={false} on both Pressables: a Pressable is an
+              accessibility element by default, which on iOS collapses
+              everything inside it into ONE element — VoiceOver could not
+              reach a single row or button. No role either: on web a
+              role="button" renders <button>, and the sheet's own buttons
+              inside it would be nested buttons. */}
+          <Pressable
+            accessible={false}
+            style={{ flex: 1, justifyContent: 'flex-end' }}
+            onPress={onClose}
+          >
             <Animated.View
-              entering={SlideInDown.duration(ENTER_MS)
-                .easing(Easing.out(Easing.cubic))
-                .withCallback((finished) => {
-                  'worklet';
-                  // Callers focus inputs here, only once the sheet has
-                  // landed. Raising the keyboard mid-slide makes
-                  // KeyboardAvoidingView shove the sheet, which reads as a
-                  // jump.
-                  if (finished) runOnJS(fireOpened)();
-                })}
-              exiting={SlideOutDown.duration(EXIT_MS).easing(Easing.in(Easing.cubic))}
+              entering={anim.sheetIn}
+              exiting={anim.sheetOut}
               style={height !== undefined ? { height } : undefined}
             >
               <Pressable
+                accessible={false}
                 onPress={(e) => e.stopPropagation()}
                 style={{
                   flex: height !== undefined ? 1 : undefined,
@@ -166,7 +201,9 @@ export function BottomSheet({
                       alignItems: 'center',
                     }}
                   >
-                    <Text variant="headingSm">{title}</Text>
+                    <Text variant="headingSm" accessibilityRole="header">
+                      {title}
+                    </Text>
                     <Pressable
                       onPress={onClose}
                       hitSlop={8}
