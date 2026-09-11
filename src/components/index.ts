@@ -23,6 +23,7 @@ export { MarketIndexBar } from './MarketIndexBar';
 export { AIPicks, type AIPickItem } from './AIPicks';
 export { ScreenBackground } from './ScreenBackground';
 export { BottomSheet } from './BottomSheet';
+export { Portal, PortalHost } from './Portal';
 export { PriceAlertModal } from './PriceAlertModal';
 export { GradingAlertModal } from './GradingAlertModal';
 export { CurrencyPickerModal } from './CurrencyPickerModal';

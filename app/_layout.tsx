@@ -8,6 +8,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
 import { queryClient } from '../src/lib/query-client';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
+import { PortalHost } from '../src/components/Portal';
 import { useUserStore } from '../src/stores/user-store';
 import { useAlertChecker } from '../src/hooks/use-alert-checker';
 import { useNewsNotifier } from '../src/hooks/use-news-notifier';
@@ -260,6 +261,10 @@ export default function RootLayout() {
               <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
               <Stack.Screen name="design-system" />
             </Stack>
+            {/* Overlays (sheets, pickers) render here, above the navigator
+                and the tab bar, instead of through RN's Modal — see
+                components/Portal.tsx for why. */}
+            <PortalHost />
           </ThemeProvider>
         </QueryClientProvider>
       </ErrorBoundary>

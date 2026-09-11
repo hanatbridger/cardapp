@@ -1,154 +1,193 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
-  Modal,
   Pressable,
   KeyboardAvoidingView,
   Keyboard,
   Platform,
-  Animated,
-  Easing,
+  BackHandler,
   StyleSheet,
-  useWindowDimensions,
+  type DimensionValue,
 } from 'react-native';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  SlideInDown,
+  SlideOutDown,
+  runOnJS,
+} from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconX } from '@tabler/icons-react-native';
 import { Text } from './Text';
+import { Portal } from './Portal';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius, shadows } from '../theme/tokens';
 
 interface BottomSheetProps {
   visible: boolean;
   onClose: () => void;
-  title: string;
+  /** Omit for a headerless sheet (the handle bar still renders). */
+  title?: string;
   children: React.ReactNode;
   /** Runs once the entry animation lands — e.g. to focus a field. */
   onOpened?: () => void;
+  /**
+   * Fixed sheet height, for sheets whose content scrolls (a list). The
+   * default sizes to content. Children get `flex: 1` to fill it.
+   */
+  height?: DimensionValue;
 }
 
-/**
- * Form-style bottom sheet: handle bar, title + close, then whatever the
- * caller stacks inside (gap spacing[4]). Wraps a KeyboardAvoidingView so
- * inputs stay above the keyboard. PriceAlertModal and GradingAlertModal
- * are the consumers; CurrencyPickerModal keeps its own taller variant.
- */
-export function BottomSheet({ visible, onClose, title, children, onOpened }: BottomSheetProps) {
-  const { colors } = useTheme();
-  const { height: windowHeight } = useWindowDimensions();
+const ENTER_MS = 260;
+const EXIT_MS = 220;
 
-  // The sheet drives its own entry/exit (Modal animationType="none") so the
-  // backdrop can FADE while the sheet SLIDES. RN's built-in "slide" drags
-  // the backdrop up with the sheet because it is a child of the same view.
-  // `mounted` keeps the Modal alive until the exit animation lands.
-  const [mounted, setMounted] = useState(visible);
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
+/**
+ * The one overlay primitive. Every sheet in the app — form sheets, pickers,
+ * the coming-soon panel, the watchlist-full upsell — renders through this
+ * so they all open the same way: backdrop fades, sheet slides up from the
+ * bottom edge, on the UI thread.
+ *
+ * Renders through `Portal` rather than RN's `Modal`. Modal's native
+ * presentation is asynchronous on Fabric and visibly late on first open;
+ * see Portal.tsx. Layout animations (`entering`/`exiting`) replace the old
+ * hand-driven Animated values, so the slide starts on the sheet's first
+ * frame instead of racing a presentation we could not observe.
+ */
+export function BottomSheet({
+  visible,
+  onClose,
+  title,
+  children,
+  onOpened,
+  height,
+}: BottomSheetProps) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
   const onOpenedRef = useRef(onOpened);
   onOpenedRef.current = onOpened;
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    if (visible) {
-      setMounted(true);
-      backdropOpacity.setValue(0);
-      sheetTranslateY.setValue(windowHeight);
-      Animated.parallel([
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sheetTranslateY, {
-          toValue: 0,
-          duration: 250,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start(({ finished }) => {
-        // Callers focus inputs here, only once the sheet has landed.
-        // Raising the keyboard while the sheet is still travelling makes
-        // KeyboardAvoidingView shove it mid-animation, which reads as a
-        // jump.
-        if (finished) onOpenedRef.current?.();
-      });
+    if (!visible) {
+      // Without this the keyboard stays up over the sheet for the whole
+      // exit and hides the slide-down entirely.
+      Keyboard.dismiss();
       return;
     }
-    if (!mounted) return;
-    // Without this the keyboard stays up over the sheet for the whole exit
-    // and hides the slide-down entirely.
-    Keyboard.dismiss();
-    Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: windowHeight,
-        duration: 250,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) setMounted(false);
+    // Modal used to give us hardware-back and Escape for free.
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      onCloseRef.current();
+      return true;
     });
-    // `windowHeight`/`mounted` are read at animation time only — listing them
-    // would restart the entry animation on rotation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let onKey: ((e: KeyboardEvent) => void) | null = null;
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      onKey = (e) => {
+        if (e.key === 'Escape') onCloseRef.current();
+      };
+      document.addEventListener('keydown', onKey);
+    }
+    return () => {
+      back.remove();
+      if (onKey) document.removeEventListener('keydown', onKey);
+    };
   }, [visible]);
 
+  if (!visible) return null;
+
+  const fireOpened = () => onOpenedRef.current?.();
+
   return (
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
-      <View style={{ flex: 1 }}>
-        {/* Backdrop is a sibling, not an ancestor, so its opacity animation
-            never bleeds into the sheet. */}
+    <Portal>
+      {/* accessibilityViewIsModal: VoiceOver treats the sheet as the only
+          content on screen, as Modal did. */}
+      <View style={StyleSheet.absoluteFill} accessibilityViewIsModal>
+        {/* Backdrop is a sibling, not an ancestor, so its fade never bleeds
+            into the sheet. */}
         <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: colors.scrim, opacity: backdropOpacity },
-          ]}
+          entering={FadeIn.duration(ENTER_MS)}
+          exiting={FadeOut.duration(EXIT_MS)}
+          style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
         />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{ flex: 1 }}
         >
-          <Pressable
-            style={{ flex: 1, justifyContent: 'flex-end' }}
-            onPress={onClose}
-          >
-            <Animated.View style={{ transform: [{ translateY: sheetTranslateY }] }}>
+          {/* No accessibilityRole here: on web a role="button" Pressable
+              renders <button>, and the sheet's own buttons inside it would
+              be nested buttons (invalid HTML, hydration error). */}
+          <Pressable style={{ flex: 1, justifyContent: 'flex-end' }} onPress={onClose}>
+            <Animated.View
+              entering={SlideInDown.duration(ENTER_MS)
+                .easing(Easing.out(Easing.cubic))
+                .withCallback((finished) => {
+                  'worklet';
+                  // Callers focus inputs here, only once the sheet has
+                  // landed. Raising the keyboard mid-slide makes
+                  // KeyboardAvoidingView shove the sheet, which reads as a
+                  // jump.
+                  if (finished) runOnJS(fireOpened)();
+                })}
+              exiting={SlideOutDown.duration(EXIT_MS).easing(Easing.in(Easing.cubic))}
+              style={height !== undefined ? { height } : undefined}
+            >
               <Pressable
                 onPress={(e) => e.stopPropagation()}
                 style={{
+                  flex: height !== undefined ? 1 : undefined,
                   backgroundColor: colors.surface,
                   borderTopLeftRadius: radius['2xl'],
                   borderTopRightRadius: radius['2xl'],
                   padding: spacing[5],
+                  // Clear the home indicator; Modal's spacer used to guess.
+                  paddingBottom: Math.max(insets.bottom, spacing[4]) + spacing[2],
                   gap: spacing[4],
                   ...shadows.xl,
                 }}
               >
                 {/* Handle bar */}
                 <View style={{ alignItems: 'center' }}>
-                  <View style={{ width: 36, height: 4, borderRadius: radius.full, backgroundColor: colors.outline }} />
+                  <View
+                    style={{
+                      width: 36,
+                      height: 4,
+                      borderRadius: radius.full,
+                      backgroundColor: colors.outline,
+                    }}
+                  />
                 </View>
 
-                {/* Header */}
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text variant="headingSm">{title}</Text>
-                  <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" accessibilityRole="button">
-                    <IconX size={20} color={colors.onSurfaceMuted} />
-                  </Pressable>
-                </View>
+                {title ? (
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text variant="headingSm">{title}</Text>
+                    <Pressable
+                      onPress={onClose}
+                      hitSlop={8}
+                      accessibilityLabel="Close"
+                      accessibilityRole="button"
+                    >
+                      <IconX size={20} color={colors.onSurfaceMuted} />
+                    </Pressable>
+                  </View>
+                ) : null}
 
-                {children}
-
-                {/* Bottom spacing for safe area */}
-                <View style={{ height: spacing[4] }} />
+                {height !== undefined ? (
+                  <View style={{ flex: 1, gap: spacing[4] }}>{children}</View>
+                ) : (
+                  children
+                )}
               </Pressable>
             </Animated.View>
           </Pressable>
         </KeyboardAvoidingView>
       </View>
-    </Modal>
+    </Portal>
   );
 }

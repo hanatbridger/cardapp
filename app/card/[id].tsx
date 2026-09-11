@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
-import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl, Modal, Animated, Easing, StyleSheet } from 'react-native';
+import { View, ScrollView, FlatList, useWindowDimensions, Pressable, Linking, Share, Alert, Platform, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router, useFocusEffect } from 'expo-router';
 import * as Haptics from 'expo-haptics';
@@ -23,6 +23,7 @@ import {
   EbayListingsBlock,
   Skeleton,
   ComingSoonPanel,
+  BottomSheet,
   withErrorBoundary,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
@@ -67,7 +68,7 @@ function CardDetailScreen() {
   const { colors } = useTheme();
   // Module-scope Dimensions.get is 0 on web before first layout and
   // stale after rotation — it fed PriceChart a negative width.
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const { width: screenWidth } = useWindowDimensions();
   const formatMoney = useMoney();
   // Field selectors — a whole-store destructure re-rendered this 1100-line
   // screen (and every stacked copy of it) on any watchlist write anywhere.
@@ -207,55 +208,6 @@ function CardDetailScreen() {
     }
     prevGradeRef.current = selectedGrade;
   }, [selectedGrade, statsSettled, psa10]);
-
-  // The coming-soon sheet animates itself (Modal animationType="none") so the
-  // backdrop can FADE while the sheet SLIDES — RN's built-in "slide" drags a
-  // child backdrop up with the sheet. `psaSheetMounted` keeps the Modal alive
-  // until the exit animation lands.
-  const [psaSheetMounted, setPsaSheetMounted] = useState(false);
-  const psaBackdropOpacity = useRef(new Animated.Value(0)).current;
-  const psaSheetTranslateY = useRef(new Animated.Value(screenHeight)).current;
-
-  useEffect(() => {
-    if (psaModalVisible) {
-      setPsaSheetMounted(true);
-      psaBackdropOpacity.setValue(0);
-      psaSheetTranslateY.setValue(screenHeight);
-      Animated.parallel([
-        Animated.timing(psaBackdropOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(psaSheetTranslateY, {
-          toValue: 0,
-          duration: 250,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-      return;
-    }
-    if (!psaSheetMounted) return;
-    Animated.parallel([
-      Animated.timing(psaBackdropOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(psaSheetTranslateY, {
-        toValue: screenHeight,
-        duration: 250,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) setPsaSheetMounted(false);
-    });
-    // `screenHeight`/`psaSheetMounted` are read at animation time only —
-    // listing them would restart the entry animation on rotation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [psaModalVisible]);
 
   // Filter raw + PSA 10 history by the selected time range
   const filteredHistory = useMemo(
@@ -1143,106 +1095,49 @@ function CardDetailScreen() {
         </>
       )}
 
-      {/* PSA 10 coming-soon popup — fires when the user flips the
+      {/* PSA 10 coming-soon sheet — fires when the user flips the
           segmented control to PSA 10 on a card WITHOUT tracked graded
           data (tracked cards render the real price/chart instead).
           Lives at the screen root (outside the loading-gated branch)
           so it can pop even on the first render if the user lands on
           PSA 10 default. Backdrop tap dismisses; "Got it" closes. */}
-      <Modal
-        visible={psaSheetMounted}
-        transparent
-        // Self-animated: the backdrop fades while the sheet slides. RN's
-        // built-in "slide" would drag the backdrop up with the sheet since
-        // it is a child of the same view.
-        animationType="none"
-        onRequestClose={() => setPsaModalVisible(false)}
-      >
-        <Pressable
-          onPress={() => setPsaModalVisible(false)}
-          // Bottom-sheet layout — backdrop fills the screen, sheet
-          // anchors to the bottom edge so the slide-up animation reads
-          // as a sheet rising rather than a centered alert appearing.
-          style={{
-            flex: 1,
-            justifyContent: 'flex-end',
-          }}
-        >
-          {/* Backdrop is a sibling, not an ancestor, so its opacity
-              animation never bleeds into the sheet. */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              StyleSheet.absoluteFillObject,
-              { backgroundColor: colors.scrim, opacity: psaBackdropOpacity },
-            ]}
-          />
-          <Animated.View style={{ width: '100%', transform: [{ translateY: psaSheetTranslateY }] }}>
-          {/* Inner pressable swallows taps so the modal doesn't dismiss
-              when the user taps the card itself. */}
-          <Pressable
-            onPress={(e) => e.stopPropagation?.()}
+      <BottomSheet visible={psaModalVisible} onClose={() => setPsaModalVisible(false)}>
+        <View style={{ alignItems: 'center', gap: spacing[4] }}>
+          <View
             style={{
-              width: '100%',
-              backgroundColor: colors.surface,
-              borderTopLeftRadius: radius['3xl'],
-              borderTopRightRadius: radius['3xl'],
-              paddingHorizontal: spacing[6],
-              paddingTop: spacing[3],
-              paddingBottom: spacing[8],
-              gap: spacing[4],
+              width: 64,
+              height: 64,
+              borderRadius: radius.full,
+              backgroundColor: withAlpha(colors.primary, 0.18),
               alignItems: 'center',
-              borderTopWidth: 1,
-              borderColor: colors.outline,
+              justifyContent: 'center',
             }}
           >
-            {/* Drag-handle pip — universal "this is a sheet" affordance. */}
-            <View
-              style={{
-                width: 40,
-                height: 4,
-                borderRadius: radius.full,
-                backgroundColor: colors.outlineStrong,
-                marginBottom: spacing[2],
-              }}
-            />
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: radius.full,
-                backgroundColor: withAlpha(colors.primary, 0.18),
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+            <IconLock size={28} color={colors.primary} />
+          </View>
+          <View style={{ alignItems: 'center', gap: spacing[2] }}>
+            <Text variant="headingMd" style={{ textAlign: 'center' }}>
+              PSA 10 — not tracked for this card
+            </Text>
+            <Text
+              variant="bodySm"
+              color={colors.onSurfaceVariant}
+              style={{ textAlign: 'center', lineHeight: 20 }}
             >
-              <IconLock size={28} color={colors.primary} />
-            </View>
-            <View style={{ alignItems: 'center', gap: spacing[2] }}>
-              <Text variant="headingMd" style={{ textAlign: 'center' }}>
-                PSA 10 — not tracked for this card
-              </Text>
-              <Text
-                variant="bodySm"
-                color={colors.onSurfaceVariant}
-                style={{ textAlign: 'center', lineHeight: 20 }}
-              >
-                Graded price tracking covers a growing set of cards, focused on recent sets — this one isn’t tracked yet. Raw prices are live for every card.
-              </Text>
-            </View>
-            <View style={{ alignSelf: 'stretch' }}>
-              <Button
-                variant="filled"
-                fullWidth
-                onPress={() => setPsaModalVisible(false)}
-              >
-                Got it
-              </Button>
-            </View>
-          </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
+              Graded price tracking covers a growing set of cards, focused on recent sets — this one isn’t tracked yet. Raw prices are live for every card.
+            </Text>
+          </View>
+          <View style={{ alignSelf: 'stretch' }}>
+            <Button
+              variant="filled"
+              fullWidth
+              onPress={() => setPsaModalVisible(false)}
+            >
+              Got it
+            </Button>
+          </View>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }

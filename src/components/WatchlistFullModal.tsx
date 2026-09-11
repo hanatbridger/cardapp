@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Modal, Pressable } from 'react-native';
+import { View, Pressable } from 'react-native';
 import { router } from 'expo-router';
-import { IconCrown, IconX } from '@tabler/icons-react-native';
+import { IconCrown } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Button } from './Button';
+import { BottomSheet } from './BottomSheet';
 import { useTheme } from '../theme/ThemeProvider';
-import { spacing, radius, shadows } from '../theme/tokens';
+import { spacing, radius } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
 
 interface WatchlistFullModalProps {
@@ -15,113 +16,82 @@ interface WatchlistFullModalProps {
   maxCount: number;
 }
 
+/**
+ * Free-tier watchlist cap upsell. A headerless sheet (no title row) so the
+ * crown and heading stay centred; the handle, backdrop and "Maybe later"
+ * all dismiss.
+ */
 export function WatchlistFullModal({ visible, onClose, currentCount, maxCount }: WatchlistFullModalProps) {
   const { colors } = useTheme();
+  const fillPct = Math.min(100, (currentCount / Math.max(1, maxCount)) * 100);
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <Pressable
-        style={{
-          flex: 1,
-          backgroundColor: withAlpha(colors.scrim, 0.6),
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: spacing[5],
-        }}
-        onPress={onClose}
-      >
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
+    <BottomSheet visible={visible} onClose={onClose}>
+      <View style={{ alignItems: 'center', gap: spacing[4] }}>
+        <View
           style={{
-            backgroundColor: colors.surface,
-            borderRadius: radius['2xl'],
-            padding: spacing[6],
-            width: '100%',
-            maxWidth: 340,
+            width: 64,
+            height: 64,
+            borderRadius: radius.full,
+            backgroundColor: withAlpha(colors.primary, 0.15),
             alignItems: 'center',
-            gap: spacing[4],
-            ...shadows.xl,
+            justifyContent: 'center',
           }}
         >
-          {/* Close button */}
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            accessibilityLabel="Close"
-            accessibilityRole="button"
-            style={{ position: 'absolute', top: spacing[3], right: spacing[3] }}
-          >
-            <IconX size={20} color={colors.onSurfaceMuted} />
-          </Pressable>
+          <IconCrown size={32} color={colors.primary} />
+        </View>
 
-          {/* Crown icon */}
+        <Text variant="headingMd" style={{ textAlign: 'center' }}>
+          Watchlist full
+        </Text>
+
+        <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
+          You're tracking {currentCount}/{maxCount} cards. Upgrade to Premium for an unlimited watchlist, price alerts, and AI insights.
+        </Text>
+
+        <View style={{ width: '100%', gap: spacing[1] }}>
           <View
             style={{
-              width: 64,
-              height: 64,
+              height: 6,
               borderRadius: radius.full,
-              backgroundColor: withAlpha(colors.primary, 0.15),
-              alignItems: 'center',
-              justifyContent: 'center',
+              backgroundColor: colors.outline,
+              overflow: 'hidden',
             }}
           >
-            <IconCrown size={32} color={colors.primary} />
-          </View>
-
-          {/* Title */}
-          <Text variant="headingMd" style={{ textAlign: 'center' }}>
-            Watchlist Full
-          </Text>
-
-          {/* Description */}
-          <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ textAlign: 'center' }}>
-            You're tracking {currentCount}/{maxCount} cards. Upgrade to Premium for unlimited watchlist, price alerts, and AI insights.
-          </Text>
-
-          {/* Progress bar */}
-          <View style={{ width: '100%', gap: spacing[1] }}>
             <View
               style={{
-                height: 6,
+                height: '100%',
+                width: `${fillPct}%`,
+                backgroundColor: colors.primary,
                 borderRadius: radius.full,
-                backgroundColor: colors.outline,
-                overflow: 'hidden',
               }}
-            >
-              <View
-                style={{
-                  height: '100%',
-                  width: `${(currentCount / maxCount) * 100}%`,
-                  backgroundColor: colors.primary,
-                  borderRadius: radius.full,
-                }}
-              />
-            </View>
-            <Text variant="caption" color={colors.onSurfaceMuted} style={{ textAlign: 'right' }}>
-              {currentCount}/{maxCount} cards
-            </Text>
+            />
           </View>
+          <Text variant="caption" color={colors.onSurfaceMuted} style={{ textAlign: 'right' }}>
+            {currentCount}/{maxCount} cards
+          </Text>
+        </View>
 
-          {/* CTA */}
-          <Button variant="filled" fullWidth size="lg" onPress={() => { onClose(); router.push('/paywall'); }}>
-            Upgrade to Premium
-          </Button>
+        <Button variant="filled" fullWidth size="lg" onPress={() => { onClose(); router.push('/paywall'); }}>
+          Upgrade to Premium
+        </Button>
 
-          <Pressable
-            onPress={onClose}
-            hitSlop={8}
-            style={({ pressed }) => ({
-              paddingVertical: spacing[2],
-              paddingHorizontal: spacing[3],
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Text variant="labelMd" color={colors.onSurfaceMuted}>
-              Maybe later
-            </Text>
-          </Pressable>
+        <Pressable
+          onPress={onClose}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Maybe later"
+          style={({ pressed }) => ({
+            paddingVertical: spacing[2],
+            paddingHorizontal: spacing[3],
+            opacity: pressed ? 0.6 : 1,
+          })}
+        >
+          <Text variant="labelMd" color={colors.onSurfaceMuted}>
+            Maybe later
+          </Text>
         </Pressable>
-      </Pressable>
-    </Modal>
+      </View>
+    </BottomSheet>
   );
 }

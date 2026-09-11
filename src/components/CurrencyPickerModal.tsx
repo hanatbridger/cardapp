@@ -1,20 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  View,
-  Modal,
-  Pressable,
-  FlatList,
-  Animated,
-  Easing,
-  StyleSheet,
-  useWindowDimensions,
-  Keyboard,
-} from 'react-native';
-import { IconX, IconCheck } from '@tabler/icons-react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Pressable, FlatList } from 'react-native';
+import { IconCheck } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { SearchBar } from './SearchBar';
+import { BottomSheet } from './BottomSheet';
 import { useTheme } from '../theme/ThemeProvider';
-import { spacing, radius, shadows } from '../theme/tokens';
+import { spacing, radius } from '../theme/tokens';
 import {
   ALL_CURRENCY_CODES,
   POPULAR_CODES,
@@ -37,6 +28,7 @@ const ORDERED: string[] = [
 /**
  * Bottom-sheet currency picker — a scrollable, searchable tray of every
  * currency the app can convert into. Tap a row to select and dismiss.
+ * Fixed at 80% so the list scrolls inside the sheet instead of sizing it.
  */
 export function CurrencyPickerModal({
   visible,
@@ -45,58 +37,11 @@ export function CurrencyPickerModal({
   onClose,
 }: CurrencyPickerModalProps) {
   const { colors } = useTheme();
-  const { height: windowHeight } = useWindowDimensions();
   const [query, setQuery] = useState('');
 
-  // Self-animated (Modal animationType="none") so the backdrop FADES while
-  // the sheet SLIDES — RN's "slide" drags a child backdrop up with the
-  // sheet. `mounted` holds the Modal open until the exit animation lands.
-  const [mounted, setMounted] = useState(visible);
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const sheetTranslateY = useRef(new Animated.Value(windowHeight)).current;
-
+  // A stale filter on reopen reads as a bug ("where did USD go?").
   useEffect(() => {
-    if (visible) {
-      setMounted(true);
-      backdropOpacity.setValue(0);
-      sheetTranslateY.setValue(windowHeight);
-      Animated.parallel([
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(sheetTranslateY, {
-          toValue: 0,
-          duration: 250,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-      ]).start();
-      return;
-    }
-    if (!mounted) return;
-    // The search field can hold the keyboard up; dismiss it first or it
-    // covers the sheet through the whole slide-down.
-    Keyboard.dismiss();
-    Animated.parallel([
-      Animated.timing(backdropOpacity, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(sheetTranslateY, {
-        toValue: windowHeight,
-        duration: 250,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start(({ finished }) => {
-      if (finished) setMounted(false);
-    });
-    // `windowHeight`/`mounted` are read at animation time only — listing them
-    // would restart the entry animation on rotation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!visible) setQuery('');
   }, [visible]);
 
   const data = useMemo(() => {
@@ -111,112 +56,58 @@ export function CurrencyPickerModal({
   }, [query]);
 
   return (
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={onClose}>
-      <View
-        style={{
-          flex: 1,
-          justifyContent: 'flex-end',
-        }}
-      >
-        {/* Backdrop is a sibling, not an ancestor, so its opacity animation
-            never bleeds into the sheet. */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFillObject,
-            { backgroundColor: colors.scrim, opacity: backdropOpacity },
-          ]}
-        />
-        {/* Tap-outside to dismiss */}
-        <Pressable style={{ flex: 1 }} onPress={onClose} accessibilityLabel="Close currency picker" />
-        <Animated.View
-          style={{
-            backgroundColor: colors.surface,
-            borderTopLeftRadius: radius['2xl'],
-            borderTopRightRadius: radius['2xl'],
-            height: '80%',
-            paddingTop: spacing[3],
-            transform: [{ translateY: sheetTranslateY }],
-            ...shadows.xl,
-          }}
-        >
-          {/* Handle bar */}
-          <View style={{ alignItems: 'center', marginBottom: spacing[3] }}>
-            <View style={{ width: 36, height: 4, borderRadius: radius.full, backgroundColor: colors.outline }} />
-          </View>
+    <BottomSheet visible={visible} onClose={onClose} title="Currency" height="80%">
+      <SearchBar value={query} onChangeText={setQuery} placeholder="Search currency or code…" />
 
-          {/* Header */}
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: spacing[5],
-              marginBottom: spacing[3],
-            }}
-          >
-            <Text variant="headingSm">Currency</Text>
-            <Pressable onPress={onClose} hitSlop={8} accessibilityLabel="Close" accessibilityRole="button">
-              <IconX size={20} color={colors.onSurfaceMuted} />
-            </Pressable>
-          </View>
-
-          {/* Search */}
-          <View style={{ paddingHorizontal: spacing[5], marginBottom: spacing[2] }}>
-            <SearchBar value={query} onChangeText={setQuery} placeholder="Search currency or code…" />
-          </View>
-
-          {/* List */}
-          <FlatList
-            data={data}
-            keyExtractor={(code) => code}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ paddingBottom: spacing[12] }}
-            renderItem={({ item: code }) => {
-              const meta = currencyMeta(code);
-              const isSel = code === selected;
-              return (
-                <Pressable
-                  onPress={() => {
-                    onSelect(code);
-                    onClose();
-                  }}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSel }}
-                  accessibilityLabel={`${meta.name} (${code})`}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: spacing[3],
-                    paddingHorizontal: spacing[5],
-                    paddingVertical: spacing[3],
-                    backgroundColor: pressed ? colors.surfaceVariant : 'transparent',
-                  })}
-                >
-                  <View style={{ width: 44, alignItems: 'center' }}>
-                    <Text variant="labelLg" color={colors.onSurfaceVariant}>
-                      {meta.symbol.trim()}
-                    </Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text variant="bodyMd">{code}</Text>
-                    <Text variant="caption" color={colors.onSurfaceMuted}>
-                      {meta.name}
-                    </Text>
-                  </View>
-                  {isSel && <IconCheck size={20} color={colors.primary} />}
-                </Pressable>
-              );
-            }}
-            ListEmptyComponent={
-              <View style={{ padding: spacing[8], alignItems: 'center' }}>
-                <Text variant="bodySm" color={colors.onSurfaceMuted}>No currency matches “{query}”.</Text>
+      <FlatList
+        data={data}
+        keyExtractor={(code) => code}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        style={{ flex: 1 }}
+        renderItem={({ item: code }) => {
+          const meta = currencyMeta(code);
+          const isSel = code === selected;
+          return (
+            <Pressable
+              onPress={() => {
+                onSelect(code);
+                onClose();
+              }}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSel }}
+              accessibilityLabel={`${meta.name} (${code})`}
+              style={({ pressed }) => ({
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: spacing[3],
+                paddingHorizontal: spacing[2],
+                paddingVertical: spacing[3],
+                borderRadius: radius.md,
+                backgroundColor: pressed ? colors.surfaceVariant : 'transparent',
+              })}
+            >
+              <View style={{ width: 44, alignItems: 'center' }}>
+                <Text variant="labelLg" color={colors.onSurfaceVariant}>
+                  {meta.symbol.trim()}
+                </Text>
               </View>
-            }
-          />
-        </Animated.View>
-      </View>
-    </Modal>
+              <View style={{ flex: 1 }}>
+                <Text variant="bodyMd">{code}</Text>
+                <Text variant="caption" color={colors.onSurfaceMuted}>
+                  {meta.name}
+                </Text>
+              </View>
+              {isSel && <IconCheck size={20} color={colors.primary} />}
+            </Pressable>
+          );
+        }}
+        ListEmptyComponent={
+          <View style={{ padding: spacing[8], alignItems: 'center' }}>
+            <Text variant="bodySm" color={colors.onSurfaceMuted}>No currency matches “{query}”.</Text>
+          </View>
+        }
+      />
+    </BottomSheet>
   );
 }
