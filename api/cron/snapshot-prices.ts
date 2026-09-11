@@ -197,14 +197,26 @@ async function checkAlerts(
   snapshots: SnapshotRow[],
   deadline: number,
 ): Promise<{ checked: number; fired: number }> {
-  const { data: targetRows, error } = await admin
-    .from('alert_targets')
-    .select(
-      'id, push_token, kind, card_id, card_name, grade, target_price, direction, card_number, condition, threshold_net',
-    )
-    .is('triggered_at', null);
-  if (error) throw new Error(`alert_targets load failed: ${error.message}`);
-  const targets = (targetRows ?? []) as unknown as AlertTargetRow[];
+  const loadTargets = (columns: string) =>
+    admin.from('alert_targets').select(columns).is('triggered_at', null);
+  let loaded = await loadTargets(
+    'id, push_token, kind, card_id, card_name, grade, target_price, direction, card_number, condition, threshold_net',
+  );
+  // 42703 = undefined column: the grading-alert migration in
+  // supabase/alerts.sql has not been applied to this database. Every run
+  // since this select gained those columns threw here and skipped the
+  // WHOLE sweep, price alerts included (alertsChecked: -1). Fall back to
+  // the price-only shape so price targets keep firing until it lands.
+  if (loaded.error?.code === '42703') {
+    console.error(
+      '[snapshot-prices] alert_targets is on the pre-grading schema — apply supabase/alerts.sql. Sweeping price targets only.',
+    );
+    loaded = await loadTargets(
+      'id, push_token, card_id, card_name, grade, target_price, direction',
+    );
+  }
+  if (loaded.error) throw new Error(`alert_targets load failed: ${loaded.error.message}`);
+  const targets = (loaded.data ?? []) as unknown as AlertTargetRow[];
   if (targets.length === 0) return { checked: 0, fired: 0 };
 
   // `kind` defaults to 'price' server-side; null only if a row predates
