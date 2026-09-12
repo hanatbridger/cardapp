@@ -201,7 +201,7 @@ export function GradingVerdict({
         {/* Header: verdict + letter grade */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flex: 1 }}>
-            <Text variant="headingMd" color={verdictColor}>
+            <Text variant="headingSm" color={verdictColor}>
               {verdict.worthGrading ? 'Grade it' : 'Sell it raw'}
             </Text>
           </View>

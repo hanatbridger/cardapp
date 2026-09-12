@@ -20,6 +20,7 @@ import {
   DynamicsChip,
   CollapsibleCard,
   ReturnsSinceAdded,
+  ScrimCta,
   PriceAlertModal,
   WatchlistFullModal,
   CardDetailSkeleton,
@@ -86,6 +87,19 @@ function formatAsOf(asOf: string | undefined): string | null {
  * the screen exists or short enough not to cost anything.
  */
 type SectionId = 'fundamentals' | 'dynamics' | 'grading';
+
+/**
+ * Free-tier prediction tease, from the design: the block starts 61pt
+ * above the card's bottom edge and the ramp starts 12pt above the block,
+ * so the call is a shape long before it is a sentence.
+ */
+const PREDICTION_PEEK = 60;
+/**
+ * 73 in the design, where the card has no bottom padding and the ramp
+ * starts 12pt above the block. Ours keeps the card's 24pt padding, so the
+ * ramp has to be that much taller to start in the same place.
+ */
+const PREDICTION_SCRIM = 96;
 
 function CardDetailScreen() {
   // `section` arrives from a notification tap — see app/_layout.tsx.
@@ -629,7 +643,7 @@ function CardDetailScreen() {
             </Card>
           ) : price ? (
             <View style={{ gap: spacing[2] }}>
-              <Card elevated>
+              <Card style={{ overflow: 'hidden' }}>
                 <View style={{ gap: spacing[3] }}>
                   <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: spacing[2] }}>
                     <Text variant="displaySm">{formatMoney(price.currentPrice)}</Text>
@@ -711,24 +725,69 @@ function CardDetailScreen() {
                       </Text>
                     </Pressable>
                   ) : null}
+
+                  {/* Alerts stay free — the button sits inside the card,
+                      above the prediction, exactly as drawn. */}
+                  <Pressable
+                    onPress={openAlertModal}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: spacing[2],
+                      paddingVertical: spacing[3],
+                      borderRadius: radius.lg,
+                      borderWidth: 1,
+                      borderColor: colors.outline,
+                    }}
+                  >
+                    <IconBellRinging size={16} color={colors.primary} />
+                    <Text variant="labelLg" color={colors.primary}>Set Price Alert</Text>
+                  </Pressable>
+
+                  {/* Prediction — the takeaway, in the same card as the
+                      number it is a read on. Premium sees it; a free
+                      account sees it fade under the scrim, which is the
+                      whole pitch. */}
+                  {isPremium ? (
+                    <AIValuation
+                      embedded
+                      card={card}
+                      marketPrice={price.currentPrice}
+                      liveDynamics={cardStats?.dynamics}
+                      statsSettled={statsSettled}
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        height: PREDICTION_PEEK,
+                        overflow: 'hidden',
+                        // A row cut in half must not take a tap, and a
+                        // half-read row is worse than none for VoiceOver.
+                        pointerEvents: 'none',
+                      }}
+                      accessibilityElementsHidden
+                      importantForAccessibility="no-hide-descendants"
+                    >
+                      <AIValuation
+                        embedded
+                        card={card}
+                        marketPrice={price.currentPrice}
+                        liveDynamics={cardStats?.dynamics}
+                        statsSettled={statsSettled}
+                      />
+                    </View>
+                  )}
                 </View>
+                {!isPremium && (
+                  <ScrimCta
+                    label="Upgrade to view AI predictions"
+                    onPress={() => router.push('/paywall')}
+                    background={colors.surfaceVariant}
+                    height={PREDICTION_SCRIM}
+                  />
+                )}
               </Card>
-              <Pressable
-                onPress={openAlertModal}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: spacing[2],
-                  paddingVertical: spacing[3],
-                  borderRadius: radius.lg,
-                  borderWidth: 1,
-                  borderColor: colors.outline,
-                }}
-              >
-                <IconBellRinging size={16} color={colors.primary} />
-                <Text variant="labelLg" color={colors.primary}>Set Price Alert</Text>
-              </Pressable>
             </View>
           ) : (
             <Card>
@@ -737,7 +796,7 @@ function CardDetailScreen() {
               <View style={{ gap: spacing[3] }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
                   <IconAlertCircle size={18} color={colors.onSurfaceMuted} />
-                  <Text variant="labelLg">Price data unavailable</Text>
+                  <Text variant="headingSm">Price data unavailable</Text>
                 </View>
                 <Text variant="caption" color={colors.onSurfaceMuted}>
                   Raw prices come from TCGPlayer Market Price. Try again in a moment, or check TCGPlayer directly for the latest market value.
@@ -794,18 +853,8 @@ function CardDetailScreen() {
               still bootstrapping (fewer than 3 snapshots accumulated for
               this card). Hidden on PSA 10 since the ComingSoonPanel
               above already explains that gate. */}
-          {/* Prediction — AI valuation + market signals. Sits above the
-              chart: it's the takeaway, the chart is the evidence. Slim
-              enough to mount with the fold. */}
-          {selectedGrade !== 'PSA10' && (
-            <AIValuation
-              card={card}
-              marketPrice={price?.currentPrice}
-              liveDynamics={cardStats?.dynamics}
-              statsSettled={statsSettled}
-              locked={!isPremium}
-            />
-          )}
+          {/* Prediction now sits inside the price card, under Set Price
+              Alert — see the price block above. */}
 
           {/* Chart-sized skeleton while the raw history query resolves —
               holds the slot so the section doesn't pop in and shift
@@ -823,7 +872,7 @@ function CardDetailScreen() {
           {selectedGrade !== 'PSA10' && price && !historyLoading && (!history || history.length < 3) && (
             <Card>
               <View style={{ gap: spacing[2], alignItems: 'center', paddingVertical: spacing[4] }}>
-                <Text variant="labelLg">Price history is building</Text>
+                <Text variant="headingSm">Price history is building</Text>
                 <Text
                   variant="caption"
                   color={colors.onSurfaceVariant}
@@ -845,7 +894,7 @@ function CardDetailScreen() {
             <Card>
               <View style={{ gap: spacing[3] }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text variant="labelLg">Price History</Text>
+                  <Text variant="headingSm">Price History</Text>
                   <View style={{ flexDirection: 'row', gap: spacing[1] }}>
                     {TIME_RANGES.map((range, i) => (
                       <Pressable
@@ -903,7 +952,7 @@ function CardDetailScreen() {
           {selectedGrade === 'PSA10' && psa10?.pop && (
             <Card>
               <View style={{ gap: spacing[3] }}>
-                <Text variant="labelLg">PSA Population</Text>
+                <Text variant="headingSm">PSA Population</Text>
                 <View style={{ flexDirection: 'row' }}>
                   <View style={{ flex: 1, gap: spacing[1] }}>
                     <Text variant="caption" color={colors.onSurfaceMuted}>PSA 10 POP</Text>
@@ -992,7 +1041,7 @@ function CardDetailScreen() {
           {selectedGrade !== 'PSA10' && (price || recentSales.length > 0) && (
             <Card>
               <View style={{ gap: spacing[3] }}>
-                <Text variant="labelLg">Recent sales</Text>
+                <Text variant="headingSm">Recent sales</Text>
                 {recentSales.length > 0 ? (
                   <View>
                     {/* Daily eBay raw-sold aggregates, newest first —

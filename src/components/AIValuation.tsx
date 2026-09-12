@@ -1,10 +1,8 @@
 import React from 'react';
 import { View } from 'react-native';
-import { router } from 'expo-router';
 import { IconBrain, IconTrendingUp, IconTrendingDown, IconMinus } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Card } from './Card';
-import { CollapsibleCard } from './CollapsibleCard';
 import { Badge } from './Badge';
 import { Skeleton } from './Skeleton';
 import { useTheme } from '../theme/ThemeProvider';
@@ -39,17 +37,13 @@ interface AIValuationProps {
    */
   statsSettled?: boolean;
   /**
-   * Premium gate. Locked renders the real prediction and fades it under
-   * the scrim, which is the tease the design asks for — you can see the
-   * shape of the call without being able to read it. Still returns null
-   * when there is no valuation for this card at all: advertising a
-   * prediction we don't have is worse than showing nothing.
+   * Render the two signal rows only — no Card, no "Prediction" title.
+   * The design puts this block inside the price card, and for a free
+   * account the price card fades it under its own scrim; owning a card
+   * here would put a second border inside that one.
    */
-  locked?: boolean;
+  embedded?: boolean;
 }
-
-/** A locked card never toggles; CollapsibleCard still wants a handler. */
-const NOOP = () => {};
 
 // Height of the market-signal row, reused by its loading skeleton so the card
 // holds its place while stats settle: two text lines plus the row padding.
@@ -119,7 +113,7 @@ export function AIValuation({
   marketPrice,
   liveDynamics,
   statsSettled = true,
-  locked = false,
+  embedded = false,
 }: AIValuationProps) {
   const { colors } = useTheme();
   const formatMoney = useMoney();
@@ -235,28 +229,12 @@ export function AIValuation({
       </View>
   );
 
-  if (locked) {
-    // Peek height stops inside the valuation row, so the verdict is
-    // legible as a shape but its numbers are already into the ramp.
-    return (
-      <CollapsibleCard
-        title="Prediction"
-        expanded={false}
-        onToggle={NOOP}
-        locked
-        lockedLabel="Upgrade to view AI predictions"
-        onUnlock={() => router.push('/paywall')}
-        collapsedHeight={56}
-      >
-        {body}
-      </CollapsibleCard>
-    );
-  }
+  if (embedded) return body;
 
   return (
     <Card>
       <View style={{ gap: spacing[3] }}>
-        <Text variant="labelLg">Prediction</Text>
+        <Text variant="headingSm">Prediction</Text>
         {body}
       </View>
     </Card>

@@ -2,6 +2,7 @@ export { Text } from './Text';
 export { Button } from './Button';
 export { Card } from './Card';
 export { CollapsibleCard } from './CollapsibleCard';
+export { ScrimCta } from './ScrimCta';
 export { Input } from './Input';
 export { Badge } from './Badge';
 export { GradeBadge } from './GradeBadge';

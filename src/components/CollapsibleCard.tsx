@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Pressable, StyleSheet, type LayoutChangeEvent } from 'react-native';
+import { View, Pressable, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -7,12 +7,11 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from './Text';
 import { Card } from './Card';
+import { ScrimCta, SCRIM_CTA_HEIGHT } from './ScrimCta';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing } from '../theme/tokens';
-import { withAlpha } from '../utils/withAlpha';
 
 interface CollapsibleCardProps {
   /**
@@ -48,15 +47,6 @@ interface CollapsibleCardProps {
  * disclosure and overlays read as one motion system.
  */
 const TOGGLE_MS = 220;
-/**
- * Height of the scrim over the cut, from the design (125 at 393pt wide).
- * Deliberately deep: a short ramp reads as a shadow, while this one takes
- * the last rows down to nothing, which is what makes a locked card a
- * tease rather than a wall.
- */
-const SCRIM_HEIGHT = 120;
-/** Bottom strip of the scrim that carries the CTA and takes the tap. */
-const CTA_HEIGHT = 48;
 /**
  * Overflow under this is not worth a control — the preview already shows
  * the whole section, and a "View more" that reveals four pixels lies.
@@ -153,7 +143,7 @@ export function CollapsibleCard({
     const full = fullHeight.value > collapsedHeight ? fullHeight.value : collapsedHeight;
     // Open, the content also has to clear the "View less" strip, which
     // sits over the card's own bottom padding.
-    const openHeight = full + (showCta ? CTA_HEIGHT - spacing[6] : 0);
+    const openHeight = full + (showCta ? SCRIM_CTA_HEIGHT - spacing[6] : 0);
     return { height: collapsedHeight + (openHeight - collapsedHeight) * progress.value };
   });
 
@@ -167,12 +157,6 @@ export function CollapsibleCard({
       ? 'View less'
       : 'View more';
   const onPress = locked ? onUnlock : onToggle;
-
-  // Ends on the Card's own non-elevated background, so the ramp lands on
-  // the surface the content actually sits on. withAlpha(…, 0) rather than
-  // the 'transparent' keyword: that keyword is rgba(0,0,0,0), and on both
-  // native platforms the ramp would travel through grey to reach it.
-  const scrimColors: readonly [string, string] = [withAlpha(colors.surface, 0), colors.surface];
 
   return (
     // Clips because the scrim bleeds over the padding to reach the card's
@@ -235,47 +219,14 @@ export function CollapsibleCard({
       </View>
 
       {showCta && (
-        // Insets are relative to the card's BORDER box, not its content
-        // box, so zero already bleeds over the padding and reaches all
-        // three edges. Negative values pushed the CTA below the card,
-        // where the clip cut the label in half.
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: SCRIM_HEIGHT,
-            justifyContent: 'flex-end',
-            pointerEvents: 'box-none',
-          }}
-        >
-          <Animated.View style={[StyleSheet.absoluteFill, scrimStyle, { pointerEvents: 'none' }]}>
-            <LinearGradient colors={scrimColors} style={StyleSheet.absoluteFill} />
-          </Animated.View>
-          <Pressable
-            onPress={onPress}
-            accessibilityRole="button"
-            accessibilityLabel={ctaLabel}
-            accessibilityState={{ expanded: isOpen }}
-            style={{
-              height: CTA_HEIGHT,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text
-              variant="labelSm"
-              // Same weight and colour locked or not, per the design —
-              // the label says which it is, the styling doesn't shout.
-              color={colors.onSurface}
-              // 0.5 tracking, from the design's CTA text style.
-              style={{ letterSpacing: 0.5 }}
-            >
-              {ctaLabel}
-            </Text>
-          </Pressable>
-        </View>
+        <ScrimCta
+          label={ctaLabel}
+          onPress={onPress}
+          background={colors.surfaceVariant}
+          gradientStyle={scrimStyle}
+          expanded={isOpen}
+          accessibilityHint={locked ? lockedLabel : undefined}
+        />
       )}
     </Card>
   );

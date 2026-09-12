@@ -229,7 +229,7 @@ export function CardFundamentals({ card, marketPrice, livePop, bare }: CardFunda
   const body = (
     <View style={{ gap: 0 }}>
       {!bare && (
-        <Text variant="labelLg" style={{ marginBottom: spacing[1] }}>Fundamentals</Text>
+        <Text variant="headingSm" style={{ marginBottom: spacing[1] }}>Fundamentals</Text>
       )}
       {rows.map((row, i) => (
         <View key={i}>

@@ -211,7 +211,7 @@ export function MarketDynamics({ cardId, live, bare }: MarketDynamicsProps) {
         {/* Header */}
         {!bare && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-          <Text variant="labelLg">eBay Market Dynamics</Text>
+          <Text variant="headingSm">eBay Market Dynamics</Text>
           <DynamicsChip />
           {/* Seeded fallback keeps the disclosure badge (same
               convention as app/sealed/[id].tsx); live data drops it. */}

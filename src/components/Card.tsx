@@ -37,10 +37,11 @@ export function Card({
           ...shadows.md,
         }
       : {
-          backgroundColor: colors.surface,
+          // Solid fill, no stroke: the design draws every card as a
+          // raised surface on the canvas, and an outlined card on a
+          // near-black background reads as an empty box instead.
+          backgroundColor: colors.surfaceVariant,
           borderRadius: radius.lg,
-          borderWidth: 1,
-          borderColor: colors.outline,
         };
 
   return (
