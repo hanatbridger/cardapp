@@ -1184,3 +1184,68 @@ body::before {
   from { width: 0; }
   to { width: var(--w); }
 }
+
+/* ---------- returns since added ---------- */
+
+/* Same shell as the market panel: these two are the app's own cards,
+   and the site should not invent a third card treatment for them. */
+.ret-card {
+  width: 100%;
+  max-width: 380px;
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 16px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.ret-head {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.ret-base {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  & > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+}
+
+.ret-key {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-3);
+}
+
+/* The figure is the point of the card, so it carries the app's numerals
+   step rather than body size. */
+.ret-num {
+  font-size: 1.35rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ret-rows { border-top: 1px solid var(--rule); }
+
+.ret-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.ret-val {
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}

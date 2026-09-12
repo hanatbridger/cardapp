@@ -1,0 +1,65 @@
+# CardPulse
+
+> An iPhone app for tracking what trading cards are worth. One watchlist, live
+> market prices, a push notification when a card hits a price you set, and the
+> return on each card since the day you added it.
+
+CardPulse is published by Han Wong and is independent — not affiliated with
+Nintendo, The Pokémon Company, PSA, eBay, or TCGplayer. It is a tracking tool,
+not a marketplace: you cannot buy or sell cards in it.
+
+- App Store: https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336
+- Platform: iOS 15.1 or later. iPhone only. No Android or web version.
+- Price: free with a 5-item watchlist and 3 active alerts. Premium is $4.99/month
+  or $29.99/year.
+
+## Definitions
+
+These terms are CardPulse's own. Each has one canonical definition, on one page.
+
+- **Returns since added** — the change in a card's market price measured from the
+  moment it was added to a watchlist. The starting price is observed by the app
+  at that moment, never estimated and never backdated to a purchase price the app
+  does not know. https://getcardpulse.app/returns
+- **Today's return** — the same card measured against yesterday's recorded close
+  rather than against the starting price. Prints an em dash, not a zero, when no
+  previous close exists. https://getcardpulse.app/returns
+- **Demand pressure** — sales a day as a share of active listings for one card,
+  on a scale from heavy supply to very tight, derived from eBay listing data.
+- **Supply saturation** — active listings measured against the card's own 30-day
+  baseline, so a rising number means supply is loosening.
+- **Grading verdict** — the expected value of sending a raw card to PSA, computed
+  across the PSA 10 / 9 / 8 / lower outcome distribution, net of grading cost.
+- **Price alert** — a target on the raw, ungraded market price of one card. It
+  fires once when the price crosses the target.
+  https://getcardpulse.app/price-alerts
+
+## Pages
+
+- https://getcardpulse.app/ — what the app is
+- https://getcardpulse.app/how-it-works — the four steps, in order
+- https://getcardpulse.app/price-alerts — what an alert checks, how often, and
+  what it will not catch
+- https://getcardpulse.app/returns — returns since added, where the starting
+  price comes from, and what it is not
+- https://getcardpulse.app/methodology — where the prices come from
+- https://getcardpulse.app/pricing — free and Premium, compared
+- https://getcardpulse.app/support — contact
+- https://getcardpulse.app/privacy, https://getcardpulse.app/terms
+
+## Where the numbers come from
+
+Raw card prices are TCGPlayer Market Price. Graded prices and sold aggregates
+come from eBay sold listings. PSA population figures come from PSA's own census.
+Price history is a daily series CardPulse records itself, so a day-over-day
+change compares one source with itself rather than two feeds with each other.
+Fair-value predictions are a model over pull cost, desirability and listing
+dynamics — labelled as a model, not as a price.
+
+## What CardPulse does not do
+
+- It does not sell cards, take payment for cards, or list them.
+- It does not know what you paid for a card and does not ask.
+- It does not give financial advice, and a return figure is not a recommendation.
+- It does not track you across other apps.
+- Graded price alerts do not exist: there is no graded price feed to honour them.

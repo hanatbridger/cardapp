@@ -55,6 +55,18 @@ const schema = {
       operatingSystem: 'iOS',
       url: APP_STORE,
       publisher: { '@id': 'https://getcardpulse.app/#org' },
+      // What the app actually does, in the app's own words. Without this
+      // the entity is three prices and a category — nothing a rich result
+      // or an assistant can enumerate.
+      featureList: [
+        'Watchlist of trading cards with live market prices',
+        'Target-price alerts with push notifications',
+        'Returns since added: what a card has made or lost since you added it',
+        'eBay market dynamics: active listings, sales a day, demand pressure',
+        'Daily price history charts for raw and PSA 10 cards',
+        'Grading verdict: expected value of sending a card to PSA',
+        'Trading card news with push notifications',
+      ],
       offers: [
         { '@type': 'Offer', price: '0', priceCurrency: 'USD', name: 'Free' },
         { '@type': 'Offer', price: '4.99', priceCurrency: 'USD', name: 'Premium monthly' },

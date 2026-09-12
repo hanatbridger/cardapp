@@ -15,9 +15,9 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "cd /Users/hanwong/code/cardApp/website && npm run dev -- --port 3000"
+        "cd /Users/hanwong/code/cardApp/website && npm run dev -- --port 3010"
       ],
-      "port": 3000
+      "port": 3010
     }
   ]
 }

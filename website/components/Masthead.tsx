@@ -58,6 +58,7 @@ export function Masthead() {
         <nav>
           <Link href="/how-it-works">How it works</Link>
           <Link href="/price-alerts">Alerts</Link>
+          <Link href="/returns">Returns</Link>
           <Link href="/methodology">Sources</Link>
           <Link href="/pricing">Price</Link>
         </nav>

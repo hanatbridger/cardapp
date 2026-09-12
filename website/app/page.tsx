@@ -146,6 +146,36 @@ export default function Home() {
 
       <section className="showcase">
         <div>
+          <h2>What it has made since you added it.</h2>
+          <p className="say">We record the price the day you add a card. Everything after that is return.</p>
+        </div>
+        <div className="ret-card" aria-label="Returns since added: Charizard ex added 18 July at $312.40, up $3.08 or 0.80% today and $57.51 or 18.40% in total">
+          <div className="ret-head">Track your returns since added</div>
+          <div className="ret-base">
+            <div>
+              <span className="ret-key">Date added</span>
+              <span className="ret-num">Jul 18</span>
+            </div>
+            <div>
+              <span className="ret-key">Price when added</span>
+              <span className="ret-num">$312.40</span>
+            </div>
+          </div>
+          <div className="ret-rows">
+            <div className="ret-row">
+              <span className="ret-key">Today&rsquo;s return</span>
+              <span className="ret-val">+$3.08 (0.80%)</span>
+            </div>
+            <div className="ret-row">
+              <span className="ret-key">Total return</span>
+              <span className="ret-val">+$57.51 (18.40%)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="showcase flip">
+        <div>
           <h2>The market, measured.</h2>
           <p className="say">Active listings, sales a day, and demand pressure, from live eBay data.</p>
         </div>
@@ -167,7 +197,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="showcase flip">
+      <section className="showcase">
         <div>
           <h2>Every card&rsquo;s history, charted.</h2>
           <p className="say">Daily closes for any card you open &mdash; raw and PSA&nbsp;10.</p>
@@ -211,7 +241,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="showcase">
+      <section className="showcase flip">
         <div>
           <h2>Any currency.</h2>
           <p className="say">Every price converts to the one you pick, at a daily rate.</p>
