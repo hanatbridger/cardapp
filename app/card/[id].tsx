@@ -823,16 +823,14 @@ function CardDetailScreen() {
                   <Text variant="headingSm">Price data unavailable</Text>
                 </View>
                 <Text variant="caption" color={colors.onSurfaceMuted}>
-                  {rawListings && rawListings.count > 0
-                    ? 'TCGPlayer has no market price for this card — usually because nothing is listed there. eBay does have it listed; asking prices below, not sold prices.'
-                    : 'TCGPlayer has no market price for this card — usually because nothing is listed there. If this is a fresh listing, try again in a moment.'}
+                  TCGPlayer has no market price for this card — usually because nothing is listed there. If this is a fresh listing, try again in a moment.
                 </Text>
-                {/* The app fetched these already and used to show them only
-                    inside a card hidden whenever the price was missing —
-                    exactly the case where they are the only number there is. */}
-                {rawListings && rawListings.count > 0 && (
-                  <EbayListingsBlock heading="Asking on eBay" data={rawListings} />
-                )}
+                {/* No eBay asking prices here, deliberately. With no reference
+                    price to check them against, the listings that match a rare
+                    card's number are as likely to be proxies as the card: the
+                    Munch Pikachu promo returned two "NM, Museum Exclusive"
+                    listings at $73 and $84 against a $4,300 market. That block
+                    comes back once a reference price exists to filter on. */}
                 <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
                   <Pressable
                     onPress={() => refetchPrice()}
