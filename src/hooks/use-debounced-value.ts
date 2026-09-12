@@ -19,14 +19,18 @@ export function useDebouncedValue(
   delayMs = 250,
 ): readonly [string, (next: string) => void] {
   const [debounced, setDebounced] = useState(value);
+  // Render-phase sync, not an effect: React re-runs this component before
+  // committing, so no commit ever pairs a short raw value with a stale
+  // debounced one. Done in an effect, the mode switch's setQuery('')
+  // committed one frame with the previous query still debounced, and
+  // React Query fired that query against the newly selected mode's API.
+  if (value.length < 2 && debounced !== value) setDebounced(value);
   const flush = useCallback((next: string) => setDebounced(next), []);
 
   useEffect(() => {
-    if (value.length < 2) {
-      setDebounced(value);
-      return;
-    }
-    if (value === debounced) return;
+    // Short values are already settled above; only the trailing timer
+    // belongs in an effect.
+    if (value.length < 2 || value === debounced) return;
     const timer = setTimeout(() => setDebounced(value), delayMs);
     return () => clearTimeout(timer);
     // debounced intentionally omitted: re-running on its own settle is a no-op.

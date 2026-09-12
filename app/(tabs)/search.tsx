@@ -32,6 +32,29 @@ import type { SealedProduct } from '../../src/types/sealed';
 
 type Mode = 'cards' | 'sets' | 'artists';
 
+/**
+ * Strips the TCGPlayer-only decorations off a product name so it reads as
+ * a Pokemon TCG card name — the same patterns resolveCardId takes off
+ * server-side (api/trending.ts), since the `q` deep link carries the raw
+ * collectrics product name: "Tyranitar ex #64", "Charizard ex (Special
+ * Illustration Rare)", "Pikachu ex - Surging Sparks #25". Left in, the
+ * "#64" alone makes the name search return nothing.
+ *
+ * The trailing-suffix rule requires spaces around the dash (the server's
+ * doesn't): this value lands in the visible search box, and a bare dash
+ * would cut "Ho-Oh" down to "Ho".
+ */
+function cleanProductName(productName: string): string {
+  const cleaned = productName
+    .replace(/\s*#[\w/]+/g, '')
+    .replace(/\s*\([^)]*\)\s*/g, ' ')
+    .replace(/\s+-\s+[^-]+$/, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Never hand back something below the 2-char search floor.
+  return cleaned.length >= 2 ? cleaned : productName.trim();
+}
+
 function SearchScreen() {
   const { colors } = useTheme();
   const params = useLocalSearchParams<{ focus?: string; from?: string; q?: string }>();
@@ -52,10 +75,12 @@ function SearchScreen() {
   // away). recentSearches is read inside SearchFocusOverlay, which only
   // mounts while the search field is focused. Zustand actions are stable.
   const addRecentSearch = useUserStore((s) => s.addRecentSearch);
-  const { scrollHandler, headerAnimatedStyle, scrimAnimatedStyle, headerHeight, extraHideHeight } = useCollapsingHeader();
+  const { scrollHandler, headerAnimatedStyle, scrimAnimatedStyle, headerHeight, extraHideHeight, reveal } =
+    useCollapsingHeader();
   // Network-facing queries trail the keystrokes; the input itself stays
-  // on the raw value. With keepPreviousData in the hooks, results update
-  // in place instead of blanking to a spinner per character.
+  // on the raw value. The hooks keep previous data for other screens, but
+  // this one shows a spinner while it's stale (see cardsSettling) — rows
+  // from the last term are worse than a spinner when they're tappable.
   const [debouncedQuery, flushQuery] = useDebouncedValue(query);
 
   // Hide the floating bottom tab bar while the focused search overlay is
@@ -74,16 +99,30 @@ function SearchScreen() {
   useFocusEffect(
     React.useCallback(() => {
       if (params.focus === '1') {
+        // The header may still be hidden from an earlier scroll; both paths
+        // below put the search field on screen, so bring it back first.
+        reveal();
+        // Optional `q` deep-link param — used by the Trending Now tile
+        // and the AIPicks fallback to pre-fill the search box with the
+        // card name. Lets the user pick the canonical record (Pokemon
+        // TCG cardId) since the trending payload only carries TCGPlayer
+        // productIds. That's a prefilled SEARCH, not a request to type:
+        // focus mode would cover those results with the opaque
+        // recent-searches overlay, and the q value is always a card
+        // name, so the mode has to be Cards no matter what the tab was
+        // last left on.
+        if (params.q) {
+          const prefill = cleanProductName(params.q);
+          setMode('cards');
+          setQuery(prefill);
+          flushQuery(prefill);
+          setSearchFocused(false);
+          setSearchOrigin('tab');
+          router.setParams({ focus: undefined, from: undefined, q: undefined });
+          return;
+        }
         setSearchFocused(true);
         setSearchOrigin(params.from === 'home' ? 'home' : 'tab');
-        // Optional `q` deep-link param — used by the Trending Now tile
-        // tap to pre-fill the search box with the card name. Lets the
-        // user pick the canonical record (Pokemon TCG cardId) since
-        // the trending payload only carries TCGPlayer productIds.
-        if (params.q) {
-          setQuery(params.q);
-          flushQuery(params.q);
-        }
         // Small delay so the input is mounted before we call .focus().
         // setParams is deferred INTO the timer: clearing the params
         // synchronously re-ran this effect (new deps) and its cleanup
@@ -96,7 +135,7 @@ function SearchScreen() {
         }, 50);
         return () => clearTimeout(t);
       }
-    }, [params.focus, params.from, params.q]),
+    }, [params.focus, params.from, params.q, reveal]),
   );
 
   // Card search
@@ -132,6 +171,23 @@ function SearchScreen() {
   const hasQuery = query.length >= 2;
   const showCardResults = mode === 'cards' && hasQuery;
   const showSetResults = mode === 'sets';
+
+  // keepPreviousData means a brand-new query key reports isLoading false
+  // while `data` still holds the PREVIOUS query's rows, so isLoading alone
+  // showed the last search's cards (and its result count) under the new
+  // term — tapping a row opened the wrong card. isPlaceholderData is the
+  // flag that says "these rows aren't for this query yet".
+  const cardsSettling =
+    debouncedQuery !== query || cardSearch.isPending || cardSearch.isPlaceholderData;
+  // Sealed and Japanese have no placeholder and settle later than the
+  // English catalog. For a sealed-only term ("etb") the card query lands
+  // empty first, so hold the spinner while a side query could still turn
+  // the empty feed into rows — otherwise the list renders a false
+  // "No results found" and then pops the rows in.
+  const sidePending = sealedSearch.isFetching || jpSearch.isFetching;
+  const cardsLoading =
+    cardsSettling ||
+    (cardResults.length + sealedResults.length + jpResults.length === 0 && sidePending);
 
   // Undervalued / Overvalued picks — proxied from collectrics via
   // /api/trending. Fed off the same daily card-leaderboard feed as the
@@ -377,7 +433,7 @@ function SearchScreen() {
         />
       ) : showCardResults ? (
         <CardResults
-          loading={cardSearch.isLoading || debouncedQuery !== query}
+          loading={cardsLoading}
           error={cardSearch.isError}
           results={cardResults}
           totalCount={cardSearch.data?.totalCount ?? 0}
@@ -393,7 +449,7 @@ function SearchScreen() {
 
       {showSetResults && (
         <SetResults
-          loading={setSearch.isLoading || debouncedQuery !== query}
+          loading={setSearch.isPending || setSearch.isPlaceholderData || debouncedQuery !== query}
           sets={setResults}
           query={query}
           onSetPress={handleSetPress}
@@ -404,7 +460,7 @@ function SearchScreen() {
 
       {mode === 'artists' && (
         <ArtistResults
-          loading={artistSearch.isLoading || debouncedQuery !== query}
+          loading={artistSearch.isPending || artistSearch.isPlaceholderData || debouncedQuery !== query}
           error={artistSearch.isError}
           artists={artistResults}
           query={query}

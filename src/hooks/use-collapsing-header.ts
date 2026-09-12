@@ -80,6 +80,19 @@ export function useCollapsingHeader() {
     },
   });
 
+  // Slide the bar back into view without a scroll event. A deep link into
+  // the search field can arrive while the header (and the sticky search row
+  // riding with it) is hidden from an earlier scroll, which focused an
+  // input the user could not see.
+  const reveal = () => {
+    if (!isHidden.value && headerOffset.value === 0) return;
+    isHidden.value = false;
+    headerOffset.value = withTiming(0, {
+      duration: ANIMATION_MS,
+      easing: Easing.out(Easing.ease),
+    });
+  };
+
   const headerAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: headerOffset.value }],
   }));
@@ -91,5 +104,5 @@ export function useCollapsingHeader() {
     opacity: interpolate(scrollY.value, [0, 32], [0, 1], Extrapolation.CLAMP),
   }));
 
-  return { scrollHandler, headerAnimatedStyle, scrimAnimatedStyle, headerHeight, extraHideHeight };
+  return { scrollHandler, headerAnimatedStyle, scrimAnimatedStyle, headerHeight, extraHideHeight, reveal };
 }

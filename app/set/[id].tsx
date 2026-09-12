@@ -50,6 +50,11 @@ function SetDetailScreen() {
 
   const cardsQuery = useCardSearch('', { setId: id, rarity });
   const cards = cardsQuery.data?.cards ?? [];
+  // The search hook keeps the previous filter's results on screen while
+  // the next request is in flight, so after a rarity tap the grid and the
+  // count still describe the old chip. Mark that pass as pending instead
+  // of letting it read as the answer.
+  const stale = cardsQuery.isPlaceholderData;
 
   const handleCardPress = (card: PokemonCard) => {
     router.push(`/card/${card.id}`);
@@ -66,6 +71,9 @@ function SetDetailScreen() {
 
       <Animated.FlatList
         data={cards}
+        // Cells are only re-rendered when `data` or `extraData` changes, and
+        // the stale pass reuses the same rows.
+        extraData={stale}
         keyExtractor={(item) => item.id}
         numColumns={COLS}
         onScroll={scrollHandler}
@@ -164,15 +172,22 @@ function SetDetailScreen() {
               })}
             </ScrollView>
 
-            {cardsQuery.data && (
+            {stale ? (
+              <ActivityIndicator
+                size="small"
+                color={colors.primary}
+                style={{ alignSelf: 'flex-start' }}
+                accessibilityLabel="Loading cards"
+              />
+            ) : cardsQuery.data ? (
               <Text variant="caption" color={colors.onSurfaceMuted}>
                 {cardsQuery.data.totalCount} cards
               </Text>
-            )}
+            ) : null}
           </View>
         }
         renderItem={({ item, index }) => (
-          <View style={{ width: CARD_W }}>
+          <View style={{ width: CARD_W, opacity: stale ? 0.4 : 1 }}>
             <AnimatedListItem index={index}>
               <Pressable
                 onPress={() => handleCardPress(item)}
