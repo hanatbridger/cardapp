@@ -198,13 +198,23 @@ export function DynamicsChip() {
   );
 }
 
+/**
+ * Whether there is a panel to show: live Collectrics dynamics, or a
+ * seeded sample for the handful of cards that have one. Exported so the
+ * screen does not draw a titled, badged, empty wrapper for everything
+ * else.
+ */
+export function hasMarketDynamics(cardId: string, live?: LiveMarketDynamics | null): boolean {
+  return Boolean(live ?? getMarketDynamics(cardId));
+}
+
 export function MarketDynamics({ cardId, live, bare }: MarketDynamicsProps) {
   const { colors } = useTheme();
   const isLive = Boolean(live);
   const dynamics: MarketDynamicsData | LiveMarketDynamics | undefined =
     live ?? getMarketDynamics(cardId);
 
-  if (!dynamics) return null;
+  if (!dynamics || !hasMarketDynamics(cardId, live)) return null;
 
   const body = (
       <View style={{ gap: spacing[4] }}>

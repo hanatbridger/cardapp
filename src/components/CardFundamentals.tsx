@@ -97,6 +97,19 @@ function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   );
 }
 
+/**
+ * Whether the table has anything to show for this card. Exported so the
+ * screen can decide whether to draw the collapsible wrapper at all — the
+ * component already returns null when empty, but a wrapper drawn around
+ * null is a titled box with nothing in it, which is what Japanese promos
+ * with no score, artist, census or release date were getting.
+ */
+export function hasFundamentals(card: PokemonCard, livePop: CardFundamentalsProps['livePop']): boolean {
+  return Boolean(
+    getCardScore(card.id) || card.artist || livePop || getPSAPopulation(card.id) || card.set.releaseDate,
+  );
+}
+
 export function CardFundamentals({ card, marketPrice, livePop, bare }: CardFundamentalsProps) {
   const { colors } = useTheme();
 
@@ -116,9 +129,8 @@ export function CardFundamentals({ card, marketPrice, livePop, bare }: CardFunda
       score.universalAppeal * 0.10;
   }
 
-  // Check if we have any data to show
-  const hasAnyData = score || card.artist || psaPop || card.set.releaseDate;
-  if (!hasAnyData) return null;
+  // Same rule the screen gates the wrapper on, so the two cannot drift.
+  if (!hasFundamentals(card, livePop)) return null;
 
   const rows: React.ReactNode[] = [];
 

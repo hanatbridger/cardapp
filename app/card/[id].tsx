@@ -17,7 +17,9 @@ import {
   AIValuation,
   hasValuation,
   CardFundamentals,
+  hasFundamentals,
   MarketDynamics,
+  hasMarketDynamics,
   DynamicsChip,
   CollapsibleCard,
   ReturnsSinceAdded,
@@ -821,8 +823,16 @@ function CardDetailScreen() {
                   <Text variant="headingSm">Price data unavailable</Text>
                 </View>
                 <Text variant="caption" color={colors.onSurfaceMuted}>
-                  Raw prices come from TCGPlayer Market Price. Try again in a moment, or check TCGPlayer directly for the latest market value.
+                  {rawListings && rawListings.count > 0
+                    ? 'TCGPlayer has no market price for this card — usually because nothing is listed there. eBay does have it listed; asking prices below, not sold prices.'
+                    : 'TCGPlayer has no market price for this card — usually because nothing is listed there. If this is a fresh listing, try again in a moment.'}
                 </Text>
+                {/* The app fetched these already and used to show them only
+                    inside a card hidden whenever the price was missing —
+                    exactly the case where they are the only number there is. */}
+                {rawListings && rawListings.count > 0 && (
+                  <EbayListingsBlock heading="Asking on eBay" data={rawListings} />
+                )}
                 <View style={{ flexDirection: 'row', gap: spacing[2], flexWrap: 'wrap' }}>
                   <Pressable
                     onPress={() => refetchPrice()}
@@ -1021,6 +1031,7 @@ function CardDetailScreen() {
               {/* Fundamentals — StockTwits-style data table. Collapsed by
                   default: seven rows of context below the numbers people
                   actually came for. */}
+              {hasFundamentals(card, psa10?.pop ?? null) && (
               <CollapsibleCard
                 title="Fundamentals"
                 expanded={openSection === 'fundamentals'}
@@ -1034,10 +1045,12 @@ function CardDetailScreen() {
                   livePop={psa10?.pop ?? null}
                 />
               </CollapsibleCard>
+              )}
 
               {/* eBay Market Dynamics — demand pressure & supply
                   saturation. The chip and the sample-data badge move to
                   the collapsible header, which is the only title now. */}
+              {hasMarketDynamics(card.id, cardStats?.dynamics) && (
               <CollapsibleCard
                 title="eBay Market Dynamics"
                 expanded={openSection === 'dynamics'}
@@ -1055,6 +1068,7 @@ function CardDetailScreen() {
               >
                 <MarketDynamics bare cardId={card.id} live={cardStats?.dynamics} />
               </CollapsibleCard>
+              )}
             </>
           )}
 
