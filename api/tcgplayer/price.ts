@@ -29,7 +29,7 @@ import {
   recordTodayCloses,
   type PreviousClose,
 } from '../_lib/snapshots';
-import { lookupJustTcg, type JustTcgPrice } from '../_lib/justtcg';
+import { lookupJustTcg, probeJustTcg, type JustTcgPrice } from '../_lib/justtcg';
 
 export const config = { runtime: 'edge' };
 
@@ -207,6 +207,33 @@ export default async function handler(req: Request): Promise<Response> {
   // Japanese catalogue ids carry the TCGPlayer product id; the fallback
   // can use it directly even though TCGPlayer itself has no price.
   const jpProductId = cardId.startsWith('jptp-') ? cardId.slice(5) : null;
+
+  // Probe — `&probe=1` with the cron bearer: the primary's answer next to
+  // JustTCG's raw answer for the same card, uncached and unrecorded, so
+  // coverage and drift can be measured without a public JustTCG path.
+  if (url.searchParams.get('probe') === '1') {
+    const expected = process.env.CRON_SECRET;
+    const auth = req.headers.get('authorization') ?? '';
+    if (!expected || auth !== `Bearer ${expected}`) return json(401, { error: 'unauthorized' }, 'no-store');
+    const productId = (await resolveProductId(cardId).catch(() => null)) ?? jpProductId;
+    const details = productId ? await fetchMarketPrice(productId).catch(() => null) : null;
+    const justtcg = await probeJustTcg({
+      tcgplayerId: productId,
+      name: meta.name,
+      number: meta.number,
+      language: meta.lang,
+    });
+    return json(
+      200,
+      {
+        cardId,
+        productId,
+        tcgplayer: details ? { marketPrice: details.marketPrice, listings: details.listings } : null,
+        justtcg,
+      },
+      'no-store',
+    );
+  }
 
   try {
     const productId = (await resolveProductId(cardId)) ?? jpProductId;

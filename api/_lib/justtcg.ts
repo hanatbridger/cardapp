@@ -57,6 +57,7 @@ interface Card {
   uuid: string;
   name: string;
   number: string | null;
+  set?: string | null;
   tcgplayerId: string | null;
   variants: Variant[];
 }
@@ -192,6 +193,63 @@ export async function lookupJustTcg(opts: {
     if (v) return toPrice(card, v);
   }
   return null;
+}
+
+/** What the id lookup and the name search each return, before variant
+ *  picking, plus the pick — for the cron-secret probe in price.ts. The
+ *  shape is trimmed to what a coverage check needs. */
+export async function probeJustTcg(opts: {
+  tcgplayerId?: string | null;
+  name: string;
+  number?: string | null;
+  language?: 'EN' | 'JP';
+}): Promise<{
+  byId: ProbeCard[] | null;
+  bySearch: ProbeCard[] | null;
+  picked: JustTcgPrice | null;
+}> {
+  const trim = (cards: Card[] | null): ProbeCard[] | null =>
+    cards?.map((c) => ({
+      uuid: c.uuid,
+      name: c.name,
+      number: c.number,
+      set: c.set ?? null,
+      tcgplayerId: c.tcgplayerId,
+      variants: c.variants.map((v) => ({
+        condition: v.condition,
+        printing: v.printing,
+        language: v.language,
+        price: v.price,
+        lastUpdated: v.lastUpdated,
+      })),
+    })) ?? null;
+
+  let byId: Card[] | null = null;
+  if (opts.tcgplayerId) {
+    byId = await get(new URLSearchParams({ tcgplayerId: opts.tcgplayerId, limit: '5' }));
+  }
+  let bySearch: Card[] | null = null;
+  if (opts.name) {
+    const params = new URLSearchParams({
+      query: opts.name,
+      game: 'pokemon',
+      language: apiLanguage(opts.language),
+      limit: '20',
+    });
+    if (opts.number) params.set('number', normNumber(opts.number));
+    bySearch = await get(params);
+  }
+  const picked = await lookupJustTcg(opts);
+  return { byId: trim(byId), bySearch: trim(bySearch), picked };
+}
+
+export interface ProbeCard {
+  uuid: string;
+  name: string;
+  number: string | null;
+  set: string | null;
+  tcgplayerId: string | null;
+  variants: Pick<Variant, 'condition' | 'printing' | 'language' | 'price' | 'lastUpdated'>[];
 }
 
 /**
