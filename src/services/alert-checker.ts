@@ -5,7 +5,7 @@ import {
   type GradingAlert,
   type PriceAlert,
 } from '../stores/alerts-store';
-import { fetchRawCardPrice } from './tcgplayer';
+import { fetchBatchPrices, type BatchPrices } from '../hooks/use-batch-prices';
 import { fetchCardStats, type CardStats } from './card-stats';
 import {
   computeGradingVerdict,
@@ -13,35 +13,41 @@ import {
   gradingAlertHit,
 } from './grading-verdict';
 import { queryClient } from '../lib/query-client';
-import type { CardPrice } from '../types/card';
 
 export type AlertEvaluation = AlertFire & { shouldTrigger: boolean };
 
 /**
  * Live raw (UNGRADED) price for a card, routed through the shared React
- * Query client with the SAME key shape + staleTime as useCardPrice
- * (['prices', cardName, setName, cardNumber, grade, language] / 1h) so
- * the checker reads the UI's cached entry instead of re-fetching.
- * Alerts don't store setName/language, so those key slots are undefined
- * here — cache hits happen when the UI query's slots are also undefined;
- * otherwise fetchQuery populates its own entry once per hour.
- * fetchRawCardPrice internally falls back to mock on proxy errors, so a
- * fulfilled query still means "best available price". Resolves
- * undefined on a transient failure so the caller can leave the alert
- * untouched for the next cycle.
+ * Query client (1h staleTime) so the price and grading alerts on one
+ * card fetch once per cycle instead of once each.
+ *
+ * Keyed on cardId, deliberately NOT on useCardPrice's
+ * ['prices', cardName, setName, cardNumber, grade, language] shape:
+ * alerts store no setName/language, so a name-keyed entry collapsed
+ * every printing sharing a name onto one price — a second 'Charizard
+ * ex' alert evaluated (and notified) off the first card's price, for an
+ * hour. The 'prices' prefix stays so Home's
+ * invalidateQueries({ queryKey: ['prices'] }) still clears it; the cost
+ * is that this entry no longer shares the card screen's cached price.
+ *
+ * Priced through the batch endpoint, NOT fetchRawCardPrice: that helper
+ * quietly substitutes seeded sample data when the proxy fails, and an
+ * alert firing off a sample price quotes a number the card never traded
+ * at. Resolves undefined on a transient failure so the caller can leave
+ * the alert untouched for the next cycle.
  */
 async function fetchLiveRawPrice(alert: {
   cardId: string;
   cardName: string;
 }): Promise<number | undefined> {
   try {
-    const live = await queryClient.fetchQuery<CardPrice | null>({
-      queryKey: ['prices', alert.cardName, undefined, undefined, 'UNGRADED', undefined],
-      queryFn: () => fetchRawCardPrice(alert.cardId, alert.cardName),
+    const prices = await queryClient.fetchQuery<BatchPrices>({
+      queryKey: ['prices', 'alert-raw', alert.cardId],
+      queryFn: () => fetchBatchPrices([alert.cardId]),
       staleTime: 60 * 60 * 1000,
       retry: false,
     });
-    const price = live?.currentPrice;
+    const price = prices[alert.cardId]?.currentPrice;
     return typeof price === 'number' && isFinite(price) ? price : undefined;
   } catch {
     return undefined;

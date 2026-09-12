@@ -19,6 +19,9 @@ import {
   removeAlertTarget,
   type AlertTargetInput,
 } from '../services/alert-sync';
+// Read-only token lookup (push.ts imports no store, so no cycle) — the
+// resync below has to know whether a token exists at all, and which one.
+import { getRegisteredPushToken } from '../services/push';
 
 // Free tier keeps up to this many ACTIVE (un-triggered) alerts across
 // both kinds; Premium is uncapped. A triggered alert frees its slot
@@ -432,3 +435,62 @@ export const useAlertsStore = create<AlertsStore>()(
     },
   ),
 );
+
+// Which push token the alerts in this process were last mirrored under.
+// In-memory on purpose: a sync that quietly failed (alert-sync swallows
+// everything) gets another attempt on the next launch instead of being
+// marked done forever.
+let resyncedForToken: string | null = null;
+let resyncInFlight: Promise<void> | null = null;
+
+async function runResyncAlertTargets(force: boolean): Promise<void> {
+  const token = await getRegisteredPushToken();
+  if (!token) return;
+  if (!force && resyncedForToken === token) return;
+
+  // On a cold start the persisted alerts may not be read back yet, and an
+  // empty alerts[] here would look like "nothing to mirror".
+  if (!useAlertsStore.persist.hasHydrated()) {
+    let unsub: (() => void) | undefined;
+    await new Promise<void>((resolve) => {
+      unsub = useAlertsStore.persist.onFinishHydration(() => resolve());
+    });
+    unsub?.();
+  }
+
+  for (const alert of useAlertsStore.getState().alerts) {
+    if (alert.triggered) continue;
+    // Re-read: an in-app check may have spent this alert (and deleted its
+    // server row) while an earlier insert was in flight, and re-inserting
+    // would let the cron push an alert that already fired.
+    const live = useAlertsStore.getState().alerts.find((a) => a.id === alert.id);
+    if (!live || live.triggered) continue;
+    await syncAlertTarget(toTarget(live));
+  }
+  resyncedForToken = token;
+}
+
+/**
+ * Mirror every active alert into alert_targets again.
+ *
+ * syncAlertTarget no-ops without a registered push token, and the alert
+ * flows ask for notification permission AFTER creating the alert — so a
+ * user's first alert never reached the server and the daily cron could
+ * never push it. Nothing re-synced it later, and rows also kept a dead
+ * token after Expo rotated one. Call this once push registration has had
+ * a chance to land (app startup, after a permission grant, on sign-in);
+ * it runs at most once per token per launch.
+ *
+ * @param force re-run even if this token was already synced this launch
+ *   (sign-in: the earlier pass had no Supabase session to write with).
+ */
+export function resyncAlertTargets(force = false): Promise<void> {
+  // Startup and the News tab can both fire on one launch; share a single
+  // pass so the per-alert delete + insert pairs can't interleave.
+  if (!resyncInFlight) {
+    resyncInFlight = runResyncAlertTargets(force).finally(() => {
+      resyncInFlight = null;
+    });
+  }
+  return resyncInFlight;
+}

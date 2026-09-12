@@ -39,28 +39,43 @@ export function PriceAlertModal({
   onRemove,
 }: PriceAlertModalProps) {
   const { colors } = useTheme();
-  const isEditing = Boolean(existingAlert);
+  const [isEditing, setIsEditing] = useState(false);
   const [alertType, setAlertType] = useState<0 | 1>(0); // 0 = above, 1 = below
   const [priceInput, setPriceInput] = useState('');
   const [error, setError] = useState('');
   const priceInputRef = useRef<TextInput>(null);
+  // Open/closed edge, whether the user has typed a target yet, and the
+  // frozen mode — the last mirrors `isEditing` because the effect below has
+  // to read it in the same commit that sets it.
+  const wasOpen = useRef(false);
+  const dirty = useRef(false);
+  const editing = useRef(false);
 
-  // Re-seed the form whenever the sheet opens. In edit mode prefill from
-  // the existing rule; otherwise fall back to the ±10% default. Keyed on
-  // `visible` so reopening always reflects current props rather than the
-  // stale state from the previous open.
+  // Seed the form on the OPEN edge only, and freeze edit/create mode for as
+  // long as the sheet stays open. `existingAlert` vanishes the moment the
+  // rule fires — the 60s sweep marks it triggered — so re-seeding while open
+  // would wipe the target being typed and flip the sheet to create mode.
   useEffect(() => {
-    if (!visible) return;
-    if (existingAlert) {
-      const t = existingAlert.type === 'above' ? 0 : 1;
-      setAlertType(t);
-      setPriceInput(String(existingAlert.targetPrice));
-    } else {
-      setAlertType(0);
-      setPriceInput(defaultTarget(0, currentPrice));
+    if (visible && !wasOpen.current) {
+      dirty.current = false;
+      editing.current = Boolean(existingAlert);
+      setIsEditing(editing.current);
+      if (existingAlert) {
+        setAlertType(existingAlert.type === 'above' ? 0 : 1);
+        setPriceInput(String(existingAlert.targetPrice));
+      } else {
+        setAlertType(0);
+        setPriceInput(defaultTarget(0, currentPrice));
+      }
+      setError('');
+    } else if (visible && !editing.current && !dirty.current && currentPrice) {
+      // The price can settle after the sheet opened (opening right after a
+      // grade switch does that). Fill the suggested target then, but never
+      // over something the user typed.
+      setPriceInput(defaultTarget(alertType, currentPrice));
     }
-    setError('');
-  }, [visible, existingAlert, currentPrice]);
+    wasOpen.current = visible;
+  }, [visible, existingAlert, currentPrice, alertType]);
 
   const handleSubmit = () => {
     const price = parseFloat(priceInput);
@@ -126,7 +141,10 @@ export function PriceAlertModal({
           <TextInput
             ref={priceInputRef}
             value={priceInput}
-            onChangeText={setPriceInput}
+            onChangeText={(t) => {
+              dirty.current = true;
+              setPriceInput(t);
+            }}
             keyboardType="decimal-pad"
             placeholder="0.00"
             placeholderTextColor={colors.onSurfaceMuted}

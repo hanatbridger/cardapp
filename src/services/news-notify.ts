@@ -41,13 +41,7 @@ function latestArticle(articles: NewsArticle[]): NewsArticle | undefined {
   })[0];
 }
 
-/**
- * Announce the day's top news if it's new. Returns true if a notification
- * was posted (so the background task can report NewData). Safe to call on
- * every wake/foreground — it self-gates on the notifications preference
- * and its own once-a-day record.
- */
-export async function maybeNotifyDailyNews(): Promise<boolean> {
+async function runDailyNews(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
   // Shares the single notifications preference with price alerts.
   if (!useUserStore.getState().preferences.notificationsEnabled) return false;
@@ -92,4 +86,24 @@ export async function maybeNotifyDailyNews(): Promise<boolean> {
     // Best effort — worst case we may re-notify the same story tomorrow.
   }
   return true;
+}
+
+// In-flight run, shared by every caller. The day stamp is only written
+// after the notification goes out, and the fetch in between takes
+// seconds — so two overlapping calls both passed the day check and both
+// posted the banner. 'active' fires for Control Center, Face ID and
+// system alerts, which is enough to overlap the 5s foreground timer or a
+// background wake. The alert checker guards itself the same way.
+let inflight: Promise<boolean> | null = null;
+
+/**
+ * Announce the day's top news if it's new. Returns true if a notification
+ * was posted (so the background task can report NewData). Safe to call on
+ * every wake/foreground — it self-gates on the notifications preference,
+ * its own once-a-day record, and collapses concurrent calls into one run.
+ */
+export function maybeNotifyDailyNews(): Promise<boolean> {
+  return (inflight ??= runDailyNews().finally(() => {
+    inflight = null;
+  }));
 }

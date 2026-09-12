@@ -58,19 +58,23 @@ export function GradingAlertModal({
   const [error, setError] = useState('');
   const inputRef = useRef<TextInput>(null);
 
-  // Re-seed on every open. Edit mode prefills from the rule; otherwise
-  // the default direction is whichever way the verdict can still flip
-  // from where it stands today.
+  // Seed on the OPEN edge only. `existingAlert` disappears the moment the
+  // rule fires (the 60s sweep marks it triggered) and currentNet moves with
+  // live prices, so re-seeding while the sheet is open would overwrite the
+  // threshold the user is typing — the same defect fixed in PriceAlertModal.
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (!visible) return;
-    if (existingAlert) {
-      setDirectionIndex(existingAlert.direction === 'above' ? 0 : 1);
-      setThresholdInput(String(existingAlert.thresholdNet));
-    } else {
-      setDirectionIndex(currentNet >= 0 ? 1 : 0);
-      setThresholdInput('0');
+    if (visible && !wasOpen.current) {
+      if (existingAlert) {
+        setDirectionIndex(existingAlert.direction === 'above' ? 0 : 1);
+        setThresholdInput(String(existingAlert.thresholdNet));
+      } else {
+        setDirectionIndex(currentNet >= 0 ? 1 : 0);
+        setThresholdInput('0');
+      }
+      setError('');
     }
-    setError('');
+    wasOpen.current = visible;
   }, [visible, existingAlert, currentNet]);
 
   const direction = DIRECTIONS[directionIndex];

@@ -8,6 +8,7 @@ export {
 } from './watchlist-store';
 export {
   useAlertsStore,
+  resyncAlertTargets,
   isGradingAlert,
   isPriceAlert,
   type CardAlert,

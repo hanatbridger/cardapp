@@ -15,6 +15,7 @@ import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useNews } from '../../src/hooks/use-news';
 import { requestNotificationPermission } from '../../src/services/notifications';
 import { registerForPushNotifications } from '../../src/services/push';
+import { resyncAlertTargets } from '../../src/stores/alerts-store';
 import { useUserStore } from '../../src/stores/user-store';
 
 // Prompt at most once per app session.
@@ -37,7 +38,8 @@ function NewsScreen() {
     requestNotificationPermission().then((granted) => {
       // Register for server push the moment permission is granted, so the
       // device gets the token this session (not only on next launch).
-      if (granted) registerForPushNotifications();
+      // Mirror alerts created before this device had a token.
+      if (granted) registerForPushNotifications().then(() => resyncAlertTargets());
     });
   }, [notificationsEnabled]);
 

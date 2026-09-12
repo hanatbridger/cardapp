@@ -40,7 +40,13 @@ let appStateSub: { remove: () => void } | null = null;
 /** Starts the foreground clock. Called once, from the root layout. */
 export function startSessionClock(): void {
   if (Platform.OS === 'web' || appStateSub) return;
-  activeSince = Date.now();
+  // iOS can cold-launch this process in the background (UIBackgroundModes
+  // fetch), where the root layout runs like any other launch. Starting
+  // the clock there counted every background hour as foreground time, so
+  // the session minimum was already satisfied the moment the user opened
+  // the app — exactly the toll-gate prompt it exists to prevent. The
+  // listener below starts the clock on the first real 'active'.
+  activeSince = AppState.currentState === 'active' ? Date.now() : null;
   accumulatedMs = 0;
   appStateSub = AppState.addEventListener('change', (next) => {
     if (next === 'active') {
@@ -94,11 +100,33 @@ async function write(state: ReviewState): Promise<void> {
   }
 }
 
-/** Counted once per cold start, from the root layout. */
-export async function recordLaunch(): Promise<void> {
-  if (Platform.OS === 'web') return;
+async function bumpLaunches(): Promise<void> {
   const state = await read();
   await write({ ...state, launches: state.launches + 1 });
+}
+
+/** Guards against a re-run of the root layout effect double-counting. */
+let launchRecorded = false;
+
+/**
+ * Counted once per cold start, from the root layout. A background
+ * cold-launch (iOS background fetch) is not a launch the user made, so
+ * it is only counted if and when the process first becomes active —
+ * deferred rather than dropped, since the user may well open the app
+ * from that same process.
+ */
+export async function recordLaunch(): Promise<void> {
+  if (Platform.OS === 'web' || launchRecorded) return;
+  launchRecorded = true;
+  if (AppState.currentState === 'active') {
+    await bumpLaunches();
+    return;
+  }
+  const sub = AppState.addEventListener('change', (next) => {
+    if (next !== 'active') return;
+    sub.remove();
+    void bumpLaunches();
+  });
 }
 
 function withinCooldown(lastPromptedAt: string | null): boolean {
