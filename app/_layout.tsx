@@ -11,7 +11,6 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { PortalHost } from '../src/components/Portal';
 import { useUserStore } from '../src/stores/user-store';
 import { useAlertChecker } from '../src/hooks/use-alert-checker';
-import { useNewsNotifier } from '../src/hooks/use-news-notifier';
 import {
   configureNotificationHandler,
 } from '../src/services/notifications';
@@ -177,7 +176,6 @@ function AuthGate() {
 function AlertCheckerHost() {
   const router = useRouter();
   useAlertChecker();
-  useNewsNotifier();
 
   // Route notification taps (there was no handler before, so tapping a
   // notification just opened the app). News pushes open the News tab;
@@ -191,7 +189,12 @@ function AlertCheckerHost() {
     const route = (data: Record<string, unknown> | undefined) => {
       if (!data) return;
       if (data.type === 'news') router.push('/(tabs)/news');
-      else if (typeof data.cardId === 'string') router.push(`/card/${data.cardId}`);
+      else if (typeof data.cardId === 'string') {
+        // A grading-ROI alert is about the verdict, which starts
+        // collapsed on the card screen — say which section to open.
+        const section = data.kind === 'grading' ? '?section=grading' : '';
+        router.push(`/card/${data.cardId}${section}`);
+      }
       // Since-added alerts on sealed products carry the product instead.
       else if (typeof data.productId === 'string') router.push(`/sealed/${data.productId}`);
     };

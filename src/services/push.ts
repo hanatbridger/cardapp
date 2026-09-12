@@ -22,6 +22,25 @@ const API_ORIGIN =
 // Remember the last token we successfully registered so we don't POST on
 // every launch — only when it's new or changed.
 const REGISTERED_TOKEN_KEY = 'cardpulse-push-registered-token';
+// The timezone that went up with it, kept in its own key so
+// getRegisteredPushToken keeps returning a bare token. Devices that
+// registered before the server knew about timezones have no value here,
+// so the stamp below mismatches once and backfills their zone.
+const REGISTERED_TZ_KEY = 'cardpulse-push-registered-timezone';
+
+/**
+ * The device's IANA zone (e.g. 'America/Los_Angeles'). The news cron uses
+ * it to hold pushes outside this device's waking hours, so a traveller's
+ * new zone matters — it re-registers when the value changes.
+ */
+function deviceTimezone(): string | null {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return typeof tz === 'string' && tz.length > 0 && tz.length <= 64 ? tz : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * The Expo push token this device has already registered with the
@@ -56,16 +75,26 @@ export async function registerForPushNotifications(): Promise<void> {
     const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId });
     if (!token) return;
 
-    const prev = await AsyncStorage.getItem(REGISTERED_TOKEN_KEY).catch(() => null);
-    if (prev === token) return; // already registered this exact token
+    const timezone = deviceTimezone();
+    const [prev, prevTz] = await Promise.all([
+      AsyncStorage.getItem(REGISTERED_TOKEN_KEY).catch(() => null),
+      AsyncStorage.getItem(REGISTERED_TZ_KEY).catch(() => null),
+    ]);
+    // Same token AND same zone — nothing for the server to learn.
+    if (prev === token && prevTz === timezone) return;
 
     const res = await fetch(`${API_ORIGIN}/api/push/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, platform: Platform.OS }),
+      body: JSON.stringify({ token, platform: Platform.OS, timezone }),
     });
     if (res.ok) {
       await AsyncStorage.setItem(REGISTERED_TOKEN_KEY, token).catch(() => {});
+      if (timezone) {
+        await AsyncStorage.setItem(REGISTERED_TZ_KEY, timezone).catch(() => {});
+      } else {
+        await AsyncStorage.removeItem(REGISTERED_TZ_KEY).catch(() => {});
+      }
     }
   } catch {
     // Best-effort — push registration must never break app startup.

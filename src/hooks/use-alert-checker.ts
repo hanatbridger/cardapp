@@ -62,6 +62,10 @@ export function useAlertChecker() {
             presentLocalNotification(title, body, {
               cardId: entry.cardId,
               triggeredAlertId: entry.id,
+              // Routing reads this to open the section the alert is
+              // about — a grading-ROI tap that lands on a collapsed
+              // verdict makes the user hunt for what we just told them.
+              kind: evaluation.kind,
             });
           }
         } catch {

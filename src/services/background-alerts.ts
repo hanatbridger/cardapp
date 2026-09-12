@@ -7,7 +7,6 @@ import { useWatchlistStore } from '../stores/watchlist-store';
 import { findReturnAlerts, deliverReturnAlerts } from './return-alerts';
 import { findAlertsToTrigger, formatAlertMessage } from './alert-checker';
 import { presentLocalNotification } from './notifications';
-import { maybeNotifyDailyNews } from './news-notify';
 
 export const PRICE_ALERT_TASK = 'cardpulse-price-alert-check';
 
@@ -54,6 +53,8 @@ export function defineBackgroundAlertTask() {
         await presentLocalNotification(title, body, {
           cardId: entry.cardId,
           triggeredAlertId: entry.id,
+          // See use-alert-checker: opens the matching section on tap.
+          kind: evaluation.kind,
         });
         firedAny = true;
       }
@@ -71,13 +72,13 @@ export function defineBackgroundAlertTask() {
         }
       }
 
-      // Daily news push — at most one per calendar day, only on a new top
-      // story. Self-gates, so it's safe to run on every wake. Runs even
-      // when no alerts fired (we no longer early-return on an empty
-      // alert set), so the news ping doesn't depend on having alerts.
-      const newsNotified = await maybeNotifyDailyNews();
-
-      return firedAny || newsNotified
+      // News is no longer announced from here. It is a SERVER push now
+      // (api/cron/news-push.ts, every 15 min), so a story lands within
+      // minutes even with the app terminated — which this task cannot
+      // promise, iOS wakes it when it feels like it. Keeping the local
+      // copy as well meant two banners for the same story whenever a
+      // wake beat the cron.
+      return firedAny
         ? BackgroundFetch.BackgroundFetchResult.NewData
         : BackgroundFetch.BackgroundFetchResult.NoData;
     } catch (e) {
