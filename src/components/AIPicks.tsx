@@ -7,36 +7,12 @@ import { Text } from './Text';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { useMoney } from '../hooks/use-money';
-import { searchCards } from '../services/pokemon-tcg';
+import {
+  CARD_ID_RESOLVE_TIMEOUT_MS,
+  resolveCardIdByLabel,
+} from '../services/pokemon-tcg';
 import type { CardScore } from '../services/price-prediction';
 
-/**
- * Resolve an unresolved pick ("Manectric #89") to a Pokemon TCG card id
- * on tap so every row lands on the card detail screen. Name search plus
- * a number filter; the "#89" suffix must be stripped first — a "#"
- * inside the Lucene name term matches nothing (which is also why the
- * old search-tab fallback landed on an empty screen).
- */
-async function resolvePickCardId(query: string): Promise<string | null> {
-  const m = /^(.*?)\s*#\s*(\w+)$/.exec(query.trim());
-  const name = (m ? m[1] : query).trim();
-  const number = m ? m[2] : null;
-  if (name.length < 2) return null;
-  try {
-    const { cards } = await searchCards(name, {}, 1, 30);
-    if (cards.length === 0) return null;
-    if (number) {
-      const hit = cards.find((c) => c.number.replace(/^0+/, '') === number.replace(/^0+/, ''));
-      if (hit) return hit.id;
-    }
-    return cards[0].id;
-  } catch {
-    return null;
-  }
-}
-
-/** Ceiling on the resolve round trip — past this the tap falls through. */
-const RESOLVE_TIMEOUT_MS = 2500;
 
 export interface AIPickItem {
   cardId: string;
@@ -86,9 +62,9 @@ function PickCard({ item, type }: { item: AIPickItem; type: 'undervalued' | 'ove
     setResolving(true);
     let timer: ReturnType<typeof setTimeout> | undefined;
     const id = await Promise.race([
-      resolvePickCardId(item.searchQuery),
+      resolveCardIdByLabel(item.searchQuery),
       new Promise<null>((resolve) => {
-        timer = setTimeout(() => resolve(null), RESOLVE_TIMEOUT_MS);
+        timer = setTimeout(() => resolve(null), CARD_ID_RESOLVE_TIMEOUT_MS);
       }),
     ]);
     if (timer) clearTimeout(timer);

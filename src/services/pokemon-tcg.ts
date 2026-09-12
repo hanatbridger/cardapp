@@ -138,6 +138,8 @@ export interface CardSearchFilters {
   rarity?: string;
   /** Restrict to cards in this set id */
   setId?: string;
+  /** Collector number within its set, e.g. "69" — narrows a name to one card. */
+  number?: string;
 }
 
 // Every field mapCard reads. Projecting drops the heavy attack/ability/
@@ -162,6 +164,65 @@ function applyQueryAliases(
   return { query, filters };
 }
 
+/** Ceiling on a tap-time resolve; past this the caller degrades. */
+export const CARD_ID_RESOLVE_TIMEOUT_MS = 2500;
+
+// Label → card id, for the session. Only hits are kept: pokemontcg.io
+// load-sheds with 500s, and a miss during one of those spells must not
+// become a permanent "this card doesn't exist" for the whole session.
+const resolvedIdsByLabel = new Map<string, string>();
+
+/** The id if it has already been resolved this session, else undefined. */
+export function cachedCardIdByLabel(label: string): string | undefined {
+  return resolvedIdsByLabel.get(label.trim());
+}
+
+/**
+ * Resolve a display label like "Chikorita #69" to a Pokemon TCG card id.
+ * Feeds sourced from TCGPlayer product ids (trending tiles, AI picks)
+ * carry a name but not always a card id; resolving on tap keeps those
+ * taps landing on card detail instead of dumping the user into search.
+ *
+ * Name search plus a number filter — the "#69" suffix has to be stripped
+ * first, since a "#" inside the Lucene name term matches nothing (which
+ * is why the old search fallback landed on an empty screen).
+ */
+export async function resolveCardIdByLabel(label: string): Promise<string | null> {
+  const key = label.trim();
+  const memo = resolvedIdsByLabel.get(key);
+  if (memo) return memo;
+
+  const m = /^(.*?)\s*#\s*(\w+)$/.exec(key);
+  const name = (m ? m[1] : key).trim();
+  const number = m ? m[2] : null;
+  if (name.length < 2) return null;
+  try {
+    // Ask for the number server-side when we have one: it usually comes
+    // back as a single card, which is both faster and the right card —
+    // the old name-only search took the newest printing when the number
+    // did not appear in its first 30 rows.
+    const { cards } = number
+      ? await searchCards(name, { number }, 1, 10)
+      : await searchCards(name, {}, 1, 30);
+    const sameNumber = (c: { number: string }) =>
+      c.number.replace(/^0+/, '') === (number ?? '').replace(/^0+/, '');
+    let id: string | null = null;
+    if (number) {
+      // A numbered label names ONE printing. If the catalog does not have
+      // it — brand-new sets lag by weeks — resolve to nothing and let the
+      // caller fall back to search. Opening a different printing of the
+      // same Pokemon would be a confidently wrong answer.
+      id = cards.find(sameNumber)?.id ?? null;
+    } else {
+      id = cards[0]?.id ?? null;
+    }
+    if (id) resolvedIdsByLabel.set(key, id);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
 export async function searchCards(
   rawQuery: string,
   rawFilters: CardSearchFilters = {},
@@ -175,6 +236,9 @@ export async function searchCards(
   if (filters.supertype) parts.push(`supertype:"${filters.supertype}"`);
   if (filters.rarity) parts.push(`rarity:"${filters.rarity}"`);
   if (filters.setId) parts.push(`set.id:${filters.setId}`);
+  // Unquoted on purpose: the API 500s on `number:"69"` but answers
+  // `number:69` with the single matching card.
+  if (filters.number) parts.push(`number:${escapeLucene(filters.number)}`);
 
   // If we only have a set filter (no text query), the API still accepts that.
   // If we have nothing, return an empty result set.
