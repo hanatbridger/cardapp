@@ -20,7 +20,7 @@ export { TrendingCarousel } from './TrendingCarousel';
 export { CardSearchResult } from './CardSearchResult';
 export { SealedSearchResult } from './SealedSearchResult';
 export { NotificationItem } from './NotificationItem';
-export { AIValuation } from './AIValuation';
+export { AIValuation, hasValuation } from './AIValuation';
 export { GradingVerdict } from './GradingVerdict';
 export { EbayListingsBlock } from './EbayListingsBlock';
 export { MarketIndexBar } from './MarketIndexBar';

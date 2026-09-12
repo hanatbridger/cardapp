@@ -15,6 +15,7 @@ import {
   PriceChart,
   Badge,
   AIValuation,
+  hasValuation,
   CardFundamentals,
   MarketDynamics,
   DynamicsChip,
@@ -202,6 +203,10 @@ function CardDetailScreen() {
     tcgPlayerUpdatedAt: card?.tcgPlayerUpdatedAt,
     tcgPlayerMidPrice: card?.tcgPlayerMidPrice,
   });
+  // Only scored cards have a prediction. Premium or not, the prediction
+  // block — and for a free account the upgrade tease over it — renders
+  // only when there is one to show.
+  const predictionAvailable = card ? hasValuation(card.id, price?.currentPrice) : false;
   const { data: history, isLoading: historyLoading } = usePriceHistory({
     cardName: card?.name ?? '',
     grade: selectedGrade,
@@ -762,7 +767,7 @@ function CardDetailScreen() {
                       number it is a read on. Premium sees it; a free
                       account sees it fade under the scrim, which is the
                       whole pitch. */}
-                  {isPremium ? (
+                  {!predictionAvailable ? null : isPremium ? (
                     <AIValuation
                       embedded
                       card={card}
@@ -793,7 +798,10 @@ function CardDetailScreen() {
                     </View>
                   )}
                 </View>
-                {!isPremium && (
+                {/* Only where a prediction exists: most cards have no score,
+                    and an upgrade prompt over empty space sells a feature
+                    the buyer would not get on this card. */}
+                {!isPremium && predictionAvailable && (
                   <ScrimCta
                     label="Upgrade to view AI predictions"
                     onPress={() => router.push('/paywall')}

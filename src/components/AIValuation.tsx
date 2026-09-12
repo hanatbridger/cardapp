@@ -119,6 +119,18 @@ function computeMarketSignal(
   return { signal: 'hold', label: 'Hold', reason };
 }
 
+/**
+ * Whether a card has a prediction at all. Only scored cards do — a small
+ * curated set — so this is false for most of the catalogue. Exported so
+ * a caller deciding whether to ADVERTISE a prediction (the free-tier
+ * upgrade tease) applies exactly the rule this component renders by;
+ * the two drifting apart is how an upgrade prompt ended up sitting over
+ * empty space on every unscored card.
+ */
+export function hasValuation(cardId: string, marketPrice?: number | null): boolean {
+  return Boolean(getCardScore(cardId) && marketPrice);
+}
+
 export function AIValuation({
   card,
   marketPrice,
@@ -134,9 +146,10 @@ export function AIValuation({
   const isLive = Boolean(liveDynamics);
   const dynamics = liveDynamics ?? getMarketDynamics(card.id);
 
-  // Compute valuation if we have score + market price
+  // Compute valuation if we have score + market price — the same test as
+  // hasValuation above, which callers use to decide whether to tease one.
   let valuation: Valuation | null = null;
-  if (score && marketPrice) {
+  if (score && marketPrice && hasValuation(card.id, marketPrice)) {
     valuation = getValuation(score, marketPrice);
   }
 
