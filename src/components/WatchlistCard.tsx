@@ -16,6 +16,7 @@ import { useMoney } from '../hooks/use-money';
 import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getValuation } from '../services/price-prediction';
+import { useUserStore } from '../stores/user-store';
 import { useCardPrice } from '../hooks/use-card-price';
 import type { GradeType } from '../constants/grades';
 import type { CardPrice } from '../types/card';
@@ -108,6 +109,8 @@ export const WatchlistCard = React.memo(function WatchlistCard({
       ? sinceAddedReturn({ baselinePrice, baselineAt }, livePrice.currentPrice)
       : null;
 
+  const isPremium = useUserStore((s) => s.isPremium);
+
   // Belt-and-suspenders launch gate — PSA 10 graded cards are hidden
   // from every watchlist surface until the eBay live proxy ships.
   // The home tab also filters them out at the FlatList data prop, but
@@ -118,11 +121,14 @@ export const WatchlistCard = React.memo(function WatchlistCard({
   // `grade` changes while mounted.
   if (grade === 'PSA10') return null;
 
-  // AI valuation
+  // AI valuation — Premium, same gate as the card screen's prediction
+  // block. Without this check the row printed the verdict we just put
+  // behind the paywall, which both undercuts the upsell and makes the
+  // paywall's own feature list untrue.
   const score = getCardScore(cardId);
   let valuationLabel: 'undervalued' | 'overvalued' | null = null;
   let valuationPercent = 0;
-  if (score && price) {
+  if (isPremium && score && price) {
     const v = getValuation(score, price.currentPrice);
     if (v.label !== 'fair') {
       valuationLabel = v.label;

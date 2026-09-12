@@ -17,7 +17,7 @@ interface ScrimCtaProps {
    * and a ramp to the wrong one leaves a visible seam.
    */
   background: string;
-  /** Ramp height. 125 over a section card, 73 over the price card. */
+  /** Ramp height. 125 over a section card, taller over the price card. */
   height?: number;
   /**
    * Padding of the card this is dropped into. Absolute insets resolve
@@ -27,8 +27,16 @@ interface ScrimCtaProps {
   inset?: number;
   /** Animated opacity for the gradient — omit for a static scrim. */
   gradientStyle?: StyleProp<ViewStyle>;
-  /** Announced state when the scrim belongs to a collapsible section. */
+  /**
+   * Announced state — omit for a card that cannot open, or VoiceOver
+   * offers a collapse the control can never perform.
+   */
   expanded?: boolean;
+  /**
+   * What the label alone doesn't say. A card with no title of its own
+   * has no other node naming it, so the section name belongs here.
+   */
+  accessibilityLabel?: string;
   accessibilityHint?: string;
 }
 
@@ -45,10 +53,11 @@ export function ScrimCta({
   label,
   onPress,
   background,
-  height = 120,
+  height = 125,
   inset = 0,
   gradientStyle,
   expanded,
+  accessibilityLabel,
   accessibilityHint,
 }: ScrimCtaProps) {
   const { colors } = useTheme();
@@ -75,7 +84,7 @@ export function ScrimCta({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={label}
+        accessibilityLabel={accessibilityLabel ?? label}
         accessibilityHint={accessibilityHint}
         accessibilityState={expanded === undefined ? undefined : { expanded }}
         style={{ height: CTA_HEIGHT, alignItems: 'center', justifyContent: 'center' }}
@@ -98,6 +107,6 @@ export function ScrimCta({
 /** Exported so callers can reserve the same strip when expanded. */
 export const SCRIM_CTA_HEIGHT = CTA_HEIGHT;
 /** Default ramp height, matching the section cards in the design. */
-export const SCRIM_HEIGHT = 120;
+export const SCRIM_HEIGHT = 125;
 /** Bleed for a card at the default padding. */
 export const SCRIM_CARD_INSET = spacing[6];

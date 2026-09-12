@@ -40,6 +40,18 @@ interface CollapsibleCardProps {
   onUnlock?: () => void;
   /** Trailing header slot — eBay dynamics puts its "7d avg" chip here. */
   headerRight?: React.ReactNode;
+  /**
+   * Spoken equivalent of `headerRight`. The header is one button, so its
+   * label replaces whatever the chips would have said — a "Sample data"
+   * disclosure that only exists as a chip would go unannounced.
+   */
+  headerRightLabel?: string;
+  /**
+   * Names the section when there is no `title` — the collapsed content is
+   * hidden from screen readers, so without this the card announces a
+   * context-free "View more".
+   */
+  label?: string;
 }
 
 /**
@@ -76,6 +88,8 @@ export function CollapsibleCard({
   lockedLabel,
   onUnlock,
   headerRight,
+  headerRightLabel,
+  label,
 }: CollapsibleCardProps) {
   const { colors } = useTheme();
   const reduceMotion = useReducedMotion();
@@ -115,7 +129,7 @@ export function CollapsibleCard({
       setClipping(true);
       return;
     }
-    if (reduceMotion || !didMount.current) {
+    if (reduceMotion) {
       setClipping(false);
       return;
     }
@@ -157,6 +171,9 @@ export function CollapsibleCard({
       ? 'View less'
       : 'View more';
   const onPress = locked ? onUnlock : onToggle;
+  // The header names the section when it exists; otherwise the caller's
+  // `label` is the only identity the card has.
+  const sectionName = title ? undefined : label;
 
   return (
     // Clips because the scrim bleeds over the padding to reach the card's
@@ -167,9 +184,10 @@ export function CollapsibleCard({
           <Pressable
             onPress={onPress}
             accessibilityRole="button"
-            accessibilityLabel={title}
-            accessibilityState={{ expanded: isOpen }}
-            accessibilityHint={locked ? lockedLabel : undefined}
+            accessibilityLabel={headerRightLabel ? `${title}, ${headerRightLabel}` : title}
+            // A locked card cannot open, so it announces no expanded
+            // state — and its hint would only repeat the CTA's label.
+            accessibilityState={locked ? undefined : { expanded: isOpen }}
             style={{
               flexDirection: 'row',
               alignItems: 'center',
@@ -180,7 +198,7 @@ export function CollapsibleCard({
             // takes hitSlop instead of padding the card taller than drawn.
             hitSlop={spacing[2]}
           >
-            <Text variant="headingSm" style={{ flex: 1 }}>
+            <Text variant="headingSm" style={{ flex: 1 }} accessibilityRole="header">
               {title}
             </Text>
             {headerRight}
@@ -224,8 +242,12 @@ export function CollapsibleCard({
           onPress={onPress}
           background={colors.surfaceVariant}
           gradientStyle={scrimStyle}
-          expanded={isOpen}
-          accessibilityHint={locked ? lockedLabel : undefined}
+          // Nothing to announce as expandable on a card that cannot open.
+          expanded={locked ? undefined : isOpen}
+          // Names the section for the one case with no header to read:
+          // the grading verdict, whose own headline is inside the hidden
+          // region while collapsed.
+          accessibilityLabel={sectionName ? `${ctaLabel}, ${sectionName}` : undefined}
         />
       )}
     </Card>

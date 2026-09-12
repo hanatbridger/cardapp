@@ -240,10 +240,15 @@ function CardDetailScreen() {
     Boolean(card) && statsSettled && !psa10 && selectedGrade === 'PSA10',
   );
 
-  // Collapse everything when the grade toggle flips. All three sections
+  // Collapse everything when the grade toggle FLIPS. All three sections
   // hide on PSA 10, so an open one would silently reopen on the way back
-  // to Raw — with numbers the user never asked to see again.
+  // to Raw — with numbers the user never asked to see again. Guarded on a
+  // real transition: unguarded, this also ran on mount and threw away the
+  // section a grading-alert tap had just asked for.
+  const prevAccordionGrade = useRef(selectedGrade);
   useEffect(() => {
+    if (prevAccordionGrade.current === selectedGrade) return;
+    prevAccordionGrade.current = selectedGrade;
     setOpenSection(null);
   }, [selectedGrade]);
 
@@ -440,6 +445,13 @@ function CardDetailScreen() {
         grade: selectedGrade,
         lastPrice: price?.currentPrice,
         lastPriceChange: price?.percentChange,
+        // Since-added baseline: the live price on screen at the moment of
+        // the tap. Without it the row waited for Home's batch prices to
+        // stamp one, so the returns card kept saying "Add to watchlist to
+        // track returns" for a card already on the watchlist — and dated
+        // the baseline whenever Home next ran. Sample prices are not
+        // live, and the store drops a baseline it cannot trust.
+        baselinePrice: price?.source === 'mock' ? undefined : price?.currentPrice,
         rarity: card.rarity,
         language: card.language,
       });
@@ -689,7 +701,7 @@ function CardDetailScreen() {
                       {price.source === 'tcgplayer' ? 'TCGPlayer' :
                        price.source === 'ebay' ? 'eBay' :
                        price.source === 'pricecharting' ? 'PriceCharting' :
-                       'Market Data'}
+                       'sample data'}
                     </Text>
                   </Text>
                   {/* A payload price is TCGPlayer's own cached snapshot,
@@ -1027,6 +1039,9 @@ function CardDetailScreen() {
                     {!cardStats?.dynamics && <Badge variant="neutral">Sample data</Badge>}
                   </>
                 }
+                headerRightLabel={
+                  cardStats?.dynamics ? '7 day average' : '7 day average, sample data'
+                }
               >
                 <MarketDynamics bare cardId={card.id} live={cardStats?.dynamics} />
               </CollapsibleCard>
@@ -1150,6 +1165,7 @@ function CardDetailScreen() {
             // is what the collapsed peek shows. A grading-ROI alert tap
             // lands here already open.
             <CollapsibleCard
+              label="Worth grading"
               expanded={openSection === 'grading'}
               onToggle={() => toggleSection('grading')}
               collapsedHeight={148}

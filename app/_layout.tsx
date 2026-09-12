@@ -273,7 +273,12 @@ export default function RootLayout() {
               <Stack.Screen name="help" />
               <Stack.Screen name="terms" />
               <Stack.Screen name="privacy" />
-              <Stack.Screen name="paywall" options={{ presentation: 'modal' }} />
+              {/* transparentModal + no stack animation: the paywall is a
+                  tray that runs its own slide, over the screen behind it. */}
+              <Stack.Screen
+                name="paywall"
+                options={{ presentation: 'transparentModal', animation: 'none' }}
+              />
               <Stack.Screen name="design-system" />
             </Stack>
             {/* Overlays (sheets, pickers) render here, above the navigator

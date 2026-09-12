@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Pressable, Alert, Platform } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import Animated, { Easing, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import {
   IconX,
@@ -15,7 +17,6 @@ import {
   Text,
   Button,
   Card,
-  ScreenBackground,
   withErrorBoundary,
 } from '../src/components';
 import { useUserStore } from '../src/stores/user-store';
@@ -74,12 +75,12 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
   {
     icon: IconBellRinging,
     title: 'Unlimited price alerts',
-    body: 'Free keeps 3 active alerts. Premium removes the cap — track every threshold, raw or graded.',
+    body: 'Free keeps 3 active alerts. Premium removes the cap — set as many price thresholds as you follow.',
   },
   {
     icon: IconBrain,
     title: 'AI predictions',
-    body: 'Fair value from pull cost, desirability and live eBay supply and demand — undervalued, overvalued or fairly priced, on every card.',
+    body: 'Fair value from pull cost, desirability and eBay supply and demand — undervalued, overvalued or fairly priced, on the cards we score.',
   },
   {
     icon: IconChartLine,
@@ -103,8 +104,14 @@ function notify(title: string, message: string, onDismiss?: () => void) {
   }
 }
 
+/** Same band as every other sheet — see components/BottomSheet.tsx. */
+const ENTER_MS = 260;
+const EXIT_MS = 220;
+
 function PaywallScreen() {
   const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+  const { height } = useWindowDimensions();
   const setPremium = useUserStore((s) => s.setPremium);
   const isPremium = useUserStore((s) => s.isPremium);
   const [selected, setSelected] = useState<PlanId>('monthly');
@@ -235,38 +242,86 @@ function PaywallScreen() {
   };
 
   return (
-    <ScreenBackground edges={['top', 'bottom']}>
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'flex-end',
-          paddingHorizontal: HORIZONTAL_PADDING,
-          paddingTop: spacing[2],
-        }}
+    // A tray, not a full screen: it slides up over the card the user was
+    // reading, and the gap above it is what keeps the hero off the
+    // status bar — the old full-bleed modal clipped the sparkle.
+    // Pinned rather than flex:1 — the transparent modal's container is
+    // unbounded on web, so a flex child sat below the fold instead of
+    // filling the viewport.
+    <View style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end' }]}>
+      <Animated.View
+        entering={FadeIn.duration(ENTER_MS)}
+        exiting={FadeOut.duration(EXIT_MS)}
+        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.scrim }}
       >
         <Pressable
+          style={{ flex: 1 }}
           onPress={close}
-          hitSlop={12}
-          accessibilityLabel="Close"
-          style={({ pressed }) => ({
-            padding: spacing[2],
-            opacity: pressed ? 0.6 : 1,
-          })}
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+        />
+      </Animated.View>
+
+      <Animated.View
+        entering={SlideInDown.duration(ENTER_MS).easing(Easing.out(Easing.cubic))}
+        exiting={SlideOutDown.duration(EXIT_MS).easing(Easing.in(Easing.cubic))}
+        style={{
+          // Fixed at most of the screen rather than hugging: a ScrollView
+          // in an unbounded parent reports almost no height, and the tray
+          // came up as a sliver. The app stays visible above it either way.
+          height: height * 0.92,
+          backgroundColor: colors.surface,
+          borderTopLeftRadius: radius['2xl'],
+          borderTopRightRadius: radius['2xl'],
+          overflow: 'hidden',
+          paddingTop: spacing[3],
+        }}
+      >
+        {/* Handle bar — same grammar as every other sheet in the app. */}
+        <View style={{ alignItems: 'center', paddingBottom: spacing[2] }}>
+          <View
+            style={{
+              width: 36,
+              height: 4,
+              borderRadius: radius.full,
+              backgroundColor: colors.outline,
+            }}
+          />
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'flex-end',
+            paddingHorizontal: HORIZONTAL_PADDING,
+          }}
         >
-          <IconX size={24} color={colors.onSurface} />
-        </Pressable>
-      </View>
+          <Pressable
+            onPress={close}
+            hitSlop={12}
+            accessibilityLabel="Close"
+            accessibilityRole="button"
+            style={({ pressed }) => ({
+              padding: spacing[2],
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <IconX size={24} color={colors.onSurface} />
+          </Pressable>
+        </View>
 
       <ScrollView
+        style={{ flex: 1 }}
         contentContainerStyle={{
           paddingHorizontal: HORIZONTAL_PADDING,
-          paddingBottom: spacing[8],
+          // Clear the home indicator — the tray owns its own bottom inset.
+          paddingBottom: Math.max(insets.bottom, spacing[4]) + spacing[6],
           gap: spacing[6],
         }}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero */}
-        <View style={{ alignItems: 'center', gap: spacing[3], paddingTop: spacing[2] }}>
+        <View style={{ alignItems: 'center', gap: spacing[3] }}>
           <View
             style={{
               width: 72,
@@ -439,7 +494,8 @@ function PaywallScreen() {
           </Text>
         </View>
       </ScrollView>
-    </ScreenBackground>
+      </Animated.View>
+    </View>
   );
 }
 

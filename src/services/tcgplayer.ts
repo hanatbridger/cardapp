@@ -144,7 +144,11 @@ export async function fetchRawCardPrice(
   // a moment to render in dev.
   await new Promise((resolve) => setTimeout(resolve, 150));
   const mock = getPrice(cardId, 'UNGRADED');
-  return mock ? { ...mock, source: 'tcgplayer' } : null;
+  // Labelled for what it is. Stamping 'tcgplayer' on a seeded price made
+  // the screen print "Price via TCGPlayer" over a number TCGPlayer never
+  // returned — a fabricated source, and the kind of thing App Review
+  // treats as fake data presented as real.
+  return mock ? { ...mock, source: 'mock' } : null;
 }
 
 /**

@@ -10,7 +10,6 @@ import { useMoney } from '../hooks/use-money';
 import {
   sinceAddedReturn,
   formatBaselineDate,
-  formatSignedPct,
 } from '../services/since-added';
 import { useUserStore } from '../stores/user-store';
 import { useWatchlistStore, isCardItem, type CardWatchlistItem } from '../stores/watchlist-store';
@@ -123,23 +122,16 @@ export function ReturnsSinceAdded({
     label: string,
     value: { amount: number; pct: number } | null,
     spokenTail: string,
+    first: boolean,
   ) => {
-    // Colour follows the rounded figure actually printed, so a "+0.0%"
-    // never shows green (same rule as SinceAddedLabel).
+    // Rounded figure decides the sign shown, so a "+0.0%" never prints a
+    // plus (same rule as SinceAddedLabel).
     const shownPct = value ? Math.round(value.pct * 10) / 10 : 0;
-    const color = !value
-      ? colors.onSurfaceMuted
-      : shownPct > 0
-        ? colors.success
-        : shownPct < 0
-          ? colors.danger
-          : colors.onSurfaceMuted;
     const absMoney = value ? formatMoney(Math.abs(value.amount)) : UNKNOWN;
-    const money = value
-      ? `${shownPct > 0 ? '+' : shownPct < 0 ? '−' : ''}${absMoney}`
+    // One string, money and percent together, exactly as drawn.
+    const shown = value
+      ? `${shownPct > 0 ? '+' : shownPct < 0 ? '−' : ''}${absMoney} (${Math.abs(shownPct).toFixed(2)}%)`
       : UNKNOWN;
-    // Colour alone carries direction visually, so the spoken string says
-    // up/down/flat in words.
     const spoken = value
       ? `${label}, ${shownPct > 0 ? 'up' : shownPct < 0 ? 'down' : 'flat'} ${absMoney}, ${Math.abs(shownPct).toFixed(1)} percent ${spokenTail}`
       : `${label}, not available`;
@@ -150,61 +142,58 @@ export function ReturnsSinceAdded({
           flexDirection: 'row',
           alignItems: 'center',
           justifyContent: 'space-between',
-          gap: spacing[2],
-          paddingVertical: spacing[3],
+          gap: spacing[3],
+          // 24/12 on the first row, 12/12 after — the design's rhythm.
+          paddingTop: first ? spacing[6] : spacing[3],
+          paddingBottom: spacing[3],
         }}
         accessible
         accessibilityLabel={spoken}
       >
-        <Text variant="bodySm" color={colors.onSurfaceVariant} style={{ flex: 1 }}>
+        <Text variant="labelMd" color={colors.onSurfaceMuted}>
           {label}
         </Text>
-        <Text variant="bodyMd" color={color} style={{ fontVariant: ['tabular-nums'] }}>
-          {money}
-        </Text>
         <Text
-          variant="labelLg"
-          color={color}
-          style={{ width: 68, textAlign: 'right', fontVariant: ['tabular-nums'] }}
+          variant="bodyMd"
+          color={value ? colors.onSurface : colors.onSurfaceMuted}
+          style={{ flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] }}
         >
-          {value ? formatSignedPct(shownPct) : UNKNOWN}
+          {shown}
         </Text>
       </View>
     );
   };
 
   const body = (
-      <View style={{ gap: spacing[4] }}>
+      <View style={{ gap: spacing[6] }}>
         {/* Baseline the returns below are measured from */}
-        <View style={{ flexDirection: 'row', gap: spacing[4] }}>
-          <View style={{ flex: 1, gap: spacing['0.5'] }}>
-            <Text variant="caption" color={colors.onSurfaceMuted}>Date added</Text>
-            <Text variant="labelLg">{baselineDate || UNKNOWN}</Text>
+        <View style={{ flexDirection: 'row', gap: spacing[3] }}>
+          <View style={{ flex: 1, gap: spacing[1] }}>
+            <Text variant="labelMd" color={colors.onSurfaceMuted}>Date added</Text>
+            <Text variant="numerals">{baselineDate || UNKNOWN}</Text>
           </View>
-          <View style={{ flex: 1, gap: spacing['0.5'] }}>
-            <Text variant="caption" color={colors.onSurfaceMuted}>Price when added</Text>
-            <Text variant="labelLg" style={{ fontVariant: ['tabular-nums'] }}>
-              {formatMoney(baselinePrice)}
-            </Text>
+          <View style={{ flex: 1, gap: spacing[1] }}>
+            <Text variant="labelMd" color={colors.onSurfaceMuted}>Price when added</Text>
+            <Text variant="numerals">{formatMoney(baselinePrice)}</Text>
           </View>
         </View>
-
-        <View style={{ height: 1, backgroundColor: colors.outlineVariant }} />
 
         <View>
-          {returnRow("Today's return", today, prevCloseTail)}
-          <View style={{ height: 1, backgroundColor: colors.outlineVariant }} />
-          {returnRow('Total return', totalValue, baselineTail)}
-        </View>
+          {/* outline, not outlineVariant: on the card's own fill the
+              subtler token is invisible, which is no divider at all. */}
+          <View style={{ height: 1, backgroundColor: colors.outline }} />
+          {returnRow("Today's return", today, prevCloseTail, true)}
+          {returnRow('Total return', totalValue, baselineTail, false)}
 
-        {/* Say why a row is dashed rather than leaving it unexplained. */}
-        {!today && (
-          <Text variant="caption" color={colors.onSurfaceMuted}>
-            {finitePositive(currentPrice)
-              ? "We don't have a previous close for this card yet, so today's return isn't available."
-              : "Waiting on a live price — returns fill in once it loads."}
-          </Text>
-        )}
+          {/* Say why a row is dashed rather than leaving it unexplained. */}
+          {!today && (
+            <Text variant="caption" color={colors.onSurfaceMuted}>
+              {finitePositive(currentPrice)
+                ? "We don't have a previous close for this card yet, so today's return isn't available."
+                : "Waiting on a live price — returns fill in once it loads."}
+            </Text>
+          )}
+        </View>
       </View>
   );
 

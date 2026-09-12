@@ -26,7 +26,7 @@ export function EbayListingsBlock({ heading, data }: EbayListingsBlockProps) {
   return (
     <View style={{ gap: spacing[2] }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <Text variant="labelLg">{heading}</Text>
+        <Text variant="headingSm">{heading}</Text>
         <Text variant="caption" color={colors.onSurfaceMuted}>
           {data.count} listed
         </Text>
