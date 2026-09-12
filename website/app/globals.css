@@ -1294,8 +1294,14 @@ body::before {
 }
 
 [data-in] .ret-val.count::after {
-  animation: count-up 1100ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  /* Slow enough to read the climb. The curve is gentler than the site's
+     usual entrance ease: a hard decelerate makes a counter sprint and
+     then crawl, which reads as lag rather than as counting. */
+  animation: count-up 2200ms cubic-bezier(0.25, 0.6, 0.3, 1) forwards;
 }
+
+/* Total return follows the day's move, so the eye lands on one at a time. */
+[data-in] .ret-row:nth-child(2) .ret-val.count::after { animation-delay: 160ms; }
 
 @keyframes count-up {
   to {
