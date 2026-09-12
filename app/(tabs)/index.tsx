@@ -400,39 +400,33 @@ function WatchlistScreen() {
               <TrendingCarousel items={trendingItems} />
             </View>
 
-            {/* Watchlist count — hidden on first launch (empty list shows
-                its own EmptyState below with a Search CTA). The label
-                flexes to "items" when the list mixes sealed products with
-                cards, since "cards tracked" would misrepresent the row. */}
-            {items.length > 0 && (() => {
-              const hasSealed = items.some((i) => i.kind === 'sealed');
-              const noun = hasSealed
-                ? items.length === 1 ? 'item' : 'items'
-                : items.length === 1 ? 'card' : 'cards';
-              return (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingHorizontal: HORIZONTAL_PADDING,
-                  }}
-                >
-                  <Text variant="labelLg" color={colors.onSurfaceVariant}>
-                    {items.length} {noun} tracked
+            {/* Section label — hidden on first launch, where the empty
+                state below carries its own Search CTA. Free users keep the
+                cap count on the right; Premium gets the watchlist's
+                average return since added. */}
+            {items.length > 0 && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingHorizontal: HORIZONTAL_PADDING,
+                }}
+              >
+                <Text variant="labelLg" color={colors.onSurfaceVariant}>
+                  Watchlist
+                </Text>
+                {isPremium ? (
+                  avgSinceAdded !== null ? (
+                    <SinceAddedLabel pct={avgSinceAdded} prefix="Avg" />
+                  ) : null
+                ) : (
+                  <Text variant="caption" color={colors.onSurfaceMuted}>
+                    {items.length}/{maxFreeItems}
                   </Text>
-                  {isPremium ? (
-                    avgSinceAdded !== null ? (
-                      <SinceAddedLabel pct={avgSinceAdded} prefix="Avg" />
-                    ) : null
-                  ) : (
-                    <Text variant="caption" color={colors.onSurfaceMuted}>
-                      {items.length}/{maxFreeItems}
-                    </Text>
-                  )}
-                </View>
-              );
-            })()}
+                )}
+              </View>
+            )}
           </View>
         }
         renderItem={({ item }: { item: WatchlistItem }) => (
