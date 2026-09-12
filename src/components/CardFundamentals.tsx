@@ -22,6 +22,12 @@ interface CardFundamentalsProps {
    * census in one card and a stale seed here.
    */
   livePop?: { psa10: number; total: number; gemPct: number } | null;
+  /**
+   * Render without the Card shell and without the "Fundamentals" title —
+   * for use inside CollapsibleCard, which supplies both. Two titles and
+   * two card edges is what you get otherwise.
+   */
+  bare?: boolean;
 }
 
 function FundamentalRow({
@@ -91,7 +97,7 @@ function ScoreBar({ score, max = 10 }: { score: number; max?: number }) {
   );
 }
 
-export function CardFundamentals({ card, marketPrice, livePop }: CardFundamentalsProps) {
+export function CardFundamentals({ card, marketPrice, livePop, bare }: CardFundamentalsProps) {
   const { colors } = useTheme();
 
   const score = getCardScore(card.id);
@@ -115,6 +121,22 @@ export function CardFundamentals({ card, marketPrice, livePop }: CardFundamental
   if (!hasAnyData) return null;
 
   const rows: React.ReactNode[] = [];
+
+  // PSA Population first: it is the only measured number in this table
+  // (PSA's own census) — Pull Cost, Desirability and Artist Score are
+  // models. Collapsed, the section peeks about two rows, and those two
+  // should be the ones that aren't our opinion.
+  // PSA Population
+  if (psaPop) {
+    rows.push(
+      <FundamentalRow
+        key="psapop"
+        label="PSA 10 Gem Rate"
+        value={`${psaPop.psa10Rate.toFixed(1)}%`}
+        subValue={`${psaPop.psa10Pop.toLocaleString()} / ${psaPop.totalPop.toLocaleString()}`}
+      />,
+    );
+  }
 
   // Pull Cost
   if (score) {
@@ -181,18 +203,6 @@ export function CardFundamentals({ card, marketPrice, livePop }: CardFundamental
     );
   }
 
-  // PSA Population
-  if (psaPop) {
-    rows.push(
-      <FundamentalRow
-        key="psapop"
-        label="PSA 10 Gem Rate"
-        value={`${psaPop.psa10Rate.toFixed(1)}%`}
-        subValue={`${psaPop.psa10Pop.toLocaleString()} / ${psaPop.totalPop.toLocaleString()}`}
-      />,
-    );
-  }
-
   // Set + Release Date
   if (card.set.releaseDate) {
     rows.push(
@@ -216,17 +226,19 @@ export function CardFundamentals({ card, marketPrice, livePop }: CardFundamental
     );
   }
 
-  return (
-    <Card>
-      <View style={{ gap: 0 }}>
+  const body = (
+    <View style={{ gap: 0 }}>
+      {!bare && (
         <Text variant="labelLg" style={{ marginBottom: spacing[1] }}>Fundamentals</Text>
-        {rows.map((row, i) => (
-          <View key={i}>
-            {i > 0 && <Divider />}
-            {row}
-          </View>
-        ))}
-      </View>
-    </Card>
+      )}
+      {rows.map((row, i) => (
+        <View key={i}>
+          {i > 0 && <Divider />}
+          {row}
+        </View>
+      ))}
+    </View>
   );
+
+  return bare ? body : <Card>{body}</Card>;
 }

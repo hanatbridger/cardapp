@@ -1,10 +1,11 @@
 import React from 'react';
 import { View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from './Text';
 import { Card } from './Card';
 import { Badge } from './Badge';
 import { useTheme } from '../theme/ThemeProvider';
-import { spacing, radius } from '../theme/tokens';
+import { spacing, radius, palette } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
 import { getMarketDynamics, type MarketDynamicsData } from '../data/ebay-market-dynamics';
 import type { LiveMarketDynamics } from '../services/card-stats';
@@ -18,6 +19,12 @@ interface MarketDynamicsProps {
    * showcase cards, and hides entirely for everything else.
    */
   live?: LiveMarketDynamics | null;
+  /**
+   * Render without the Card shell and without the title row — for use
+   * inside CollapsibleCard, which supplies the card, the title and the
+   * header chips.
+   */
+  bare?: boolean;
 }
 
 /** Format a percentage change with sign */
@@ -78,55 +85,49 @@ function GaugeMeter({
   value: number;
   min: number;
   max: number;
-  labels: string[];
-  /** Colors from left to right */
-  colorStops: string[];
+  /** One label per end of the track — left edge, right edge. */
+  labels: [string, string];
+  /** Gradient stops from left to right. Tuple so LinearGradient's
+      two-colour minimum is checked at the call site. */
+  colorStops: readonly [string, string, ...string[]];
 }) {
   const { colors } = useTheme();
   const clamped = Math.max(min, Math.min(max, value));
   const pct = ((clamped - min) / (max - min)) * 100;
 
-  // Pick color based on position
-  const colorIndex = Math.min(
-    Math.floor((pct / 100) * colorStops.length),
-    colorStops.length - 1,
-  );
-  const indicatorColor = colorStops[colorIndex];
-
   return (
     <View style={{ gap: spacing[1] }}>
-      {/* Track */}
-      <View style={{ height: 8, borderRadius: radius.full, overflow: 'hidden', flexDirection: 'row' }}>
-        {colorStops.map((color, i) => (
-          <View
-            key={i}
-            style={{
-              flex: 1,
-              backgroundColor: withAlpha(color, 0.3),
-            }}
-          />
-        ))}
-      </View>
-
-      {/* Indicator */}
-      <View style={{ position: 'relative', height: 16 }}>
+      {/* Track + marker. The row is as tall as the marker so the marker
+          centres on the 8pt track, and it sits OUTSIDE the gradient —
+          the track's rounded ends need no overflow clip to eat it. */}
+      <View style={{ height: 12, justifyContent: 'center' }}>
+        <LinearGradient
+          colors={colorStops}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={{ height: 8, borderRadius: radius.full }}
+        />
         <View
           style={{
             position: 'absolute',
             left: `${pct}%`,
             marginLeft: -6,
+            top: 0,
             width: 12,
             height: 12,
             borderRadius: radius.full,
-            backgroundColor: indicatorColor,
+            // Pure white from the palette (mode-independent, unlike
+            // colors.surface): the marker rides a fully saturated
+            // gradient, so it needs the same fill in both themes. The
+            // dark ring is what separates it from the amber midpoint.
+            backgroundColor: palette.neutral[0],
             borderWidth: 2,
-            borderColor: colors.surface,
-            top: 0,
+            borderColor: withAlpha(palette.neutral[950], 0.25),
           }}
         />
       </View>
 
-      {/* Labels */}
+      {/* Labels — one per end, so the pair reads as the track's range */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
         {labels.map((label) => (
           <Text key={label} variant="caption" color={colors.onSurfaceMuted}>
@@ -153,8 +154,8 @@ function GaugeSection({
   formattedValue: string;
   min: number;
   max: number;
-  labels: string[];
-  colorStops: string[];
+  labels: [string, string];
+  colorStops: readonly [string, string, ...string[]];
 }) {
   const { colors } = useTheme();
 
@@ -175,7 +176,29 @@ function GaugeSection({
   );
 }
 
-export function MarketDynamics({ cardId, live }: MarketDynamicsProps) {
+/**
+ * The "7d avg" pill from the section header. Exported because a bare
+ * MarketDynamics has no header of its own — the screen hands this to
+ * CollapsibleCard's headerRight so the qualifier stays next to the title
+ * instead of disappearing.
+ */
+export function DynamicsChip() {
+  const { colors } = useTheme();
+  return (
+    <View
+      style={{
+        backgroundColor: withAlpha(colors.primary, 0.12),
+        borderRadius: radius.full,
+        paddingHorizontal: spacing[1],
+        paddingVertical: 1,
+      }}
+    >
+      <Text variant="caption" color={colors.primary}>7d avg</Text>
+    </View>
+  );
+}
+
+export function MarketDynamics({ cardId, live, bare }: MarketDynamicsProps) {
   const { colors } = useTheme();
   const isLive = Boolean(live);
   const dynamics: MarketDynamicsData | LiveMarketDynamics | undefined =
@@ -183,26 +206,18 @@ export function MarketDynamics({ cardId, live }: MarketDynamicsProps) {
 
   if (!dynamics) return null;
 
-  return (
-    <Card>
+  const body = (
       <View style={{ gap: spacing[4] }}>
         {/* Header */}
+        {!bare && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
           <Text variant="labelLg">eBay Market Dynamics</Text>
-          <View
-            style={{
-              backgroundColor: withAlpha(colors.primary, 0.12),
-              borderRadius: radius.full,
-              paddingHorizontal: spacing[1],
-              paddingVertical: 1,
-            }}
-          >
-            <Text variant="caption" color={colors.primary}>7d avg</Text>
-          </View>
+          <DynamicsChip />
           {/* Seeded fallback keeps the disclosure badge (same
               convention as app/sealed/[id].tsx); live data drops it. */}
           {!isLive && <Badge variant="neutral">Sample data</Badge>}
         </View>
+        )}
 
         {/* 3-stat summary row */}
         <View
@@ -242,7 +257,7 @@ export function MarketDynamics({ cardId, live }: MarketDynamicsProps) {
           formattedValue={`${dynamics.demandPressure.toFixed(1)}%`}
           min={0}
           max={18}
-          labels={['Heavy Supply', 'Moderate', 'Tight', 'Very Tight']}
+          labels={['Heavy Supply', 'Very Tight']}
           colorStops={[colors.danger, colors.warning, colors.success, colors.primary]}
         />
 
@@ -253,7 +268,7 @@ export function MarketDynamics({ cardId, live }: MarketDynamicsProps) {
           formattedValue={`${dynamics.supplySaturation.toFixed(2)}×`}
           min={0.4}
           max={2.0}
-          labels={['Tightening', 'Stable', 'Loosening']}
+          labels={['Tightening', 'Loosening']}
           colorStops={[colors.success, colors.warning, colors.danger]}
         />
 
@@ -262,6 +277,7 @@ export function MarketDynamics({ cardId, live }: MarketDynamicsProps) {
           Based on eBay listing data. Directionally accurate, not exact.
         </Text>
       </View>
-    </Card>
   );
+
+  return bare ? body : <Card>{body}</Card>;
 }

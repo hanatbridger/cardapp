@@ -40,6 +40,12 @@ interface GradingVerdictProps {
   psa10Price: number;
   /** PSA population census; null when collectrics has none for this card. */
   pop: Psa10Population | null;
+  /**
+   * Render without the Card shell — for use inside CollapsibleCard. The
+   * verdict header stays: "Grade it" plus the letter grade IS the
+   * headline here, and it is what the collapsed peek should show.
+   */
+  bare?: boolean;
 }
 
 /**
@@ -56,6 +62,7 @@ export function GradingVerdict({
   rawPrice,
   psa10Price,
   pop,
+  bare,
 }: GradingVerdictProps) {
   const { colors } = useTheme();
   const formatMoney = useMoney();
@@ -188,8 +195,8 @@ export function GradingVerdict({
     </View>
   );
 
-  return (
-    <Card>
+  const body = (
+    <>
       <View style={{ gap: spacing[4] }}>
         {/* Header: verdict + letter grade */}
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -375,6 +382,10 @@ export function GradingVerdict({
             : undefined
         }
       />
-    </Card>
+    </>
   );
+
+  // Inside CollapsibleCard the Card comes from the wrapper; a second one
+  // would double the padding and the border.
+  return bare ? body : <Card>{body}</Card>;
 }

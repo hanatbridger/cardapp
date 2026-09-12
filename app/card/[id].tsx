@@ -13,9 +13,13 @@ import {
   SegmentedControl,
   PriceChange,
   PriceChart,
+  Badge,
   AIValuation,
   CardFundamentals,
   MarketDynamics,
+  DynamicsChip,
+  CollapsibleCard,
+  ReturnsSinceAdded,
   PriceAlertModal,
   WatchlistFullModal,
   CardDetailSkeleton,
@@ -34,6 +38,7 @@ import { cardShareUrl } from '../../src/constants/links';
 // Card data/valuation handled internally by AIValuation component
 import { GRADE_OPTIONS, GRADES } from '../../src/constants/grades';
 import { useWatchlistStore } from '../../src/stores';
+import { useUserStore } from '../../src/stores/user-store';
 import {
   useAlertsStore,
   MAX_FREE_ALERTS,
@@ -75,8 +80,16 @@ function formatAsOf(asOf: string | undefined): string | null {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/**
+ * The three sections that collapse. Price History, the returns card,
+ * Recent sales and Similar cards stay open — they are either the reason
+ * the screen exists or short enough not to cost anything.
+ */
+type SectionId = 'fundamentals' | 'dynamics' | 'grading';
+
 function CardDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `section` arrives from a notification tap — see app/_layout.tsx.
+  const { id, section } = useLocalSearchParams<{ id: string; section?: string }>();
   const { colors } = useTheme();
   // Module-scope Dimensions.get is 0 on web before first layout and
   // stale after rotation — it fed PriceChart a negative width.
@@ -107,8 +120,19 @@ function CardDetailScreen() {
   // an action rather than a screen-load surprise.
   const [psaModalVisible, setPsaModalVisible] = useState(false);
   const prevGradeRef = useRef(GRADE_OPTIONS[gradeIndex]);
+  // Accordion: at most one of the three collapsing sections is open, so
+  // the page stops being a mile of stacked analysis. Starts closed unless
+  // a notification tap named a section.
+  const [openSection, setOpenSection] = useState<SectionId | null>(() =>
+    section === 'grading' ? 'grading' : null,
+  );
+  const toggleSection = useCallback((next: SectionId) => {
+    setOpenSection((cur) => (cur === next ? null : next));
+    if (Platform.OS !== 'web') Haptics.selectionAsync();
+  }, []);
   const [refreshing, setRefreshing] = useState(false);
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const isPremium = useUserStore((s) => s.isPremium);
   const allAlerts = useAlertsStore((s) => s.alerts);
   const addAlert = useAlertsStore((s) => s.addAlert);
   const removeAlert = useAlertsStore((s) => s.removeAlert);
@@ -201,6 +225,13 @@ function CardDetailScreen() {
     { ...ebayArgs, grade: 'psa10' },
     Boolean(card) && statsSettled && !psa10 && selectedGrade === 'PSA10',
   );
+
+  // Collapse everything when the grade toggle flips. All three sections
+  // hide on PSA 10, so an open one would silently reopen on the way back
+  // to Raw — with numbers the user never asked to see again.
+  useEffect(() => {
+    setOpenSection(null);
+  }, [selectedGrade]);
 
   // Fire the coming-soon popup when the toggle transitions UNGRADED →
   // PSA10 — but only for cards with no real graded data. While the
@@ -772,6 +803,7 @@ function CardDetailScreen() {
               marketPrice={price?.currentPrice}
               liveDynamics={cardStats?.dynamics}
               statsSettled={statsSettled}
+              locked={!isPremium}
             />
           )}
 
@@ -851,6 +883,20 @@ function CardDetailScreen() {
             </Card>
           )}
 
+          {/* Track your returns since added — Premium. Sits under the
+              chart because it answers the same question the chart does,
+              but for this user's own entry price. Raw only, like the rest
+              of the price sections. */}
+          {selectedGrade !== 'PSA10' && (
+            <ReturnsSinceAdded
+              cardId={card.id}
+              grade={selectedGrade}
+              currentPrice={price?.currentPrice}
+              previousPrice={price?.previousPrice}
+              previousDate={price?.previousDate}
+            />
+          )}
+
           {/* PSA Population — graded census for tracked cards on the
               PSA 10 tab. Counts and gem rate come from the latest
               history-psa snapshot in the collectrics proxy. */}
@@ -901,11 +947,40 @@ function CardDetailScreen() {
               (Prediction moved above the Price History chart.) */}
           {selectedGrade !== 'PSA10' && (
             <>
-              {/* Fundamentals — StockTwits-style data table */}
-              <CardFundamentals card={card} marketPrice={price?.currentPrice} livePop={psa10?.pop ?? null} />
+              {/* Fundamentals — StockTwits-style data table. Collapsed by
+                  default: seven rows of context below the numbers people
+                  actually came for. */}
+              <CollapsibleCard
+                title="Fundamentals"
+                expanded={openSection === 'fundamentals'}
+                onToggle={() => toggleSection('fundamentals')}
+                collapsedHeight={112}
+              >
+                <CardFundamentals
+                  bare
+                  card={card}
+                  marketPrice={price?.currentPrice}
+                  livePop={psa10?.pop ?? null}
+                />
+              </CollapsibleCard>
 
-              {/* eBay Market Dynamics — demand pressure & supply saturation */}
-              <MarketDynamics cardId={card.id} live={cardStats?.dynamics} />
+              {/* eBay Market Dynamics — demand pressure & supply
+                  saturation. The chip and the sample-data badge move to
+                  the collapsible header, which is the only title now. */}
+              <CollapsibleCard
+                title="eBay Market Dynamics"
+                expanded={openSection === 'dynamics'}
+                onToggle={() => toggleSection('dynamics')}
+                collapsedHeight={120}
+                headerRight={
+                  <>
+                    <DynamicsChip />
+                    {!cardStats?.dynamics && <Badge variant="neutral">Sample data</Badge>}
+                  </>
+                }
+              >
+                <MarketDynamics bare cardId={card.id} live={cardStats?.dynamics} />
+              </CollapsibleCard>
             </>
           )}
 
@@ -1021,14 +1096,25 @@ function CardDetailScreen() {
               than a verdict built on guesses. Sits last before Similar
               cards — it's a decision aid, not price data. */}
           {selectedGrade !== 'PSA10' && price && psa10 && psa10.latestPrice > 0 && (
-            <GradingVerdict
-              cardId={card.id}
-              cardName={card.name}
-              cardNumber={card.number}
-              rawPrice={price.currentPrice}
-              psa10Price={psa10.latestPrice}
-              pop={psa10.pop}
-            />
+            // No title on the wrapper: the verdict's own "Grade it" /
+            // "Sell it raw" plus the letter grade IS the headline, and it
+            // is what the collapsed peek shows. A grading-ROI alert tap
+            // lands here already open.
+            <CollapsibleCard
+              expanded={openSection === 'grading'}
+              onToggle={() => toggleSection('grading')}
+              collapsedHeight={148}
+            >
+              <GradingVerdict
+                bare
+                cardId={card.id}
+                cardName={card.name}
+                cardNumber={card.number}
+                rawPrice={price.currentPrice}
+                psa10Price={psa10.latestPrice}
+                pop={psa10.pop}
+              />
+            </CollapsibleCard>
           )}
 
           {/* Similar cards — other printings of the same character, newest

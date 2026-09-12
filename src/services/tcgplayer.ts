@@ -68,6 +68,8 @@ interface TcgPlayerPriceResponse {
   productId: string;
   currentPrice: number;
   previousPrice: number;
+  /** null when no daily close inside the comparison window. */
+  previousDate: string | null;
   percentChange: number;
   averagePrice: number;
   highPrice: number;
@@ -120,6 +122,7 @@ export async function fetchRawCardPrice(
         grade: 'UNGRADED',
         currentPrice: data.currentPrice,
         previousPrice: data.previousPrice,
+        previousDate: data.previousDate ?? null,
         percentChange: data.percentChange,
         averagePrice: data.averagePrice,
         highPrice: data.highPrice,

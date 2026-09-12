@@ -8,6 +8,7 @@ import {
   IconInfinity,
   IconBellRinging,
   IconChartLine,
+  IconBrain,
 } from '@tabler/icons-react-native';
 import { useTheme } from '../src/theme/ThemeProvider';
 import {
@@ -58,10 +59,12 @@ const PLANS: Plan[] = [
 ];
 
 // Only list features that are actually gated by `isPremium` in code.
-// Everything else — AI valuation, live eBay listings, AI Picks — is
-// available on the free tier, so listing it here would be deceptive and
-// grounds for App Store rejection under Guideline 2.3.1 (Accurate
-// Metadata) and 3.1.2 (Subscriptions must provide ongoing value).
+// Everything else — live eBay listings, AI Picks — is available on the
+// free tier, so listing it here would be deceptive and grounds for App
+// Store rejection under Guideline 2.3.1 (Accurate Metadata) and 3.1.2
+// (Subscriptions must provide ongoing value). AI predictions moved INTO
+// this list the same build that gated them on the card screen; the two
+// have to change together or the metadata is wrong either way.
 const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[] = [
   {
     icon: IconInfinity,
@@ -72,6 +75,11 @@ const FEATURES: { icon: React.ComponentType<any>; title: string; body: string }[
     icon: IconBellRinging,
     title: 'Unlimited price alerts',
     body: 'Free keeps 3 active alerts. Premium removes the cap — track every threshold, raw or graded.',
+  },
+  {
+    icon: IconBrain,
+    title: 'AI predictions',
+    body: 'Fair value from pull cost, desirability and live eBay supply and demand — undervalued, overvalued or fairly priced, on every card.',
   },
   {
     icon: IconChartLine,

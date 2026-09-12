@@ -48,6 +48,15 @@ export interface CardPrice {
   grade: GradeType;
   currentPrice: number;
   previousPrice: number;
+  /**
+   * Date the previous close was taken, or null when we have no history
+   * for this card. Absent means percentChange is 0 because there was
+   * nothing to compare against — NOT because the price was flat, which
+   * is why the returns panel keys "today's return" off this and not off
+   * previousPrice (the payload sets that equal to currentPrice when it
+   * has no close).
+   */
+  previousDate?: string | null;
   percentChange: number;
   lastSaleDate: string;
   lastSalePrice: number;
