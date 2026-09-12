@@ -43,7 +43,18 @@ interface AIValuationProps {
    * here would put a second border inside that one.
    */
   embedded?: boolean;
+  /**
+   * Free tier: keep the shape — tinted rows, icons, the verdict's own
+   * colour — and replace every word of the call with a placeholder. The
+   * card reads as a real answer sitting there, which is the tease, but
+   * "Undervalued by 13.5%" is the product and stays unread.
+   */
+  masked?: boolean;
 }
+
+/** Placeholder bars, sized to the two text lines they stand in for. */
+const MASK_BAR = 14;
+const MASK_BAR_SM = 10;
 
 // Height of the market-signal row, reused by its loading skeleton so the card
 // holds its place while stats settle: two text lines plus the row padding.
@@ -114,6 +125,7 @@ export function AIValuation({
   liveDynamics,
   statsSettled = true,
   embedded = false,
+  masked = false,
 }: AIValuationProps) {
   const { colors } = useTheme();
   const formatMoney = useMoney();
@@ -180,13 +192,22 @@ export function AIValuation({
           }}
         >
           <IconBrain size={20} color={accentColor} />
-          <View style={{ flex: 1 }}>
-            <Text variant="labelLg" color={accentColor}>
-              {labelText}
-            </Text>
-            <Text variant="caption" color={colors.onSurfaceMuted}>
-              AI predicted fair value: {formatMoney(valuation.predictedPrice)}
-            </Text>
+          <View style={{ flex: 1, gap: masked ? spacing[1.5] : 0 }}>
+            {masked ? (
+              <>
+                <Skeleton width="58%" height={MASK_BAR} borderRadius={radius.sm} />
+                <Skeleton width="82%" height={MASK_BAR_SM} borderRadius={radius.sm} />
+              </>
+            ) : (
+              <>
+                <Text variant="labelLg" color={accentColor}>
+                  {labelText}
+                </Text>
+                <Text variant="caption" color={colors.onSurfaceMuted}>
+                  AI predicted fair value: {formatMoney(valuation.predictedPrice)}
+                </Text>
+              </>
+            )}
           </View>
         </View>
 
@@ -207,18 +228,27 @@ export function AIValuation({
             }}
           >
             <SignalIcon size={20} color={signalColor} />
-            <View style={{ flex: 1 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-                <Text variant="labelLg" color={signalColor} style={{ flexShrink: 1 }}>
-                  Market Signal: {marketSignal.label}
-                </Text>
-                {/* Seeded fallback stays badged, same convention as
-                    MarketDynamics; live data drops it. */}
-                {!isLive && <Badge variant="neutral">Sample data</Badge>}
-              </View>
-              <Text variant="caption" color={colors.onSurfaceMuted}>
-                {marketSignal.reason}
-              </Text>
+            <View style={{ flex: 1, gap: masked ? spacing[1.5] : 0 }}>
+              {masked ? (
+                <>
+                  <Skeleton width="50%" height={MASK_BAR} borderRadius={radius.sm} />
+                  <Skeleton width="34%" height={MASK_BAR_SM} borderRadius={radius.sm} />
+                </>
+              ) : (
+                <>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                    <Text variant="labelLg" color={signalColor} style={{ flexShrink: 1 }}>
+                      Market Signal: {marketSignal.label}
+                    </Text>
+                    {/* Seeded fallback stays badged, same convention as
+                        MarketDynamics; live data drops it. */}
+                    {!isLive && <Badge variant="neutral">Sample data</Badge>}
+                  </View>
+                  <Text variant="caption" color={colors.onSurfaceMuted}>
+                    {marketSignal.reason}
+                  </Text>
+                </>
+              )}
             </View>
           </View>
         ) : null}

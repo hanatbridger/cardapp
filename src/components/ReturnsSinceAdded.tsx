@@ -4,8 +4,10 @@ import { router } from 'expo-router';
 import { Text } from './Text';
 import { Card } from './Card';
 import { CollapsibleCard } from './CollapsibleCard';
+import { Skeleton } from './Skeleton';
 import { useTheme } from '../theme/ThemeProvider';
-import { spacing } from '../theme/tokens';
+import { spacing, radius } from '../theme/tokens';
+import { withAlpha } from '../utils/withAlpha';
 import { useMoney } from '../hooks/use-money';
 import {
   sinceAddedReturn,
@@ -16,6 +18,10 @@ import { useWatchlistStore, isCardItem, type CardWatchlistItem } from '../stores
 import type { GradeType } from '../constants/grades';
 
 const UNKNOWN = '—';
+/** Height of the numerals line, so the locked bar occupies the same box. */
+const NUMERALS_HEIGHT = 29;
+/** The bar itself sits inside that box rather than filling it. */
+const NUMERALS_BAR = 20;
 /** A locked card never toggles; CollapsibleCard still wants a handler. */
 const NOOP = () => {};
 
@@ -153,16 +159,47 @@ export function ReturnsSinceAdded({
         <Text variant="labelMd" color={colors.onSurfaceMuted}>
           {label}
         </Text>
-        <Text
-          variant="bodyMd"
-          color={value ? colors.onSurface : colors.onSurfaceMuted}
-          style={{ flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] }}
-        >
-          {shown}
-        </Text>
+        {isPremium ? (
+          <Text
+            variant="bodyMd"
+            color={value ? colors.onSurface : colors.onSurfaceMuted}
+            style={{ flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] }}
+          >
+            {shown}
+          </Text>
+        ) : (
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <Skeleton
+              width={118}
+              height={NUMERALS_BAR}
+              borderRadius={radius.sm}
+              style={{ backgroundColor: withAlpha(colors.onSurface, 0.13) }}
+            />
+          </View>
+        )}
       </View>
     );
   };
+
+  // Locked, the figures are placeholders rather than faded text: a
+  // gradient only dims a number, and a dimmed number is still a number
+  // you can read if you lean in. The layout is identical either way, so
+  // unlocking swaps values in without the card changing shape.
+  const baselineValue = (value: string, width: number) =>
+    isPremium ? (
+      <Text variant="numerals">{value}</Text>
+    ) : (
+      <View style={{ height: NUMERALS_HEIGHT, justifyContent: 'center' }}>
+        <Skeleton
+          width={width}
+          height={NUMERALS_BAR}
+          borderRadius={radius.sm}
+          // The skeleton token is a shade off the card and disappears
+          // under the ramp; a placeholder nobody can see is just a gap.
+          style={{ backgroundColor: withAlpha(colors.onSurface, 0.13) }}
+        />
+      </View>
+    );
 
   const body = (
       <View style={{ gap: spacing[6] }}>
@@ -170,11 +207,11 @@ export function ReturnsSinceAdded({
         <View style={{ flexDirection: 'row', gap: spacing[3] }}>
           <View style={{ flex: 1, gap: spacing[1] }}>
             <Text variant="labelMd" color={colors.onSurfaceMuted}>Date added</Text>
-            <Text variant="numerals">{baselineDate || UNKNOWN}</Text>
+            {baselineValue(baselineDate || UNKNOWN, 76)}
           </View>
           <View style={{ flex: 1, gap: spacing[1] }}>
             <Text variant="labelMd" color={colors.onSurfaceMuted}>Price when added</Text>
-            <Text variant="numerals">{formatMoney(baselinePrice)}</Text>
+            {baselineValue(formatMoney(baselinePrice), 94)}
           </View>
         </View>
 
@@ -210,7 +247,11 @@ export function ReturnsSinceAdded({
         locked
         lockedLabel="Upgrade to view"
         onUnlock={() => router.push('/paywall')}
-        collapsedHeight={64}
+        // Tall enough for the baseline row to sit above the ramp, and a
+        // shorter ramp so the placeholders read as loading rather than as
+        // empty space.
+        collapsedHeight={72}
+        scrimHeight={88}
       >
         {body}
       </CollapsibleCard>

@@ -89,11 +89,12 @@ function formatAsOf(asOf: string | undefined): string | null {
 type SectionId = 'fundamentals' | 'dynamics' | 'grading';
 
 /**
- * Free-tier prediction tease, from the design: the block starts 61pt
- * above the card's bottom edge and the ramp starts 12pt above the block,
- * so the call is a shape long before it is a sentence.
+ * Free-tier prediction tease: the whole first signal row plus the top of
+ * the second, so the section reads as a real answer sitting there rather
+ * than as an empty gap above a button. Its words are placeholders (see
+ * AIValuation's masked mode), so the peek costs nothing.
  */
-const PREDICTION_PEEK = 60;
+const PREDICTION_PEEK = 86;
 /**
  * 73 in the design, where the card has no bottom padding and the ramp
  * starts 12pt above the block. Ours keeps the card's 24pt padding, so the
@@ -783,6 +784,7 @@ function CardDetailScreen() {
                     >
                       <AIValuation
                         embedded
+                        masked
                         card={card}
                         marketPrice={price.currentPrice}
                         liveDynamics={cardStats?.dynamics}

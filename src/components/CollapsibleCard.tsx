@@ -41,6 +41,12 @@ interface CollapsibleCardProps {
   /** Trailing header slot — eBay dynamics puts its "7d avg" chip here. */
   headerRight?: React.ReactNode;
   /**
+   * Ramp height. The default suits a tall section; a short locked card
+   * wants less, or the ramp reaches the top of the card and dims content
+   * that is meant to be seen.
+   */
+  scrimHeight?: number;
+  /**
    * Spoken equivalent of `headerRight`. The header is one button, so its
    * label replaces whatever the chips would have said — a "Sample data"
    * disclosure that only exists as a chip would go unannounced.
@@ -90,6 +96,7 @@ export function CollapsibleCard({
   headerRight,
   headerRightLabel,
   label,
+  scrimHeight,
 }: CollapsibleCardProps) {
   const { colors } = useTheme();
   const reduceMotion = useReducedMotion();
@@ -241,6 +248,7 @@ export function CollapsibleCard({
           label={ctaLabel}
           onPress={onPress}
           background={colors.surfaceVariant}
+          height={scrimHeight}
           gradientStyle={scrimStyle}
           // Nothing to announce as expandable on a card that cannot open.
           expanded={locked ? undefined : isOpen}
