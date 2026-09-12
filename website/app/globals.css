@@ -598,6 +598,19 @@ ul.plain {
 
 .showcase .say { color: var(--ink-2); margin-top: var(--gap-1); max-width: 34ch; }
 
+/* A quiet way through to the explainer page, for the reader who wants
+   the method behind the panel. */
+.showcase .more {
+  margin-top: var(--gap-2);
+  font-size: 0.9rem;
+
+  & a {
+    color: var(--brand);
+    text-decoration: none;
+    &:hover { text-decoration: underline; }
+  }
+}
+
 
 
 .closer {

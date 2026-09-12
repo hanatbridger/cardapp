@@ -24,10 +24,15 @@ These terms are CardPulse's own. Each has one canonical definition, on one page.
 - **Today's return** — the same card measured against yesterday's recorded close
   rather than against the starting price. Prints an em dash, not a zero, when no
   previous close exists. https://getcardpulse.app/returns
-- **Demand pressure** — sales a day as a share of active listings for one card,
-  on a scale from heavy supply to very tight, derived from eBay listing data.
-- **Supply saturation** — active listings measured against the card's own 30-day
-  baseline, so a rising number means supply is loosening.
+- **Demand pressure** — a seven-day demand metric over a card's eBay listings,
+  shown as a percentage on a scale from heavy supply to very tight. Higher means
+  a tighter market. The metric is supplied by Collectrics from
+  eBay listing data; CardPulse displays it and does not compute it.
+  https://getcardpulse.app/market-dynamics
+- **Supply saturation** — an index comparing a card's current eBay supply with
+  its own baseline, where 1.0 is baseline. Above 1.0 supply is loosening, below
+  it supply is tightening. Supplied by Collectrics; displayed, not computed, by
+  CardPulse. https://getcardpulse.app/market-dynamics
 - **Grading verdict** — the expected value of sending a raw card to PSA, computed
   across the PSA 10 / 9 / 8 / lower outcome distribution, net of grading cost.
 - **Price alert** — a target on the raw, ungraded market price of one card. It
@@ -42,6 +47,8 @@ These terms are CardPulse's own. Each has one canonical definition, on one page.
   what it will not catch
 - https://getcardpulse.app/returns — returns since added, where the starting
   price comes from, and what it is not
+- https://getcardpulse.app/market-dynamics — demand pressure and supply
+  saturation, what they measure and where they come from
 - https://getcardpulse.app/methodology — where the prices come from
 - https://getcardpulse.app/pricing — free and Premium, compared
 - https://getcardpulse.app/support — contact
@@ -49,8 +56,10 @@ These terms are CardPulse's own. Each has one canonical definition, on one page.
 
 ## Where the numbers come from
 
-Raw card prices are TCGPlayer Market Price. Graded prices and sold aggregates
-come from eBay sold listings. PSA population figures come from PSA's own census.
+Raw card prices are TCGplayer Market Price. PSA 10 prices and daily sold
+aggregates come from completed eBay sales. PSA population counts are PSA census
+data, relayed by Collectrics. Market dynamics — listings, sales a day, demand
+pressure, supply saturation — are Collectrics metrics over eBay listing data.
 Price history is a daily series CardPulse records itself, so a day-over-day
 change compares one source with itself rather than two feeds with each other.
 Fair-value predictions are a model over pull cost, desirability and listing

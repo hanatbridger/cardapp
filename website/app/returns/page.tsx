@@ -29,7 +29,7 @@ const FAQ = [
   },
   {
     q: 'Is returns since added free?',
-    a: 'The card shows on the free tier with your own figures behind an upgrade prompt. Reading them, and the 20% pushes, are part of Premium at $4.99 a month or $29.99 a year.',
+    a: 'The card shows on the free tier, but its figures are placeholders behind an upgrade prompt. Reading them, and the 20% pushes, are part of Premium at $4.99 a month or $29.99 a year.',
   },
 ];
 
@@ -123,9 +123,9 @@ export default function Page() {
       <section className="block">
         <h2>Price</h2>
         <p>
-          The card is visible on the free tier with your own figures behind an
-          upgrade prompt. Reading them, and the 20% pushes, are part of Premium at
-          $4.99 a month or $29.99 a year.
+          The card is visible on the free tier, with its figures shown as
+          placeholders behind an upgrade prompt. Reading them, and the 20% pushes,
+          are part of Premium at $4.99 a month or $29.99 a year.
         </p>
       </section>
     </div>

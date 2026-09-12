@@ -118,6 +118,7 @@ export default function Home() {
         <div>
           <h2>What it has made since you added it.</h2>
           <p className="say">We record the price the day you add a card. Everything after that is return.</p>
+          <p className="more"><a href="/returns">How returns are measured</a></p>
         </div>
         <Reveal>
         <div className="ret-card" aria-label="Returns since added: Charizard ex added 18 July at $312.40, up $3.08 or 0.80% today and $57.51 or 18.40% in total">
@@ -153,6 +154,7 @@ export default function Home() {
         <div>
           <h2>The market, measured.</h2>
           <p className="say">Active listings, sales a day, and demand pressure, from live eBay data.</p>
+          <p className="more"><a href="/market-dynamics">What the gauges measure</a></p>
         </div>
         <Reveal>
         <div className="dyn-card" aria-label="Market dynamics: 34 active listings, 2.6 new per day, 3.1 sold per day, demand pressure high">

@@ -1,4 +1,27 @@
 import type { Metadata } from 'next';
+import { Faq } from '@/components/Faq';
+
+// Each answer restates something the sections above already say — no
+// question here is answered only in the schema.
+const FAQ = [
+  {
+    q: 'How do I get notified when a Pokémon card hits a price?',
+    a: 'Put the card on your CardPulse list, set a target price and a direction — above if you are waiting to sell, below if you are waiting to buy. When the raw market price crosses the target, the app sends a push notification.',
+  },
+  {
+    q: 'How often does CardPulse check a price alert?',
+    a: 'About once a minute while the app is open, on a schedule iOS controls while it is backgrounded, and once a day server-side while it is closed. A card that spikes and falls back inside one day, with the app closed, will not fire.',
+  },
+  {
+    q: 'Can I set a price alert on a PSA 10 or graded card?',
+    a: 'No. Alerts run on raw, ungraded prices only. There is no graded price feed behind them, so the app declines to set one rather than accept an alert it cannot honour.',
+  },
+  {
+    q: 'Does a price alert buy or sell the card for me?',
+    a: 'No. It is a notification. CardPulse does not place orders, hold funds, or connect to any marketplace.',
+  },
+];
+
 export const metadata: Metadata = {
   title: 'How price alerts work',
   description: 'What a CardPulse price alert checks, how often it checks it, and what it will not catch.',
@@ -63,6 +86,8 @@ export default function Page() {
           ever.
         </p>
       </section>
+
+      <Faq items={FAQ} />
     </div>
   );
 }

@@ -1,4 +1,25 @@
 import type { Metadata } from 'next';
+import { Faq } from '@/components/Faq';
+
+const FAQ = [
+  {
+    q: 'Is CardPulse free?',
+    a: 'Yes. The free tier holds five cards or sealed products and three active price alerts, with no ads. Search, price history, market dynamics, recent sales, daily movers, the grading verdict and the news feed are the same on both tiers.',
+  },
+  {
+    q: 'What does CardPulse Premium add?',
+    a: 'An unlimited watchlist, unlimited price alerts, returns since added with a push at plus or minus 20%, and AI predictions. Premium is $4.99 a month or $29.99 a year.',
+  },
+  {
+    q: 'Can I see returns since added without Premium?',
+    a: 'The card shows on the free tier, but its figures are placeholders behind an upgrade prompt. Reading them, and the 20% pushes, are part of Premium.',
+  },
+  {
+    q: 'How do I cancel CardPulse Premium?',
+    a: 'In your Apple Account settings. The subscription renews automatically unless auto-renew is turned off at least 24 hours before the end of the current period.',
+  },
+];
+
 export const metadata: Metadata = {
   title: 'Price',
   description: 'Free for 5 cards and 3 alerts. Premium is $4.99 a month or $29.99 a year, removes both caps, and adds returns since added and AI predictions.',
@@ -34,8 +55,8 @@ export default function Page() {
           </table>
         </div>
         <p className="note">
-          Preview means the card is there with your own figures in it, faded
-          behind the upgrade prompt — not hidden, not fabricated. $4.99 a month
+          Preview means the card is there with its layout intact and its
+          figures replaced by placeholders behind the upgrade prompt. $4.99 a month
           or $29.99 a year. Cards and sealed products share the same
           five free slots. Two cards are already on the list the first time you
           open the app and they count toward the five.
@@ -51,6 +72,8 @@ export default function Page() {
           in your Apple Account settings.
         </p>
       </section>
+
+      <Faq items={FAQ} />
     </div>
   );
 }
