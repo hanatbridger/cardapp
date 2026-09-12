@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import {
+  AccessibilityInfo,
   View,
   Pressable,
   KeyboardAvoidingView,
@@ -73,8 +74,16 @@ export function BottomSheet({
 
   // Built once: fresh builders every render made Reanimated re-serialize
   // both configs to the UI runtime on each keystroke inside a form sheet.
+  const bodyRef = useRef<React.ComponentRef<typeof View>>(null);
   const anim = useMemo(() => {
-    const fireOpened = () => onOpenedRef.current?.();
+    const fireOpened = () => {
+      // Move VoiceOver into the sheet. Without it focus stays on whatever
+      // was behind, which the sheet now hides.
+      if (Platform.OS !== 'web' && bodyRef.current) {
+        AccessibilityInfo.sendAccessibilityEvent(bodyRef.current, 'focus');
+      }
+      onOpenedRef.current?.();
+    };
     return {
       backdropIn: FadeIn.duration(ENTER_MS),
       backdropOut: FadeOut.duration(EXIT_MS),
@@ -139,90 +148,89 @@ export function BottomSheet({
           native modal. Modality itself is set on the PortalHost, whose
           sibling is the navigator. */}
       <View style={StyleSheet.absoluteFill} onAccessibilityEscape={onClose}>
-        {/* Backdrop is a sibling, not an ancestor, so its fade never bleeds
-            into the sheet. */}
+        {/* Backdrop is a SIBLING behind the sheet, never an ancestor. As an
+            ancestor its Pressable was an accessibility element wrapping
+            everything, so iOS collapsed the entire sheet into ONE element:
+            VoiceOver could not reach a field, a row or a button, and
+            activating what it did reach just closed the sheet. */}
         <Animated.View
           entering={anim.backdropIn}
           exiting={anim.backdropOut}
           style={[StyleSheet.absoluteFill, { backgroundColor: colors.scrim }]}
-        />
+        >
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={onClose}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss"
+          />
+        </Animated.View>
+        {/* box-none (in style, for Fabric): taps above the sheet fall
+            through to the backdrop, taps on the sheet stop at the sheet. */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={{ flex: 1 }}
+          style={{ flex: 1, justifyContent: 'flex-end', pointerEvents: 'box-none' }}
         >
-          {/* accessible={false} on both Pressables: a Pressable is an
-              accessibility element by default, which on iOS collapses
-              everything inside it into ONE element — VoiceOver could not
-              reach a single row or button. No role either: on web a
-              role="button" renders <button>, and the sheet's own buttons
-              inside it would be nested buttons. */}
-          <Pressable
-            accessible={false}
-            style={{ flex: 1, justifyContent: 'flex-end' }}
-            onPress={onClose}
+          <Animated.View
+            entering={anim.sheetIn}
+            exiting={anim.sheetOut}
+            style={height !== undefined ? { height } : undefined}
           >
-            <Animated.View
-              entering={anim.sheetIn}
-              exiting={anim.sheetOut}
-              style={height !== undefined ? { height } : undefined}
+            <View
+              ref={bodyRef}
+              style={{
+                flex: height !== undefined ? 1 : undefined,
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: radius['2xl'],
+                borderTopRightRadius: radius['2xl'],
+                padding: spacing[5],
+                // Clear the home indicator; Modal's spacer used to guess.
+                paddingBottom: Math.max(insets.bottom, spacing[4]) + spacing[2],
+                gap: spacing[4],
+                ...shadows.xl,
+              }}
             >
-              <Pressable
-                accessible={false}
-                onPress={(e) => e.stopPropagation()}
-                style={{
-                  flex: height !== undefined ? 1 : undefined,
-                  backgroundColor: colors.surface,
-                  borderTopLeftRadius: radius['2xl'],
-                  borderTopRightRadius: radius['2xl'],
-                  padding: spacing[5],
-                  // Clear the home indicator; Modal's spacer used to guess.
-                  paddingBottom: Math.max(insets.bottom, spacing[4]) + spacing[2],
-                  gap: spacing[4],
-                  ...shadows.xl,
-                }}
-              >
-                {/* Handle bar */}
-                <View style={{ alignItems: 'center' }}>
-                  <View
-                    style={{
-                      width: 36,
-                      height: 4,
-                      borderRadius: radius.full,
-                      backgroundColor: colors.outline,
-                    }}
-                  />
-                </View>
+              {/* Handle bar */}
+              <View style={{ alignItems: 'center' }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 4,
+                    borderRadius: radius.full,
+                    backgroundColor: colors.outline,
+                  }}
+                />
+              </View>
 
-                {title ? (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                    }}
+              {title ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                  }}
+                >
+                  <Text variant="headingSm" accessibilityRole="header">
+                    {title}
+                  </Text>
+                  <Pressable
+                    onPress={onClose}
+                    hitSlop={8}
+                    accessibilityLabel="Close"
+                    accessibilityRole="button"
                   >
-                    <Text variant="headingSm" accessibilityRole="header">
-                      {title}
-                    </Text>
-                    <Pressable
-                      onPress={onClose}
-                      hitSlop={8}
-                      accessibilityLabel="Close"
-                      accessibilityRole="button"
-                    >
-                      <IconX size={20} color={colors.onSurfaceMuted} />
-                    </Pressable>
-                  </View>
-                ) : null}
+                    <IconX size={20} color={colors.onSurfaceMuted} />
+                  </Pressable>
+                </View>
+              ) : null}
 
-                {height !== undefined ? (
-                  <View style={{ flex: 1, gap: spacing[4] }}>{children}</View>
-                ) : (
-                  children
-                )}
-              </Pressable>
-            </Animated.View>
-          </Pressable>
+              {height !== undefined ? (
+                <View style={{ flex: 1, gap: spacing[4] }}>{children}</View>
+              ) : (
+                children
+              )}
+            </View>
+          </Animated.View>
         </KeyboardAvoidingView>
       </View>
     </Portal>

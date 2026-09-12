@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useLayoutEffect, useSyncExternalStore } from 'react';
+import React, { useId, useLayoutEffect, useSyncExternalStore } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 /**
@@ -18,9 +18,10 @@ import { StyleSheet, View } from 'react-native';
  * outside the navigator, so navigation hooks (useNavigation, useFocusEffect)
  * are unavailable in portal content — the imperative `router` still works.
  *
- * Caveat: content stays mounted while its owning screen is blurred and
- * frozen by react-native-screens, and a frozen screen's state updates do
- * not commit. Owners must close their overlay on blur — BottomSheet does.
+ * A frozen screen's state updates do not commit, so an overlay whose
+ * owner is frozen could not close itself. Two guards: this module drops
+ * entries in a layout cleanup (which Suspense runs), and owners close on
+ * blur — BottomSheet does both.
  */
 
 interface Entry {
@@ -68,7 +69,12 @@ export function Portal({ children }: { children: React.ReactNode }) {
   useLayoutEffect(() => {
     setEntry(key, children);
   }, [key, children]);
-  useEffect(() => () => removeEntry(key), [key]);
+  // Layout cleanup, not passive: react-freeze hides a blurred screen
+  // through Suspense, which runs LAYOUT cleanups but not passive ones. As
+  // a passive cleanup this left the overlay in the host after its owner
+  // was frozen — visible, on top of the next screen, and unclosable,
+  // because a frozen owner never commits the state change from onClose.
+  useLayoutEffect(() => () => removeEntry(key), [key]);
   return null;
 }
 
