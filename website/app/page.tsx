@@ -1,5 +1,6 @@
 import { BrandMark } from '@/components/BrandMark';
 import { AppStoreBadge } from '@/components/AppStoreBadge';
+import { Reveal } from '@/components/Reveal';
 
 /* The hero device: real captures of the app (header, watchlist) layered
    with live DOM for the moving parts — the iOS status bar and the
@@ -118,6 +119,7 @@ export default function Home() {
           <h2>What it has made since you added it.</h2>
           <p className="say">We record the price the day you add a card. Everything after that is return.</p>
         </div>
+        <Reveal>
         <div className="ret-card" aria-label="Returns since added: Charizard ex added 18 July at $312.40, up $3.08 or 0.80% today and $57.51 or 18.40% in total">
           <div className="ret-head">Track your returns since added</div>
           <div className="ret-base">
@@ -133,20 +135,26 @@ export default function Home() {
           <div className="ret-rows">
             <div className="ret-row">
               <span className="ret-key">Today&rsquo;s return</span>
-              <span className="ret-val">+$3.08 (0.80%)</span>
+              <span className="ret-val count" style={{ '--d': 3, '--c': 8, '--p': 0, '--pc': 80 } as React.CSSProperties}>
+                +$3.08 (0.80%)
+              </span>
             </div>
             <div className="ret-row">
               <span className="ret-key">Total return</span>
-              <span className="ret-val">+$57.51 (18.40%)</span>
+              <span className="ret-val count" style={{ '--d': 57, '--c': 51, '--p': 18, '--pc': 40 } as React.CSSProperties}>
+                +$57.51 (18.40%)
+              </span>
             </div>
           </div>
         </div>
+        </Reveal>
       </section>
       <section className="showcase">
         <div>
           <h2>The market, measured.</h2>
           <p className="say">Active listings, sales a day, and demand pressure, from live eBay data.</p>
         </div>
+        <Reveal>
         <div className="dyn-card" aria-label="Market dynamics: 34 active listings, 2.6 new per day, 3.1 sold per day, demand pressure high">
           <div className="chart-label">EBAY MARKET DYNAMICS &middot; 7D AVG</div>
           <div className="dyn-grid">
@@ -163,6 +171,7 @@ export default function Home() {
             <div className="g-track"><div className="g-fill dim" style={{ '--w': '31%' } as React.CSSProperties} /></div>
           </div>
         </div>
+        </Reveal>
       </section>
       <section className="showcase flip">
         <div>

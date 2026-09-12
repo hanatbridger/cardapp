@@ -1175,24 +1175,27 @@ body::before {
 
 .g-fill {
   height: 100%;
-  width: var(--w);
+  /* Starts empty and is filled by [data-in] below. A transition, not a
+     scroll-timeline animation: view() resolves to a zero-length duration
+     here — the animation reported progress 1 while the panel was still
+     two thousand pixels below the fold — so the old version painted its
+     end state and never moved. See components/Reveal.tsx. */
+  width: 0;
   border-radius: 999px;
   background: var(--brand);
+  transition: width 900ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .g-fill.dim { background: color-mix(in srgb, var(--brand) 45%, transparent); }
 
-@supports (animation-timeline: view()) {
-  .g-fill {
-    animation: gauge-fill both;
-    animation-timeline: view();
-    animation-range: entry 30% cover 45%;
-  }
-}
+[data-in] .g-fill { width: var(--w); }
 
-@keyframes gauge-fill {
-  from { width: 0; }
-  to { width: var(--w); }
+/* The second gauge follows the first, so the panel reads as one gesture
+   rather than two things happening at once. */
+[data-in] .dyn-gauge:nth-of-type(2) .g-fill { transition-delay: 120ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .g-fill { transition: none; }
 }
 
 /* ---------- returns since added ---------- */
@@ -1258,4 +1261,59 @@ body::before {
 .ret-val {
   font-size: 0.95rem;
   font-variant-numeric: tabular-nums;
+  /* The figure is one unit — money and percent never break apart. */
+  white-space: nowrap;
+}
+
+/* ---------- counting figures ---------- */
+
+/* The return values count up when the card arrives. Registered custom
+   properties are what make a number animatable at all: counters read
+   them, and `content` re-renders every frame as they interpolate. The
+   literal text stays in the markup — transparent, so it still reserves
+   the exact final width and screen readers and copy-paste still get the
+   real value — and the counter is painted over it. */
+@property --n-d { syntax: '<integer>'; initial-value: 0; inherits: false; }
+@property --n-c { syntax: '<integer>'; initial-value: 0; inherits: false; }
+@property --n-p { syntax: '<integer>'; initial-value: 0; inherits: false; }
+@property --n-pc { syntax: '<integer>'; initial-value: 0; inherits: false; }
+
+.ret-val.count {
+  position: relative;
+  color: transparent;
+}
+
+.ret-val.count::after {
+  content: '+$' counter(nd) '.' counter(nc, decimal-leading-zero)
+    ' (' counter(np) '.' counter(npc, decimal-leading-zero) '%)';
+  counter-reset: nd var(--n-d) nc var(--n-c) np var(--n-p) npc var(--n-pc);
+  position: absolute;
+  inset: 0;
+  text-align: right;
+  color: var(--ink);
+}
+
+[data-in] .ret-val.count::after {
+  animation: count-up 1100ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+@keyframes count-up {
+  to {
+    --n-d: var(--d);
+    --n-c: var(--c);
+    --n-p: var(--p);
+    --n-pc: var(--pc);
+  }
+}
+
+/* No support for registered properties, or the reader asked for less
+   motion: the literal text is already correct, so drop the overlay. */
+@supports not (background: paint(x)) {
+  .ret-val.count { color: var(--ink); }
+  .ret-val.count::after { content: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ret-val.count { color: var(--ink); }
+  .ret-val.count::after { content: none; }
 }
