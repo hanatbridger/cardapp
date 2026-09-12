@@ -175,7 +175,14 @@ export const useUserStore = create<UserStore>()(
         // doesn't bounce the user to /login. Profile fields stay as-
         // is — they were saved on first sign-in and persist alongside.
         try {
-          const { data } = await supabase.auth.getSession();
+          const { data, error } = await supabase.auth.getSession();
+          // getSession doesn't throw when the token refresh fails — it
+          // returns a null session plus the fetch error. Reading that as
+          // "signed out" bounced offline users (plane, subway, captive
+          // wifi, Supabase 5xx) to /login with a valid session still on
+          // disk. A genuine rejection removes the session and emits
+          // SIGNED_OUT, so keeping local state here is safe.
+          if (error) return;
           if (data.session) {
             set({ isAuthenticated: true });
           } else {

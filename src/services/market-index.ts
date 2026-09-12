@@ -4,8 +4,11 @@ import { Platform } from 'react-native';
  * Client for /api/market-index — matched-basket market, card and sealed
  * indices sharing one anchor date.
  * The card side is computed from our own price_snapshots table, so it
- * holds up regardless of upstream provider access. Returns null on any
- * failure; the trends strip hides itself.
+ * holds up regardless of upstream provider access. Throws on transport
+ * failure so React Query gets retry and error semantics instead of
+ * caching an outage as a successful "no index" for the full 6h
+ * staleTime; returns null only when the payload itself carries no
+ * index, and the trends strip hides itself.
  */
 
 // Same origin resolution as card-stats.ts: the Vercel function only
@@ -47,12 +50,10 @@ export async function fetchMarketIndex(): Promise<MarketIndex | null> {
   const timer = setTimeout(() => ctl.abort(), 10000);
   try {
     const res = await fetch(`${PROXY_ORIGIN}/api/market-index`, { signal: ctl.signal });
-    if (!res.ok) return null;
+    if (!res.ok) throw new Error(`market-index ${res.status}`);
     const data = (await res.json()) as MarketIndex;
     if (!data || (!data.market && !data.card && !data.sealed)) return null;
     return data;
-  } catch {
-    return null;
   } finally {
     clearTimeout(timer);
   }

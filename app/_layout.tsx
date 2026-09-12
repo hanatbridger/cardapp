@@ -27,6 +27,7 @@ import {
 } from '../src/services/revenue-cat';
 import { configureGoogleSignin } from '../src/services/google-auth';
 import { registerForPushNotifications } from '../src/services/push';
+import { resyncAlertTargets } from '../src/stores/alerts-store';
 import { recordLaunch, startSessionClock } from '../src/utils/review-prompt';
 import { supabase, registerSupabaseAppStateBridge } from '../src/services/supabase';
 import {
@@ -66,7 +67,10 @@ configureNotificationHandler();
 // Register this device's Expo push token with the backend so the server
 // can deliver news pushes even when the app is closed. No-op unless
 // notification permission is already granted (no launch-time prompt).
-registerForPushNotifications();
+// Alerts created before a push token existed were never mirrored to the
+// server, so the daily cron could not push for them. Re-sync once the
+// token is registered.
+registerForPushNotifications().then(() => resyncAlertTargets());
 
 // Pump Supabase token refresh while the app is foregrounded. Without
 // this RN suspends timers in the background and refresh-on-wake
@@ -101,9 +105,15 @@ function AuthGate() {
     hydrateFromSupabase();
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
-        // Mirror Supabase logout into the local boolean. Profile data
-        // stays put — wiping it is the deleteAccount path, not signOut.
-        useUserStore.setState({ isAuthenticated: false });
+        // Only an explicit sign-out clears the flag. INITIAL_SESSION also
+        // arrives with a null session when an offline refresh fails, and
+        // treating that as a sign-out bounced signed-in users to the login
+        // screen on a flaky cold start — the same defect hydrateFromSupabase
+        // guards against. Profile data stays put either way; wiping it is
+        // the deleteAccount path, not signOut.
+        if (event === 'SIGNED_OUT') {
+          useUserStore.setState({ isAuthenticated: false });
+        }
         return;
       }
       // SIGNED_IN with a session: the only path that reaches here

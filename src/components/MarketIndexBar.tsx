@@ -67,6 +67,10 @@ export function MarketIndexBar() {
             <View
               key={label}
               style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}
+              // Without `accessible` iOS ignores the label and reads the
+              // child Texts instead — the bare percent, no horizon, no
+              // direction word.
+              accessible
               accessibilityLabel={
                 w
                   ? `${spoken} index, ${active.spoken}, ${w.changePct >= 0 ? 'up' : 'down'} ${Math.abs(w.changePct).toFixed(2)} percent`

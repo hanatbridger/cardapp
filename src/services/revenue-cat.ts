@@ -30,6 +30,7 @@ import { useUserStore } from '../stores/user-store';
 // revenue-cat → supabase is also one-way (supabase does not import this
 // module), so no cycle. Used to bind RC identity to the auth user.
 import { supabase } from './supabase';
+import { captureException } from './sentry';
 
 const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 const ENTITLEMENT_ID = 'premium';
@@ -232,7 +233,17 @@ export async function restorePurchases(): Promise<boolean> {
   try {
     const customerInfo = await Purchases.restorePurchases();
     return customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
-  } catch {
-    return false;
+  } catch (e: any) {
+    if (e?.userCancelled) return false;
+    // Swallowing this returned `false`, which the paywall shows as "No
+    // Subscription Found" — telling a paying subscriber on a bad
+    // connection that they never bought anything (a path App Review
+    // exercises). Report it and let the paywall's catch say "Restore
+    // Failed" instead.
+    captureException(
+      e instanceof Error ? e : new Error(String(e?.message ?? e)),
+      { where: 'restorePurchases' },
+    );
+    throw e;
   }
 }
