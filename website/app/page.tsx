@@ -113,38 +113,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       <section className="showcase flip">
-        <div>
-          <h2>A push when it hits your price.</h2>
-          <p className="say">Set a number. Put the phone down.</p>
-        </div>
-        <div className="notif-stack">
-          <div className="notif banner n3">
-            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-            <div>
-              <div className="t">CardPulse</div>
-              <div className="b">Charizard ex is now below $370 &mdash; currently $368.20.</div>
-            </div>
-          </div>
-          <div className="notif banner n2">
-            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-            <div>
-              <div className="t">CardPulse</div>
-              <div className="b">Latias &#9733; is now below $1,450 &mdash; currently $1,439.</div>
-            </div>
-          </div>
-          <div className="notif banner n1">
-            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
-            <div>
-              <div className="t">CardPulse</div>
-              <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="showcase">
         <div>
           <h2>What it has made since you added it.</h2>
           <p className="say">We record the price the day you add a card. Everything after that is return.</p>
@@ -173,8 +142,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      <section className="showcase flip">
+      <section className="showcase">
         <div>
           <h2>The market, measured.</h2>
           <p className="say">Active listings, sales a day, and demand pressure, from live eBay data.</p>
@@ -196,7 +164,24 @@ export default function Home() {
           </div>
         </div>
       </section>
-
+      <section className="showcase flip">
+        <div>
+          <h2>Any currency.</h2>
+          <p className="say">Every price converts to the one you pick, at a daily rate.</p>
+        </div>
+        <div className="currency-card" aria-label="The same card price shown in dollars, euros, yen and pounds">
+          <div className="chart-label">UMBREON VMAX &middot; RAW</div>
+          <div className="cur-roll" aria-hidden="true">
+            <div className="cur-list">
+              <div className="cur-line"><span className="cur-amount">$2,380</span><span className="cur-code">USD</span></div>
+              <div className="cur-line"><span className="cur-amount">&euro;2,190</span><span className="cur-code">EUR</span></div>
+              <div className="cur-line"><span className="cur-amount">&yen;352,000</span><span className="cur-code">JPY</span></div>
+              <div className="cur-line"><span className="cur-amount">&pound;1,860</span><span className="cur-code">GBP</span></div>
+              <div className="cur-line"><span className="cur-amount">$2,380</span><span className="cur-code">USD</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
       <section className="showcase">
         <div>
           <h2>Every card&rsquo;s history, charted.</h2>
@@ -240,21 +225,31 @@ export default function Home() {
           </div>
         </div>
       </section>
-
       <section className="showcase flip">
         <div>
-          <h2>Any currency.</h2>
-          <p className="say">Every price converts to the one you pick, at a daily rate.</p>
+          <h2>A push when it hits your price.</h2>
+          <p className="say">Set a number. Put the phone down.</p>
         </div>
-        <div className="currency-card" aria-label="The same card price shown in dollars, euros, yen and pounds">
-          <div className="chart-label">UMBREON VMAX &middot; RAW</div>
-          <div className="cur-roll" aria-hidden="true">
-            <div className="cur-list">
-              <div className="cur-line"><span className="cur-amount">$2,380</span><span className="cur-code">USD</span></div>
-              <div className="cur-line"><span className="cur-amount">&euro;2,190</span><span className="cur-code">EUR</span></div>
-              <div className="cur-line"><span className="cur-amount">&yen;352,000</span><span className="cur-code">JPY</span></div>
-              <div className="cur-line"><span className="cur-amount">&pound;1,860</span><span className="cur-code">GBP</span></div>
-              <div className="cur-line"><span className="cur-amount">$2,380</span><span className="cur-code">USD</span></div>
+        <div className="notif-stack">
+          <div className="notif banner n3">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Charizard ex is now below $370 &mdash; currently $368.20.</div>
+            </div>
+          </div>
+          <div className="notif banner n2">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Latias &#9733; is now below $1,450 &mdash; currently $1,439.</div>
+            </div>
+          </div>
+          <div className="notif banner n1">
+            <div className="glyph"><BrandMark size={17} variant="inverse" /></div>
+            <div>
+              <div className="t">CardPulse</div>
+              <div className="b">Moonbreon is now below $420 &mdash; currently $418.50.</div>
             </div>
           </div>
         </div>

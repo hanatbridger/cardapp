@@ -5,36 +5,29 @@ import { useEffect, useRef } from 'react';
 import { BrandMark } from './BrandMark';
 
 /**
- * Sticky header that hides on downward scroll and returns on the first
- * upward scroll — the one behavior on the site that needs JavaScript,
- * since CSS scroll timelines cannot express direction. Server-rendered
- * like any client component, so the nav links stay in the crawled HTML.
+ * Sticky header. It stays on screen the whole way down — the Get the app
+ * button is the page's one call to action, and a bar that hides on scroll
+ * takes it away precisely while someone is reading toward it.
+ *
+ * The JavaScript here does one thing: flag that the page has moved, so
+ * the capsule can frost itself. That cannot be done in CSS alone at the
+ * top of a document. Server-rendered like any client component, so the
+ * nav links stay in the crawled HTML.
  */
 export function Masthead() {
   const ref = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    let last = window.scrollY;
     let ticking = false;
 
     const update = () => {
       ticking = false;
       const el = ref.current;
       if (!el) return;
-      const y = window.scrollY;
-      // Capsule state: detached shadow once the page is moving.
-      if (y > 14) el.setAttribute('data-scrolled', '');
+      // Capsule state: frost and detached shadow once the page is moving,
+      // which is what keeps the bar legible over the content beneath it.
+      if (window.scrollY > 14) el.setAttribute('data-scrolled', '');
       else el.removeAttribute('data-scrolled');
-      // Near the top the bar is always shown; below that, direction rules.
-      // The 8px deadband stops trackpad jitter from flickering it.
-      if (y < 96) {
-        el.removeAttribute('data-hidden');
-      } else if (y > last + 8) {
-        el.setAttribute('data-hidden', '');
-      } else if (y < last - 8) {
-        el.removeAttribute('data-hidden');
-      }
-      last = y;
     };
 
     const onScroll = () => {
@@ -44,6 +37,8 @@ export function Masthead() {
       }
     };
 
+    // Run once: a reload partway down a page starts already scrolled.
+    update();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);

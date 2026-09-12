@@ -691,15 +691,10 @@ p, li, dd, dt { max-width: var(--measure); }
   to { transform: translateY(-4rem); }
 }
 
-/* Hide-on-scroll-down: the Masthead island toggles data-hidden by
-   scroll direction. Transition is killed by the reduced-motion rule. */
-.masthead {
-  transition: translate 0.3s ease;
-}
-
-.masthead[data-hidden] {
-  translate: 0 -100%;
-}
+/* The bar stays put. It used to hide on downward scroll, which meant the
+   one call to action on the page was absent exactly while someone was
+   reading their way toward it. The capsule earns its keep over content by
+   frosting once the page moves, not by leaving. */
 
 
 
