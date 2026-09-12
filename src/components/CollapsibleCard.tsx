@@ -8,22 +8,17 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { IconChevronDown, IconLock } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Card } from './Card';
-import { Button } from './Button';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
-import { MIN_TOUCH_TARGET } from '../constants/layout';
 
 interface CollapsibleCardProps {
   /**
    * Omit when the content already opens with its own headline — the
    * grading verdict leads with "Grade it" and a letter grade, and a
-   * second title above it would just repeat the section to itself. With
-   * no title there is no header row, and the chevron moves into the CTA,
-   * which is then the only control.
+   * second title above it would repeat the section to itself.
    */
   title?: string;
   children: React.ReactNode;
@@ -36,7 +31,10 @@ interface CollapsibleCardProps {
   onToggle: () => void;
   /** How much of the content peeks through while collapsed. */
   collapsedHeight?: number;
-  /** Premium gate: the preview still renders, but the card never opens. */
+  /**
+   * Premium gate: the real content still renders and still fades under
+   * the scrim — that tease IS the pitch — but the card never opens.
+   */
   locked?: boolean;
   /** CTA label while locked, e.g. "Upgrade to view AI predictions". */
   lockedLabel?: string;
@@ -50,8 +48,15 @@ interface CollapsibleCardProps {
  * disclosure and overlays read as one motion system.
  */
 const TOGGLE_MS = 220;
-/** Ramp height of the fade over the bottom of the clipped preview. */
-const FADE_HEIGHT = spacing[10];
+/**
+ * Height of the scrim over the cut, from the design (125 at 393pt wide).
+ * Deliberately deep: a short ramp reads as a shadow, while this one takes
+ * the last rows down to nothing, which is what makes a locked card a
+ * tease rather than a wall.
+ */
+const SCRIM_HEIGHT = 120;
+/** Bottom strip of the scrim that carries the CTA and takes the tap. */
+const CTA_HEIGHT = 48;
 /**
  * Overflow under this is not worth a control — the preview already shows
  * the whole section, and a "View more" that reveals four pixels lies.
@@ -59,14 +64,17 @@ const FADE_HEIGHT = spacing[10];
 const OVERFLOW_SLOP = 8;
 
 /**
- * The one collapsing-section primitive on the card detail screen. Header
- * row + content clipped to a peek height + a centred CTA underneath.
+ * The one collapsing-section primitive on the card detail screen: header
+ * row, content clipped to a peek height, and a gradient scrim over the
+ * cut whose bottom strip carries the only control — "View more", or
+ * "Upgrade to view …" when the section is gated.
  *
- * Height and chevron both animate from a single shared `progress`, so the
- * whole transition runs on the UI thread — no setState per frame. Content
- * height is measured once by layout rather than assumed, which is what
- * lets a section that grows after its fetch lands (odds bars, listings)
- * open to its real size instead of a guess.
+ * The scrim bleeds over the card's padding so the fade reaches all four
+ * edges, which is why the Card clips. Height, scrim opacity and the CTA
+ * all animate from a single shared `progress`, so the whole transition
+ * runs on the UI thread with no setState per frame. Content height is
+ * measured by layout rather than assumed — a section that grows after
+ * its fetch lands (odds bars, listings) opens to its real size.
  */
 export function CollapsibleCard({
   title,
@@ -133,24 +141,26 @@ export function CollapsibleCard({
     if (Math.abs(h - contentHeight) > 1) setContentHeight(h);
   };
 
+  const overflows = contentHeight > collapsedHeight + OVERFLOW_SLOP;
+  // A locked card always keeps its CTA: it is the only route to the
+  // paywall, even when the teaser happens to fit inside the peek.
+  const showCta = locked || overflows;
+
   const clipStyle = useAnimatedStyle(() => {
     // Before the first layout only the collapsed box is known. The height
     // key stays present in every branch — dropping it would leave the
     // last committed height behind once the measurement lands.
     const full = fullHeight.value > collapsedHeight ? fullHeight.value : collapsedHeight;
-    return { height: collapsedHeight + (full - collapsedHeight) * progress.value };
+    // Open, the content also has to clear the "View less" strip, which
+    // sits over the card's own bottom padding.
+    const openHeight = full + (showCta ? CTA_HEIGHT - spacing[6] : 0);
+    return { height: collapsedHeight + (openHeight - collapsedHeight) * progress.value };
   });
 
-  const fadeStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }));
+  // Only the gradient fades — the CTA stays legible the whole way, since
+  // it is the control.
+  const scrimStyle = useAnimatedStyle(() => ({ opacity: 1 - progress.value }));
 
-  const chevronStyle = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${progress.value * 180}deg` }],
-  }));
-
-  const overflows = contentHeight > collapsedHeight + OVERFLOW_SLOP;
-  // A locked card always keeps its CTA: it is the only route to the
-  // paywall, even when the teaser happens to fit inside the peek.
-  const showToggle = locked || overflows;
   const ctaLabel = locked
     ? (lockedLabel ?? 'Upgrade to view')
     : isOpen
@@ -158,44 +168,39 @@ export function CollapsibleCard({
       : 'View more';
   const onPress = locked ? onUnlock : onToggle;
 
-  // Card's own non-elevated background, so the ramp ends on the surface
-  // the content actually sits on. withAlpha(…, 0) rather than the
-  // 'transparent' keyword: that keyword is rgba(0,0,0,0), and on both
+  // Ends on the Card's own non-elevated background, so the ramp lands on
+  // the surface the content actually sits on. withAlpha(…, 0) rather than
+  // the 'transparent' keyword: that keyword is rgba(0,0,0,0), and on both
   // native platforms the ramp would travel through grey to reach it.
-  const fadeColors: readonly [string, string] = [withAlpha(colors.surface, 0), colors.surface];
+  const scrimColors: readonly [string, string] = [withAlpha(colors.surface, 0), colors.surface];
 
   return (
-    <Card>
+    // Clips because the scrim bleeds over the padding to reach the card's
+    // edges, and square scrim corners over a rounded card would show.
+    <Card style={{ overflow: 'hidden' }}>
       <View style={{ gap: spacing[4] }}>
         {title ? (
-        <Pressable
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={title}
-          accessibilityState={{ expanded: isOpen }}
-          accessibilityHint={locked ? lockedLabel : undefined}
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing[2],
-            // The label alone is ~20pt tall; the row carries the target.
-            minHeight: MIN_TOUCH_TARGET,
-          }}
-        >
-          <Text variant="labelLg" style={{ flex: 1 }}>
-            {title}
-          </Text>
-          {headerRight}
-          {/* A rotating chevron on a card that cannot open would promise
-              an expand that never happens — locked shows a lock. */}
-          {locked ? (
-            <IconLock size={20} color={colors.onSurfaceMuted} strokeWidth={2} />
-          ) : (
-            <Animated.View style={chevronStyle}>
-              <IconChevronDown size={20} color={colors.onSurfaceMuted} strokeWidth={2} />
-            </Animated.View>
-          )}
-        </Pressable>
+          <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={title}
+            accessibilityState={{ expanded: isOpen }}
+            accessibilityHint={locked ? lockedLabel : undefined}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: spacing[2],
+            }}
+            // The CTA strip below is the real control and clears the 44pt
+            // minimum on its own; this row is a convenience target, so it
+            // takes hitSlop instead of padding the card taller than drawn.
+            hitSlop={spacing[2]}
+          >
+            <Text variant="headingSm" style={{ flex: 1 }}>
+              {title}
+            </Text>
+            {headerRight}
+          </Pressable>
         ) : null}
 
         <Animated.View
@@ -226,50 +231,52 @@ export function CollapsibleCard({
           >
             {children}
           </View>
-
-          {overflows && (
-            <Animated.View
-              style={[
-                fadeStyle,
-                {
-                  position: 'absolute',
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  height: FADE_HEIGHT,
-                  pointerEvents: 'none',
-                },
-              ]}
-            >
-              <LinearGradient colors={fadeColors} style={StyleSheet.absoluteFill} />
-            </Animated.View>
-          )}
         </Animated.View>
-
-        {showToggle && (
-          // size lg clears the 44pt minimum on a text-only control, and
-          // fullWidth centres the label across the card.
-          <Button
-            variant={locked ? 'tonal' : 'ghost'}
-            size="lg"
-            fullWidth
-            icon={
-              locked ? (
-                <IconLock size={16} color={colors.onPrimaryContainer} />
-              ) : title ? undefined : (
-                // No header row to rotate a chevron in — it rides the CTA.
-                <Animated.View style={chevronStyle}>
-                  <IconChevronDown size={16} color={colors.onSurfaceVariant} strokeWidth={2} />
-                </Animated.View>
-              )
-            }
-            onPress={onPress}
-            accessibilityState={{ expanded: isOpen }}
-          >
-            {ctaLabel}
-          </Button>
-        )}
       </View>
+
+      {showCta && (
+        // Insets are relative to the card's BORDER box, not its content
+        // box, so zero already bleeds over the padding and reaches all
+        // three edges. Negative values pushed the CTA below the card,
+        // where the clip cut the label in half.
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: SCRIM_HEIGHT,
+            justifyContent: 'flex-end',
+            pointerEvents: 'box-none',
+          }}
+        >
+          <Animated.View style={[StyleSheet.absoluteFill, scrimStyle, { pointerEvents: 'none' }]}>
+            <LinearGradient colors={scrimColors} style={StyleSheet.absoluteFill} />
+          </Animated.View>
+          <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            accessibilityLabel={ctaLabel}
+            accessibilityState={{ expanded: isOpen }}
+            style={{
+              height: CTA_HEIGHT,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              variant="labelSm"
+              // Same weight and colour locked or not, per the design —
+              // the label says which it is, the styling doesn't shout.
+              color={colors.onSurface}
+              // 0.5 tracking, from the design's CTA text style.
+              style={{ letterSpacing: 0.5 }}
+            >
+              {ctaLabel}
+            </Text>
+          </Pressable>
+        </View>
+      )}
     </Card>
   );
 }

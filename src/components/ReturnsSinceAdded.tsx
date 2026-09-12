@@ -1,13 +1,11 @@
 import React from 'react';
 import { View } from 'react-native';
 import { router } from 'expo-router';
-import { IconLock } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Card } from './Card';
-import { Button } from './Button';
+import { CollapsibleCard } from './CollapsibleCard';
 import { useTheme } from '../theme/ThemeProvider';
-import { spacing, radius } from '../theme/tokens';
-import { withAlpha } from '../utils/withAlpha';
+import { spacing } from '../theme/tokens';
 import { useMoney } from '../hooks/use-money';
 import {
   sinceAddedReturn,
@@ -19,6 +17,8 @@ import { useWatchlistStore, isCardItem, type CardWatchlistItem } from '../stores
 import type { GradeType } from '../constants/grades';
 
 const UNKNOWN = '—';
+/** A locked card never toggles; CollapsibleCard still wants a handler. */
+const NOOP = () => {};
 
 interface ReturnsSinceAddedProps {
   cardId: string;
@@ -73,46 +73,7 @@ export function ReturnsSinceAdded({
     ),
   );
 
-  const title = (
-    <Text variant="headingSm">Track your returns since added</Text>
-  );
-
-  if (!isPremium) {
-    return (
-      <Card>
-        <View style={{ gap: spacing[4] }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
-            <View
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: radius.full,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: withAlpha(colors.primary, 0.14),
-              }}
-            >
-              <IconLock size={16} color={colors.primary} />
-            </View>
-            <View style={{ flex: 1 }}>{title}</View>
-          </View>
-          <Text variant="bodySm" color={colors.onSurfaceVariant}>
-            Premium records the price the moment you add a card, then shows what
-            it has made or lost since — today and in total.
-          </Text>
-          <Button
-            variant="tonal"
-            size="lg"
-            fullWidth
-            onPress={() => router.push('/paywall')}
-            accessibilityLabel="Unlock returns since added with Premium"
-          >
-            Unlock with Premium
-          </Button>
-        </View>
-      </Card>
-    );
-  }
+  const title = <Text variant="headingSm">Track your returns since added</Text>;
 
   const total = item ? sinceAddedReturn(item, currentPrice) : null;
   // Read the baseline into locals so the guard below narrows both for the
@@ -212,11 +173,8 @@ export function ReturnsSinceAdded({
     );
   };
 
-  return (
-    <Card>
+  const body = (
       <View style={{ gap: spacing[4] }}>
-        {title}
-
         {/* Baseline the returns below are measured from */}
         <View style={{ flexDirection: 'row', gap: spacing[4] }}>
           <View style={{ flex: 1, gap: spacing['0.5'] }}>
@@ -247,6 +205,34 @@ export function ReturnsSinceAdded({
               : "Waiting on a live price — returns fill in once it loads."}
           </Text>
         )}
+      </View>
+  );
+
+  if (!isPremium) {
+    // The tease is the pitch: a free account sees its OWN entry price and
+    // its OWN return, going illegible under the ramp. Nothing is invented
+    // and nothing is fully readable — the peek stops inside the baseline
+    // row, so the numbers are already fading where they appear.
+    return (
+      <CollapsibleCard
+        title="Track your returns since added"
+        expanded={false}
+        onToggle={NOOP}
+        locked
+        lockedLabel="Upgrade to view"
+        onUnlock={() => router.push('/paywall')}
+        collapsedHeight={64}
+      >
+        {body}
+      </CollapsibleCard>
+    );
+  }
+
+  return (
+    <Card>
+      <View style={{ gap: spacing[4] }}>
+        {title}
+        {body}
       </View>
     </Card>
   );
