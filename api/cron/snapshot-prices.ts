@@ -37,6 +37,7 @@ import {
   type CardCondition,
 } from '../../src/services/grading-verdict';
 import { fetchCollectricsStats } from '../_lib/collectrics';
+import { fetchWithTimeout } from '../_lib/http';
 import { fetchTcgMarketPrice } from '../_lib/tcgplayer';
 
 export const config = { runtime: 'edge' };
@@ -120,6 +121,15 @@ function extractProductId(url: string): string | null {
 // per distinct card, shared by every user watching it; a card whose
 // raw price or PSA 10 price is unavailable today is skipped untouched.
 const GRADING_LOOKUP_CHUNK = 6;
+// The deadline check only guards STARTING a chunk, and one chunk can burn
+// ~18s of sequential upstream timeouts. Stop waiting on a chunk this far
+// past the soft deadline so the Expo send and the triggered_at writes
+// still fit: an invocation killed at the edge limit sends pushes it never
+// records, which re-fires every alert on the next run.
+const GRADING_HARD_OVERRUN_MS = 1_000;
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function evaluateGradingTargets(
   targets: AlertTargetRow[],
@@ -135,6 +145,8 @@ async function evaluateGradingTargets(
   const cards = [...byCard.entries()];
   const fired: FiredAlert[] = [];
 
+  const hardDeadline = deadline + GRADING_HARD_OVERRUN_MS;
+
   for (let i = 0; i < cards.length; i += GRADING_LOOKUP_CHUNK) {
     if (Date.now() > deadline) {
       console.warn(
@@ -142,7 +154,10 @@ async function evaluateGradingTargets(
       );
       break;
     }
-    await Promise.all(
+    // Hits collect per chunk so an unfinished chunk contributes nothing —
+    // its targets stay armed and are evaluated again on a later run.
+    const chunkHits: FiredAlert[] = [];
+    const chunkWork = Promise.all(
       cards.slice(i, i + GRADING_LOOKUP_CHUNK).map(async ([cardId, rows]) => {
         const sample = rows[0];
         const [rawPrice, stats] = await Promise.all([
@@ -176,10 +191,24 @@ async function evaluateGradingTargets(
             verdict.expectedNet,
             verdict.letter,
           );
-          fired.push({ target: t, title, body });
+          chunkHits.push({ target: t, title, body });
         }
       }),
     );
+    const finished = await Promise.race([
+      chunkWork.then(() => true),
+      sleep(Math.max(0, hardDeadline - Date.now())).then(() => false),
+    ]);
+    if (!finished) {
+      // Nothing awaits the abandoned chunk now, so take its rejection
+      // here rather than leaving an unhandled one in the isolate.
+      void chunkWork.catch(() => {});
+      console.warn(
+        `[snapshot-prices] grading sweep hard-stopped mid-chunk: ${cards.length - i} card(s) deferred`,
+      );
+      break;
+    }
+    fired.push(...chunkHits);
   }
   return fired;
 }
@@ -197,26 +226,43 @@ async function checkAlerts(
   snapshots: SnapshotRow[],
   deadline: number,
 ): Promise<{ checked: number; fired: number }> {
-  const loadTargets = (columns: string) =>
-    admin.from('alert_targets').select(columns).is('triggered_at', null);
-  let loaded = await loadTargets(
-    'id, push_token, kind, card_id, card_name, grade, target_price, direction, card_number, condition, threshold_net',
-  );
-  // 42703 = undefined column: the grading-alert migration in
-  // supabase/alerts.sql has not been applied to this database. Every run
-  // since this select gained those columns threw here and skipped the
-  // WHOLE sweep, price alerts included (alertsChecked: -1). Fall back to
-  // the price-only shape so price targets keep firing until it lands.
-  if (loaded.error?.code === '42703') {
-    console.error(
-      '[snapshot-prices] alert_targets is on the pre-grading schema — apply supabase/alerts.sql. Sweeping price targets only.',
-    );
-    loaded = await loadTargets(
-      'id, push_token, card_id, card_name, grade, target_price, direction',
-    );
+  // PostgREST hard-caps a response at 1000 rows, so page — an unbounded
+  // select silently ignored every armed target past the first 1000.
+  // Ordered by id so the pages neither overlap nor skip.
+  const TARGET_PAGE = 1000;
+  const GRADING_COLUMNS =
+    'id, push_token, kind, card_id, card_name, grade, target_price, direction, card_number, condition, threshold_net';
+  const PRICE_COLUMNS = 'id, push_token, card_id, card_name, grade, target_price, direction';
+  const loadTargets = (columns: string, from: number) =>
+    admin
+      .from('alert_targets')
+      .select(columns)
+      .is('triggered_at', null)
+      .order('id', { ascending: true })
+      .range(from, from + TARGET_PAGE - 1);
+
+  let columns = GRADING_COLUMNS;
+  const targets: AlertTargetRow[] = [];
+  for (let page = 0; ; page++) {
+    const from = page * TARGET_PAGE;
+    let loaded = await loadTargets(columns, from);
+    // 42703 = undefined column: the grading-alert migration in
+    // supabase/alerts.sql has not been applied to this database. Every run
+    // since this select gained those columns threw here and skipped the
+    // WHOLE sweep, price alerts included (alertsChecked: -1). Fall back to
+    // the price-only shape so price targets keep firing until it lands.
+    if (loaded.error?.code === '42703') {
+      console.error(
+        '[snapshot-prices] alert_targets is on the pre-grading schema — apply supabase/alerts.sql. Sweeping price targets only.',
+      );
+      columns = PRICE_COLUMNS;
+      loaded = await loadTargets(columns, from);
+    }
+    if (loaded.error) throw new Error(`alert_targets load failed: ${loaded.error.message}`);
+    const pageRows = (loaded.data ?? []) as unknown as AlertTargetRow[];
+    targets.push(...pageRows);
+    if (pageRows.length < TARGET_PAGE) break;
   }
-  if (loaded.error) throw new Error(`alert_targets load failed: ${loaded.error.message}`);
-  const targets = (loaded.data ?? []) as unknown as AlertTargetRow[];
   if (targets.length === 0) return { checked: 0, fired: 0 };
 
   // `kind` defaults to 'price' server-side; null only if a row predates
@@ -301,11 +347,17 @@ async function checkAlerts(
       data: { type: 'alert', cardId: target.card_id },
     }));
     try {
-      const res = await fetch('https://exp.host/--/api/v2/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify(messages),
-      });
+      // Bounded: a hung exp.host would otherwise hold the handler past
+      // the edge limit and kill it before triggered_at is written.
+      const res = await fetchWithTimeout(
+        'https://exp.host/--/api/v2/push/send',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify(messages),
+        },
+        4000,
+      );
       if (!res.ok) continue; // whole batch failed — rows stay armed for tomorrow
       const payload = (await res.json().catch(() => null)) as
         | { data?: ExpoTicket[] }

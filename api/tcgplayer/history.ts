@@ -67,6 +67,8 @@ interface SnapshotRow {
   card_id: string | null;
   snapshot_date: string;
   raw_price: number;
+  /** 'collectrics' (daily cron) or 'tcgplayer' (self-enrollment below). */
+  source: string | null;
 }
 
 const CORS = {
@@ -198,7 +200,7 @@ export default async function handler(req: Request): Promise<Response> {
   // 3. Fetch every snapshot for that product_id, ordered by date.
   const { data: snapshots, error } = await sb
     .from('price_snapshots')
-    .select('product_id, card_id, snapshot_date, raw_price')
+    .select('product_id, card_id, snapshot_date, raw_price, source')
     .eq('product_id', productId)
     .order('snapshot_date', { ascending: true });
 
@@ -219,6 +221,28 @@ export default async function handler(req: Request): Promise<Response> {
   const rows = snapshots ?? [];
   const hasToday = rows.some((s: SnapshotRow) => s.snapshot_date === today);
   const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  // A collectrics sparkline ends YESTERDAY, so hasToday was never true
+  // for a tracked card and every view wrote a 'tcgplayer' row for today
+  // — a second, differently-based price on a day the cron then filled
+  // too. Treat a card whose newest collectrics row is within three days
+  // as still on the leaderboard and leave its series to the cron; only
+  // genuinely untracked cards self-enroll and backfill.
+  const trackedSince = new Date(Date.now() - 3 * 86400000)
+    .toISOString()
+    .slice(0, 10);
+  let lastCollectrics: string | null = null;
+  for (const s of rows as SnapshotRow[]) {
+    if (
+      s.source === 'collectrics' &&
+      (lastCollectrics === null || s.snapshot_date > lastCollectrics)
+    ) {
+      lastCollectrics = s.snapshot_date;
+    }
+  }
+  const tracked = lastCollectrics !== null && lastCollectrics >= trackedSince;
+  // Set when an upstream step below actually failed, so a thin series
+  // caused by that failure isn't cached for an hour.
+  let degraded = false;
   const knownCardIdForWrites =
     confirmedViaApi || rows.some((s: SnapshotRow) => s.card_id === cardId)
       ? cardId
@@ -231,7 +255,7 @@ export default async function handler(req: Request): Promise<Response> {
   // buckets for any product — 90 days at 3-day resolution — so a card
   // with a thin series gets a genuine chart on the very first open.
   // Real data only: buckets are TCGPlayer's own numbers, never derived.
-  if (rows.length < 3 && SERVICE_ROLE_KEY) {
+  if (!tracked && rows.length < 3 && SERVICE_ROLE_KEY) {
     try {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 4000);
@@ -287,6 +311,7 @@ export default async function handler(req: Request): Promise<Response> {
               card_id: knownCardIdForWrites,
               snapshot_date: b.date,
               raw_price: b.price,
+              source: 'tcgplayer',
             } as SnapshotRow);
           }
           rows.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
@@ -294,9 +319,10 @@ export default async function handler(req: Request): Promise<Response> {
       }
     } catch {
       // Backfill is best-effort — the chart renders whatever exists.
+      degraded = true;
     }
   }
-  if (!hasToday && SERVICE_ROLE_KEY) {
+  if (!tracked && !hasToday && SERVICE_ROLE_KEY) {
     try {
       const ctl = new AbortController();
       const timer = setTimeout(() => ctl.abort(), 4000);
@@ -329,13 +355,17 @@ export default async function handler(req: Request): Promise<Response> {
             card_id: knownCardIdForWrites,
             snapshot_date: today,
             raw_price: marketPrice,
+            source: 'tcgplayer',
           } as SnapshotRow);
           rows.sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
         }
+      } else {
+        degraded = true;
       }
     } catch {
       // Enrollment is best-effort — the chart still renders whatever
       // history exists.
+      degraded = true;
     }
   }
 
@@ -372,10 +402,44 @@ export default async function handler(req: Request): Promise<Response> {
     }
   }
 
-  return json(200, {
-    history: rows.map((s: SnapshotRow) => ({
-      date: s.snapshot_date,
-      price: Number(s.raw_price),
-    })),
-  });
+  // 5. One point per day. Collectrics and TCGPlayer price the same
+  // product on different bases, so a day holding both rows drew two
+  // points at two prices — a sawtooth line, plus the wrong up/down
+  // color and period change. Keep the collectrics row wherever both
+  // exist, and for a tracked card drop tcgplayer rows past the
+  // collectrics coverage (today-rows written before the gate above).
+  // tcgplayer rows OUTSIDE that coverage stay: they are the only
+  // history an untracked card, or one that left the leaderboard, has.
+  const byDate = new Map<string, SnapshotRow>();
+  for (const s of rows as SnapshotRow[]) {
+    if (
+      tracked &&
+      lastCollectrics !== null &&
+      s.source !== 'collectrics' &&
+      s.snapshot_date > lastCollectrics
+    ) {
+      continue;
+    }
+    const held = byDate.get(s.snapshot_date);
+    if (!held || (held.source !== 'collectrics' && s.source === 'collectrics')) {
+      byDate.set(s.snapshot_date, s);
+    }
+  }
+  const series = [...byDate.values()].sort((a, b) =>
+    a.snapshot_date.localeCompare(b.snapshot_date),
+  );
+
+  return json(
+    200,
+    {
+      history: series.map((s) => ({
+        date: s.snapshot_date,
+        price: Number(s.raw_price),
+      })),
+    },
+    // Don't cache a thin series that an upstream failure caused — that
+    // is what pinned "history is building" for an hour. A genuinely
+    // short series, and any full one, still caches.
+    !(degraded && series.length < 3),
+  );
 }

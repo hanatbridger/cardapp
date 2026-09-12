@@ -96,12 +96,18 @@ export default async function handler(req: Request): Promise<Response> {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // 2. Already pushed this story? bail.
-  const { data: stateRow } = await admin
+  // 2. Already pushed this story? bail. A swallowed read error read as
+  // "never pushed" and re-blasted the same story to every device, so a
+  // transient DB blip must fail the run instead.
+  const { data: stateRow, error: stateErr } = await admin
     .from('push_state')
     .select('value')
     .eq('key', LAST_URL_KEY)
     .maybeSingle();
+  if (stateErr) {
+    console.error('[news-push] push_state read failed:', stateErr.message);
+    return new Response(JSON.stringify({ error: 'state read failed' }), { status: 502 });
+  }
   if (stateRow?.value === top.url) {
     return new Response(JSON.stringify({ pushed: 0, note: 'no new story' }), {
       status: 200,
@@ -110,8 +116,29 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   // 3. Fan out an Expo push to every registered token (batched ≤100).
-  const { data: tokenRows } = await admin.from('push_tokens').select('token');
-  const tokens = (tokenRows ?? []).map((r: { token: string }) => r.token);
+  // PostgREST hard-caps a response at 1000 rows, so page by token: the
+  // unbounded select silently skipped every device past the first 1000,
+  // and its swallowed error looked the same as "no devices registered".
+  const TOKEN_PAGE = 1000;
+  const tokens: string[] = [];
+  let after = '';
+  for (;;) {
+    const { data, error } = await admin
+      .from('push_tokens')
+      .select('token')
+      .gt('token', after)
+      .order('token', { ascending: true })
+      .limit(TOKEN_PAGE);
+    if (error) {
+      console.error('[news-push] push_tokens load failed:', error.message);
+      return new Response(JSON.stringify({ error: 'token load failed' }), { status: 502 });
+    }
+    const page = (data ?? []) as { token: string }[];
+    if (page.length === 0) break;
+    for (const r of page) tokens.push(r.token);
+    after = page[page.length - 1].token;
+    if (page.length < TOKEN_PAGE) break;
+  }
 
   let sent = 0;
   let failed = 0;
@@ -166,10 +193,15 @@ export default async function handler(req: Request): Promise<Response> {
     await admin.from('push_tokens').delete().in('token', staleTokens);
   }
 
-  // 4. Record the story we just pushed so we don't repeat it.
-  await admin
-    .from('push_state')
-    .upsert({ key: LAST_URL_KEY, value: top.url, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  // 4. Record the story we just pushed so we don't repeat it — only when
+  // it actually went somewhere. Writing this after every batch failed
+  // burned the story permanently: nobody got it and no run retried it.
+  // Zero registered devices is not a failure, so it still advances.
+  if (sent > 0 || tokens.length === 0) {
+    await admin
+      .from('push_state')
+      .upsert({ key: LAST_URL_KEY, value: top.url, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+  }
 
   return new Response(
     JSON.stringify({
