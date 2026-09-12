@@ -333,17 +333,18 @@ export function GradingVerdict({
             </Pressable>
           </View>
         ) : (
-          <View style={{ flexDirection: 'row' }}>
-            <Button
-              variant="tonal"
-              size="sm"
-              icon={<IconBellPlus size={16} color={colors.onPrimaryContainer} />}
-              onPress={openAlert}
-              accessibilityLabel="Alert me when this verdict flips"
-            >
-              Alert me when this flips
-            </Button>
-          </View>
+          // Full width, and tall enough to clear the 44pt touch minimum —
+          // the row wrapper existed only to shrink it to its label.
+          <Button
+            variant="tonal"
+            size="lg"
+            fullWidth
+            icon={<IconBellPlus size={16} color={colors.onPrimaryContainer} />}
+            onPress={openAlert}
+            accessibilityLabel="Alert me when this verdict flips"
+          >
+            Alert me when this flips
+          </Button>
         )}
 
         {/* Provenance footer */}
