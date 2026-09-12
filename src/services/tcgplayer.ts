@@ -70,6 +70,9 @@ interface TcgPlayerPriceResponse {
   previousPrice: number;
   /** null when no daily close inside the comparison window. */
   previousDate: string | null;
+  /** Absent means TCGPlayer; 'justtcg' is the fallback for unpriced cards. */
+  source?: 'tcgplayer' | 'justtcg';
+  asOf?: string;
   percentChange: number;
   averagePrice: number;
   highPrice: number;
@@ -110,13 +113,16 @@ export async function fetchRawCardPrice(
   cardId: string,
   cardName: string,
   tcgplayerProductId?: string,
+  // For the server's fallback search when no TCGPlayer id resolves.
+  meta?: { number?: string; language?: 'EN' | 'JP' },
 ): Promise<CardPrice | null> {
   if (LIVE.rawPrice) {
     try {
       const lookup = tcgplayerProductId ?? cardId;
-      const data = await getJson<TcgPlayerPriceResponse>(
-        `/api/tcgplayer/price?id=${encodeURIComponent(lookup)}`,
-      );
+      const params = new URLSearchParams({ id: lookup, name: cardName });
+      if (meta?.number) params.set('number', meta.number);
+      if (meta?.language) params.set('lang', meta.language);
+      const data = await getJson<TcgPlayerPriceResponse>(`/api/tcgplayer/price?${params}`);
       return {
         cardName,
         grade: 'UNGRADED',
@@ -132,7 +138,7 @@ export async function fetchRawCardPrice(
           ? new Date(data.lastSaleDate).toISOString().split('T')[0]
           : '',
         lastSalePrice: data.lastSalePrice,
-        source: 'tcgplayer',
+        source: data.source ?? 'tcgplayer',
       };
     } catch {
       // Live proxy didn't have the card (e.g. set not on TCGPlayer yet)

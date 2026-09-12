@@ -41,7 +41,7 @@ export interface PokemonCard {
   tcgPlayerUrl?: string;
 }
 
-export type PriceSource = 'ebay' | 'tcgplayer' | 'pricecharting' | 'mock';
+export type PriceSource = 'ebay' | 'tcgplayer' | 'justtcg' | 'pricecharting' | 'mock';
 
 export interface CardPrice {
   cardName: string;

@@ -30,6 +30,14 @@ export interface PriceResponse {
   lastSalePrice: number;
   /** Date of the previous close percentChange is measured from; null = none recorded. */
   previousDate: string | null;
+  /**
+   * Which feed priced the card. Absent means TCGPlayer, the primary;
+   * 'justtcg' is the fallback for cards TCGPlayer does not price, and the
+   * client labels it so the user knows which market they are reading.
+   */
+  source?: 'tcgplayer' | 'justtcg';
+  /** ISO date the fallback price was last updated upstream. */
+  asOf?: string;
 }
 
 export async function resolveProductId(cardId: string): Promise<string | null> {

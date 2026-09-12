@@ -121,7 +121,10 @@ export function useCardPrice(opts: UseCardPriceOptions) {
         // 2. TCGPlayer server proxy / mock — full sales stats.
         if (cardId) {
           try {
-            const tcg = await fetchRawCardPrice(cardId, cardName);
+            const tcg = await fetchRawCardPrice(cardId, cardName, undefined, {
+              number: cardNumber,
+              language,
+            });
             if (tcg) return { ...tcg, freshness: 'live' };
           } catch {
             // fall through to watchlist tertiary

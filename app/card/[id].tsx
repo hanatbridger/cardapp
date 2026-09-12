@@ -698,6 +698,8 @@ function CardDetailScreen() {
                         const sourceUrl =
                           price.source === 'tcgplayer'
                             ? `https://www.tcgplayer.com/search/pokemon/product?q=${encodeURIComponent(card.name + ' ' + card.number)}&view=grid`
+                            : price.source === 'justtcg'
+                              ? 'https://justtcg.com'
                             : price.source === 'ebay'
                               ? `https://www.ebay.com/sch/183454/i.html?_nkw=${encodeURIComponent(cardSearch)}&LH_Sold=1&LH_Complete=1&_sop=13`
                               : price.source === 'pricecharting'
@@ -707,6 +709,7 @@ function CardDetailScreen() {
                       }}
                     >
                       {price.source === 'tcgplayer' ? 'TCGPlayer' :
+                       price.source === 'justtcg' ? 'JustTCG' :
                        price.source === 'ebay' ? 'eBay' :
                        price.source === 'pricecharting' ? 'PriceCharting' :
                        'sample data'}

@@ -30,6 +30,7 @@ function supabaseUrl(): string | undefined {
 export async function previousCloses(
   productIds: string[],
   today: string,
+  source: 'tcgplayer' | 'justtcg' = 'tcgplayer',
 ): Promise<Map<string, PreviousClose>> {
   const out = new Map<string, PreviousClose>();
   const url = supabaseUrl();
@@ -46,7 +47,7 @@ export async function previousCloses(
     .from('price_snapshots')
     .select('product_id, snapshot_date, raw_price')
     .in('product_id', ids)
-    .eq('source', 'tcgplayer')
+    .eq('source', source)
     .lt('snapshot_date', today)
     .gte('snapshot_date', since)
     .order('snapshot_date', { ascending: false });
@@ -70,6 +71,7 @@ export async function previousCloses(
 export async function recordTodayCloses(
   points: { productId: string; cardId: string; price: number }[],
   today: string,
+  source: 'tcgplayer' | 'justtcg' = 'tcgplayer',
 ): Promise<void> {
   const url = supabaseUrl();
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -85,9 +87,76 @@ export async function recordTodayCloses(
       card_id: p.cardId,
       snapshot_date: today,
       raw_price: p.price,
-      source: 'tcgplayer',
+      source,
     })),
     { onConflict: 'product_id,snapshot_date,source', ignoreDuplicates: true },
   );
   if (error) throw new Error(`record closes: ${error.message}`);
+}
+
+/**
+ * The most recent close for a card from one source, if it is no older
+ * than `maxAgeDays`. The JustTCG fallback reads this before it spends a
+ * request: a price we recorded today is the price.
+ */
+export async function latestCloseForCard(
+  cardId: string,
+  source: 'tcgplayer' | 'justtcg',
+  maxAgeDays: number,
+): Promise<{ productId: string; date: string; price: number } | null> {
+  const url = supabaseUrl();
+  const key = process.env.SUPABASE_ANON_KEY ?? process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !cardId) return null;
+  const sb = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const since = dayKey(Date.now() - maxAgeDays * DAY_MS);
+  const { data, error } = await sb
+    .from('price_snapshots')
+    .select('product_id, snapshot_date, raw_price')
+    .eq('card_id', cardId)
+    .eq('source', source)
+    .gte('snapshot_date', since)
+    .order('snapshot_date', { ascending: false })
+    .limit(1);
+  if (error || !data || data.length === 0) return null;
+  const row = data[0] as { product_id: string; snapshot_date: string; raw_price: number };
+  const price = Number(row.raw_price);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  return { productId: row.product_id, date: row.snapshot_date, price };
+}
+
+/**
+ * Cards priced through the fallback in the last `days` — the set the
+ * daily refresh keeps current. Distinct by card, newest first.
+ */
+export async function recentFallbackCards(
+  source: 'justtcg',
+  days: number,
+  limit: number,
+): Promise<{ cardId: string; productId: string }[]> {
+  const url = supabaseUrl();
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !serviceKey) return [];
+  const admin = createClient(url, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const since = dayKey(Date.now() - days * DAY_MS);
+  const { data, error } = await admin
+    .from('price_snapshots')
+    .select('card_id, product_id, snapshot_date')
+    .eq('source', source)
+    .gte('snapshot_date', since)
+    .order('snapshot_date', { ascending: false })
+    .limit(limit * 8);
+  if (error || !data) return [];
+  const seen = new Set<string>();
+  const out: { cardId: string; productId: string }[] = [];
+  for (const row of data as { card_id: string | null; product_id: string }[]) {
+    if (!row.card_id || seen.has(row.card_id)) continue;
+    seen.add(row.card_id);
+    out.push({ cardId: row.card_id, productId: row.product_id });
+    if (out.length >= limit) break;
+  }
+  return out;
 }

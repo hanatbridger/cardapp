@@ -24,10 +24,12 @@ import {
 } from '../_lib/tcgplayer';
 import {
   dayKey,
+  latestCloseForCard,
   previousCloses,
   recordTodayCloses,
   type PreviousClose,
 } from '../_lib/snapshots';
+import { lookupJustTcg, type JustTcgPrice } from '../_lib/justtcg';
 
 export const config = { runtime: 'edge' };
 
@@ -85,6 +87,67 @@ async function dailyCloses(
 
 const MAX_BATCH_IDS = 20;
 
+/** A fallback price in the primary's shape, labelled as the fallback. */
+function fallbackResponse(
+  productKey: string,
+  price: number,
+  asOf: string,
+  prev: PreviousClose | undefined,
+): PriceResponse {
+  return {
+    ...priceResponse(productKey, { marketPrice: price, listings: 0 }, prev),
+    source: 'justtcg',
+    asOf,
+  };
+}
+
+/**
+ * JustTCG, for a card TCGPlayer does not price. Cache first: a close we
+ * recorded today is the answer and costs no request. Otherwise one live
+ * lookup — by TCGPlayer product id where we have one, else name + number
+ * — recorded as today's close so tomorrow has a day change and the cron
+ * can keep it fresh. Returns null when the feature is dark (no key) or
+ * JustTCG has nothing either.
+ */
+async function justTcgFallback(
+  cardId: string,
+  tcgplayerId: string | null,
+  meta: { name: string; number: string | null; lang: 'EN' | 'JP' | undefined },
+): Promise<PriceResponse | null> {
+  const today = dayKey(Date.now());
+  const cached = await latestCloseForCard(cardId, 'justtcg', 1).catch(() => null);
+  if (cached) {
+    const prev = await previousCloses([cached.productId], today, 'justtcg').catch(
+      () => new Map<string, PreviousClose>(),
+    );
+    return fallbackResponse(cached.productId, cached.price, cached.date, prev.get(cached.productId));
+  }
+
+  const live: JustTcgPrice | null = await lookupJustTcg({
+    tcgplayerId,
+    name: meta.name,
+    number: meta.number,
+    language: meta.lang,
+  });
+  if (!live) return null;
+
+  const productKey = live.tcgplayerId ?? `jt:${live.cardUuid}`;
+  const [prev] = await Promise.all([
+    previousCloses([productKey], today, 'justtcg').catch(() => new Map<string, PreviousClose>()),
+    recordTodayCloses([{ productId: productKey, cardId, price: live.price }], today, 'justtcg').catch(
+      () => {},
+    ),
+  ]);
+  return fallbackResponse(productKey, live.price, live.updatedAt, prev.get(productKey));
+}
+
+/** Cache-only fallback for the batch path — never a live request per row. */
+async function justTcgCached(cardId: string): Promise<PriceResponse | null> {
+  const cached = await latestCloseForCard(cardId, 'justtcg', 3).catch(() => null);
+  if (!cached) return null;
+  return fallbackResponse(cached.productId, cached.price, cached.date, undefined);
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'GET') return json(405, { error: 'method not allowed' });
@@ -110,10 +173,19 @@ export default async function handler(req: Request): Promise<Response> {
     const resolved = await Promise.all(ids.map(resolveCardPrice));
     const priced = resolved.flatMap((r, i) => (r ? [{ cardId: ids[i], ...r }] : []));
     const prev = await dailyCloses(priced);
+    // Misses read the JustTCG cache only. The batch path serves the whole
+    // watchlist at once, and a live fallback per row would spend the daily
+    // quota on one Home load; the card screen's single-id path is what
+    // populates that cache.
+    const fallbacks = await Promise.all(
+      resolved.map((r, i) => (r ? Promise.resolve(null) : justTcgCached(ids[i]))),
+    );
     const prices: Record<string, PriceResponse | null> = {};
     ids.forEach((id, i) => {
       const r = resolved[i];
-      prices[id] = r ? priceResponse(r.productId, r.details, prev.get(r.productId)) : null;
+      prices[id] = r
+        ? priceResponse(r.productId, r.details, prev.get(r.productId))
+        : fallbacks[i];
     });
     return json(200, { prices }, resolved.every(Boolean) ? LONG_CACHE : SHORT_CACHE);
   }
@@ -123,15 +195,31 @@ export default async function handler(req: Request): Promise<Response> {
   // this from older builds keep working.
   const cardId = url.searchParams.get('id') ?? url.searchParams.get('cardId');
   if (!cardId) return json(400, { error: 'missing id' });
+  // Optional, for the fallback's name search when no TCGPlayer id resolves.
+  const meta = {
+    name: (url.searchParams.get('name') ?? '').trim(),
+    number: url.searchParams.get('number')?.trim() || null,
+    lang: (url.searchParams.get('lang') === 'JP' ? 'JP' : url.searchParams.get('lang') === 'EN' ? 'EN' : undefined) as
+      | 'EN'
+      | 'JP'
+      | undefined,
+  };
+  // Japanese catalogue ids carry the TCGPlayer product id; the fallback
+  // can use it directly even though TCGPlayer itself has no price.
+  const jpProductId = cardId.startsWith('jptp-') ? cardId.slice(5) : null;
 
   try {
-    const productId = await resolveProductId(cardId);
+    const productId = (await resolveProductId(cardId)) ?? jpProductId;
     if (!productId) {
+      const fb = await justTcgFallback(cardId, null, meta);
+      if (fb) return json(200, fb);
       return json(404, { error: 'productId not found for card', cardId }, SHORT_CACHE);
     }
 
     const details = await fetchMarketPrice(productId);
     if (!details?.marketPrice) {
+      const fb = await justTcgFallback(cardId, productId, meta);
+      if (fb) return json(200, fb);
       return json(404, { error: 'no market price', cardId, productId }, SHORT_CACHE);
     }
     const prev = await dailyCloses([{ cardId, productId, details }]);
