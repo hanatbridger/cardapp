@@ -142,7 +142,7 @@ p { margin: 0; text-wrap: pretty; }
   }
 
   &[data-scrolled] .inner {
-    max-width: 600px;
+    max-width: 660px;
     padding: 0.45rem 0.6rem 0.45rem 1rem;
     border-color: color-mix(in srgb, var(--rule) 70%, transparent);
     background: color-mix(in srgb, var(--canvas) 85%, transparent);
@@ -156,6 +156,14 @@ p { margin: 0; text-wrap: pretty; }
   &[data-scrolled] .brand-word {
     max-width: 0;
     opacity: 0;
+  }
+
+  /* The capsule is tighter than the resting bar, so it takes a closer
+     gap and refuses to wrap: a nav that breaks onto two lines inside a
+     pill does not read as a pill any more. */
+  &[data-scrolled] .inner nav {
+    gap: var(--gap-3);
+    flex-wrap: nowrap;
   }
 
   & .brand { justify-self: start; }
@@ -183,6 +191,8 @@ p { margin: 0; text-wrap: pretty; }
   & nav a {
     color: var(--ink-2);
     text-decoration: none;
+    /* "How it works" is two words and must stay one link. */
+    white-space: nowrap;
 
     &:hover { color: var(--ink); text-decoration: underline; }
   }
@@ -601,9 +611,11 @@ ul.plain {
 
 .closer h2 { font-size: clamp(1.7rem, 4vw, 2.3rem); max-width: 18ch; }
 
-/* Narrow screens: the four nav links wrap around the wordmark and read
-   as a broken grid. Stack them under it instead. */
-@media (max-width: 700px) {
+/* Narrow screens: the nav links wrap around the wordmark and read as a
+   broken grid. Stack them under it instead. The threshold moved from
+   700px to 880px when Returns made it five links — between those widths
+   the resting bar could not hold one row, and "Price" fell under it. */
+@media (max-width: 880px) {
   .masthead .inner,
   .masthead[data-scrolled] .inner {
     width: calc(100% - 2 * var(--gap-3));
@@ -734,6 +746,9 @@ p, li, dd, dt { max-width: var(--measure); }
   padding: 0.45rem 0.95rem;
   border-radius: 999px;
   text-decoration: none;
+  /* A three-word CTA in a pill wraps the moment the row is tight, and a
+     two-line pill reads as a mistake. */
+  white-space: nowrap;
 
   &:hover { opacity: 0.9; }
 }
