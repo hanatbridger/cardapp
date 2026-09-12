@@ -624,26 +624,141 @@ ul.plain {
 
 .closer h2 { font-size: clamp(1.7rem, 4vw, 2.3rem); max-width: 18ch; }
 
-/* Narrow screens: the nav links wrap around the wordmark and read as a
-   broken grid. Stack them under it instead. The threshold moved from
-   700px to 880px when Returns made it five links — between those widths
-   the resting bar could not hold one row, and "Price" fell under it. */
+/* The menu toggle only exists on narrow screens. */
+.menu-toggle { display: none; }
+
+/* Narrow screens: five links do not fit beside the wordmark, and a
+   second row of them read as a broken grid. They fold behind a toggle
+   instead, with Get the app kept beside it — that button stays on screen
+   at every width. The threshold is 880px because that is where the
+   resting bar stops holding one row. */
 @media (max-width: 880px) {
-  .masthead .inner,
-  .masthead[data-scrolled] .inner {
-    width: calc(100% - 2 * var(--gap-3));
+  /* At rest the bar is not a capsule: it shares the content column's
+     edges, so the wordmark lines up with the headline under it and the
+     toggle with the right margin. The .shell padding is the reference. */
+  .masthead .inner {
+    width: 100%;
     max-width: none;
     flex-wrap: wrap;
-    justify-content: space-between;
-    gap: var(--gap-2) var(--gap-3);
-    border-radius: 24px;
+    justify-content: flex-start;
+    gap: 0 var(--gap-1);
+    border-radius: 0;
+    padding: 0.45rem var(--gap-3);
   }
 
+  /* Scrolled, or opened as a menu, it contracts into the inset capsule —
+     a deliberate change of shape, not a misalignment. */
+  .masthead[data-scrolled] .inner,
+  .masthead[data-menu-open] .inner {
+    width: calc(100% - 2 * var(--gap-2));
+    border-radius: 24px;
+    padding: 0.45rem 0.45rem 0.45rem 0.9rem;
+  }
+
+  /* Wordmark left; the CTA and the toggle pack together on the right. */
+  .masthead .brand { margin-right: auto; }
+
+  .menu-toggle {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 999px;
+    border: 1px solid color-mix(in srgb, var(--rule) 80%, transparent);
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+
+    &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  }
+
+  /* Hidden, not removed: the links stay in the HTML for crawlers. */
   .masthead .inner > nav {
+    display: none;
     order: 3;
     width: 100%;
-    gap: var(--gap-2) var(--gap-3);
-    font-size: 0.85rem;
+    margin: 0;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 0;
+    padding: var(--gap-1) 0.25rem 0.25rem;
+    font-size: 1rem;
+  }
+
+  .masthead .inner > nav[data-open] { display: flex; }
+
+  /* The bar holds its resting height while the menu is open, so the
+     grown capsule overflows down over the page instead of pushing the
+     whole page down under it. The sum is the bar's own box: 10px of
+     masthead padding each side, the inner's 0.45rem each side, and the
+     44px toggle. */
+  .masthead[data-menu-open] { height: calc(20px + 0.9rem + 44px); }
+
+  .masthead .inner > nav a {
+    padding: 0.85rem 0.35rem;
+    border-top: 1px solid color-mix(in srgb, var(--rule) 70%, transparent);
+    color: var(--ink);
+  }
+
+  /* An open menu overlays the page, so it gets a solid surface: frosted
+     glass let the headline read straight through the links. */
+  .masthead[data-menu-open] .inner {
+    background: var(--surface);
+    border-color: color-mix(in srgb, var(--rule) 70%, transparent);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 12px 32px -12px rgb(0 0 0 / 0.4),
+      0 2px 8px rgb(0 0 0 / 0.12);
+  }
+}
+
+/* Phones: the desktop rhythm gives each idea 12–20rem of air, which on
+   a narrow screen is a whole scroll of nothing between sections. */
+@media (max-width: 779px) {
+  :root { --section: clamp(4.5rem, 11vh, 6.5rem); }
+
+  main { padding-top: var(--gap-1); }
+
+  /* The hero stops centering itself in most of the viewport — that was
+     the gap under the bar — and starts right under it instead. */
+  .hero {
+    min-height: auto;
+    align-content: start;
+    padding: var(--gap-2) 0 var(--gap-3);
+    gap: var(--gap-4);
+  }
+
+  /* One centered column: copy and visuals share the same axis, so the page
+     reads as a stack rather than a left-aligned layout with a hole on the
+     right. Balanced wrapping keeps centered headlines from ending on one
+     orphaned word. */
+  .hero > div:first-child,
+  .showcase > div:has(> h2) {
+    text-align: center;
+  }
+
+  .hero h1,
+  .showcase h2 { text-wrap: balance; }
+
+  /* These carry their own max-width, so centering the text inside them
+     is not enough — the block itself has to sit in the middle. */
+  .hero .sub,
+  .showcase .say { margin-inline: auto; }
+
+  .hero .actions { align-items: center; }
+
+  /* Visuals sit centered under their copy rather than hugging the left
+     edge with dead space beside them. */
+  .showcase .ret-card,
+  .showcase .dyn-card,
+  .showcase .chart-card,
+  .showcase .currency-card,
+  .showcase .notif-stack,
+  .showcase .row,
+  .showcase .notif,
+  .hero .phone {
+    margin-inline: auto;
   }
 }
 
@@ -669,6 +784,15 @@ p, li, dd, dt { max-width: var(--measure); }
   /* Direction-aware: flipped rows drift in from their own side. */
   .showcase:not(.flip) > *:last-child { animation-name: drift-right; }
   .showcase.flip > *:first-child { animation-name: drift-left; }
+
+  /* Phones: sideways drift makes sense beside a column, but in a single
+     centered column it holds the visual 3rem off-center for the whole
+     entrance. Rise instead. Must follow the two rules above — same
+     specificity, so source order decides. */
+  @media (max-width: 779px) {
+    .showcase:not(.flip) > *:last-child,
+    .showcase.flip > *:first-child { animation-name: rise-in; }
+  }
   .showcase > * {
     animation: rise-in both;
     animation-timeline: view();
