@@ -133,14 +133,18 @@ export default async function handler(req: Request): Promise<Response> {
   // article list, silent "no article" exit, zero pushes ever sent (the
   // June 14 manual test via the public domain was the only success).
   //
-  // cache: 'no-store' because /api/news is edge-cached for an hour. At a
-  // 15-minute cadence that cache would be the difference between "live"
-  // and "within the hour".
+  // /api/news is edge-cached for an hour, and a request from here still
+  // goes through that cache — at a 15-minute cadence it would be the
+  // difference between "live" and "within the hour". So the URL carries
+  // a 5-minute bucket, which misses the CDN on purpose. cache: 'no-store'
+  // on top only covers the function's own fetch cache. Every other
+  // caller (the app's News tab) keeps the hour.
   const origin = process.env.PUBLIC_ORIGIN ?? 'https://strange-saha.vercel.app';
+  const bucket = Math.floor(Date.now() / (5 * 60 * 1000));
   let articles: Article[] = [];
   let newsStatus = 0;
   try {
-    const res = await fetch(`${origin}/api/news?limit=20`, { cache: 'no-store' });
+    const res = await fetch(`${origin}/api/news?limit=20&t=${bucket}`, { cache: 'no-store' });
     newsStatus = res.status;
     if (res.ok) {
       const data = (await res.json()) as { articles?: Article[] };
