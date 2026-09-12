@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { fetchWithTimeout } from '../services/api-client';
 
 /**
@@ -83,5 +83,11 @@ export function useBatchPrices(cardIds: string[]) {
     queryFn: () => fetchBatchPrices(sortedIds),
     enabled: sortedIds.length > 0,
     staleTime: BATCH_PRICE_STALE_MS,
+    // The key carries the whole id list, so adding or removing one card
+    // used to drop `data` to undefined and flip every already-priced row
+    // back to its fallback until the new batch landed. Hold the previous
+    // map: the prices in it are still live for the ids that stayed, and
+    // only the new id falls back.
+    placeholderData: keepPreviousData,
   });
 }

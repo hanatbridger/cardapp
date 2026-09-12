@@ -51,10 +51,14 @@ const HomeCardRow = React.memo(function HomeCardRow({
   livePrice: { currentPrice: number; percentChange: number } | null | undefined;
   showSinceAdded: boolean;
 }) {
+  // Last-known price ONLY — never the seeded mock. This fallback paints
+  // on every cold start, on every watchlist add/remove, and forever for
+  // a card the batch can't price, so a sample number here reads as the
+  // user's real holding. No stamp yet means the row shows `--` until the
+  // first live price lands.
   const fallbackPrice = useMemo(
     () =>
-      getPrice(item.cardId, item.grade) ??
-      (item.lastPrice && item.lastPriceChange !== undefined
+      item.lastPrice && item.lastPriceChange !== undefined
         ? {
             cardName: item.cardName,
             grade: item.grade,
@@ -68,7 +72,7 @@ const HomeCardRow = React.memo(function HomeCardRow({
             lowPrice: item.lastPrice,
             salesCount: 0,
           }
-        : undefined),
+        : undefined,
     [item],
   );
   const rarity = useMemo(
@@ -144,6 +148,15 @@ function WatchlistScreen() {
     if (entries.length > 0) stampBaselines(entries);
   }, [batchPrices, items, stampBaselines]);
 
+  // Persist the batch as each row's last-known price. Without this the
+  // stamp only ever came from opening card detail, so a cold start showed
+  // a dash (or a days-old number) until the network answered.
+  const stampBatchPrices = useWatchlistStore((s) => s.stampBatchPrices);
+  useEffect(() => {
+    if (!batchPrices || batchQuery.isPlaceholderData) return;
+    stampBatchPrices(batchPrices);
+  }, [batchPrices, batchQuery.isPlaceholderData, stampBatchPrices]);
+
   // Watchlist return since added (Premium): equal-weighted mean of the
   // rows that have one. Cards read the live batch; sealed read their
   // live-refreshed stamp, and only for live-priced products.
@@ -196,10 +209,12 @@ function WatchlistScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     // Invalidate every price query so each card re-fetches live data.
     // useCardPrice is keyed `['prices', ...]`; the Home batch is keyed
-    // `['batch-prices', ...]` — both need the kick.
+    // `['batch-prices', ...]`; the index strip is `['market-index', ...]`
+    // — pulling down should refresh what the screen actually shows.
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['prices'] }),
       queryClient.invalidateQueries({ queryKey: ['batch-prices'] }),
+      queryClient.invalidateQueries({ queryKey: ['market-index'] }),
     ]);
     setRefreshing(false);
   }, [queryClient]);

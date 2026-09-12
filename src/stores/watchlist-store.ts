@@ -136,6 +136,14 @@ interface WatchlistStore {
    */
   stampBaselines: (entries: { id: string; grade?: GradeType; price: number }[]) => void;
   /**
+   * Stamp live batched prices onto raw card rows, so a cold start paints
+   * the last real price instead of a dash. Raw only: the batch is
+   * TCGPlayer raw pricing and would be 5-10x wrong on a graded row.
+   */
+  stampBatchPrices: (
+    prices: Record<string, { currentPrice: number; percentChange: number } | null>,
+  ) => void;
+  /**
    * Flag that the since-added push fired for this item in `direction`.
    * Returns false when it was already flagged, so overlapping foreground
    * and background checks cannot notify twice for one crossing.
@@ -245,6 +253,24 @@ export const useWatchlistStore = create<WatchlistStore>()(
             if (!hit) return i;
             changed = true;
             return { ...i, baselinePrice: hit.price, baselineAt: now, returnAlerted: undefined };
+          });
+          // Same bail as updatePrice: Home calls this on every batch
+          // resolve, and a fresh array re-renders every subscriber.
+          return changed ? { items } : state;
+        }),
+
+      stampBatchPrices: (prices) =>
+        set((state) => {
+          let changed = false;
+          const items = state.items.map((i) => {
+            if (i.kind !== 'card' || i.grade !== 'UNGRADED') return i;
+            const p = prices[i.cardId];
+            if (!p || !isLivePrice(p.currentPrice)) return i;
+            if (i.lastPrice === p.currentPrice && i.lastPriceChange === p.percentChange) {
+              return i;
+            }
+            changed = true;
+            return { ...i, lastPrice: p.currentPrice, lastPriceChange: p.percentChange };
           });
           // Same bail as updatePrice: Home calls this on every batch
           // resolve, and a fresh array re-renders every subscriber.
