@@ -21,6 +21,10 @@ export const metadata: Metadata = {
   description:
     'iPhone app. One list of the cards you are watching, the current market price for each, and a push notification when a card hits the price you set. Free for 5 cards and 3 alerts.',
   alternates: { canonical: '/' },
+  // Google Search Console ownership, for hanwong118@gmail.com. A public
+  // value by design — it proves control of the site by being published
+  // on it. Removing it un-verifies the property.
+  verification: { google: 'jw-8K3fRMFiY3Z1H_u0NjrrPrKphtYFb2lK94dMgT38' },
   openGraph: {
     type: 'website',
     siteName: 'CardPulse',
