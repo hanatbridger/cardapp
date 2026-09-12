@@ -2,7 +2,7 @@ import React, { useMemo, useState, useCallback, useEffect } from 'react';
 import { View, FlatList, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Haptics } from '../../src/utils/haptics';
-import { IconSearch, IconLock } from '@tabler/icons-react-native';
+import { IconSearch } from '@tabler/icons-react-native';
 import { router, useFocusEffect } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -426,24 +426,9 @@ function WatchlistScreen() {
                       <SinceAddedLabel pct={avgSinceAdded} prefix="Avg" />
                     ) : null
                   ) : (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-                      {/* Premium teaser for the since-added return. */}
-                      <Touchable
-                        onPress={() => router.push('/paywall')}
-                        hitSlop={12}
-                        accessibilityRole="button"
-                        accessibilityLabel="Return since added, a Premium feature"
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}
-                      >
-                        <IconLock size={12} color={colors.primary} />
-                        <Text variant="labelSm" color={colors.primary}>
-                          Since added
-                        </Text>
-                      </Touchable>
-                      <Text variant="caption" color={colors.onSurfaceMuted}>
-                        {items.length}/{maxFreeItems}
-                      </Text>
-                    </View>
+                    <Text variant="caption" color={colors.onSurfaceMuted}>
+                      {items.length}/{maxFreeItems}
+                    </Text>
                   )}
                 </View>
               );
