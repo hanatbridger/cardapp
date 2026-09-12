@@ -33,11 +33,31 @@ interface UseCardPriceOptions {
   /** TCGPlayer market price (raw) from Pokemon TCG API */
   tcgPlayerPrice?: number;
   /**
+   * When TCGPlayer last refreshed `tcgPlayerPrice` upstream (YYYY/MM/DD).
+   * Carried through to the result so the UI can date a snapshot price
+   * instead of implying it was just read.
+   */
+  tcgPlayerUpdatedAt?: string;
+  /**
    * TCGPlayer mid price. Accepted but intentionally NOT used for
    * percentChange: market-vs-mid is a static listing spread, not daily
    * movement, and rendering it as change showed permanent gains/losses.
    */
   tcgPlayerMidPrice?: number;
+}
+
+/**
+ * A price plus which source answered. Only this hook knows, and the
+ * three sources are not equally fresh: a refetch re-reads the same
+ * bundled number for `payload`, so a relative "updated" label and a
+ * retry control are honest for `live`/`stored` and a lie for `payload`.
+ * Kept local to the hook rather than on CardPrice — nothing outside the
+ * raw-price chain can populate it.
+ */
+export interface CardPriceResult extends CardPrice {
+  freshness: 'payload' | 'live' | 'stored';
+  /** Date the payload price was last refreshed upstream (YYYY/MM/DD). */
+  asOf?: string;
 }
 
 function buildPrice(
@@ -66,11 +86,24 @@ function buildPrice(
 }
 
 export function useCardPrice(opts: UseCardPriceOptions) {
-  const { cardName, grade, cardId, setName, cardNumber, language, tcgPlayerPrice } = opts;
+  const {
+    cardName,
+    grade,
+    cardId,
+    setName,
+    cardNumber,
+    language,
+    tcgPlayerPrice,
+    tcgPlayerUpdatedAt,
+  } = opts;
 
-  return useQuery<CardPrice | null>({
-    queryKey: ['prices', cardName, setName, cardNumber, grade, language],
-    queryFn: async (): Promise<CardPrice | null> => {
+  return useQuery<CardPriceResult | null>({
+    // tcgPlayerPrice is in the key because it PICKS the branch below.
+    // Without it, a placeholder card from the similar-cards rail (field-
+    // projected, no bundled price) cached a proxy miss under the same key
+    // the real payload would use, and the full card never refetched.
+    queryKey: ['prices', cardName, setName, cardNumber, grade, language, tcgPlayerPrice ?? null],
+    queryFn: async (): Promise<CardPriceResult | null> => {
       // === RAW / UNGRADED — TCGPlayer ONLY ===
       if (grade === 'UNGRADED') {
         // 1. Pokemon TCG API's bundled tcgPlayerPrice (already fetched
@@ -78,14 +111,18 @@ export function useCardPrice(opts: UseCardPriceOptions) {
         //    a single snapshot has no history, so percentChange stays 0
         //    (neutral) rather than faking movement from the mid spread.
         if (tcgPlayerPrice && tcgPlayerPrice > 0) {
-          return buildPrice(cardName, grade, tcgPlayerPrice, 'tcgplayer');
+          return {
+            ...buildPrice(cardName, grade, tcgPlayerPrice, 'tcgplayer'),
+            freshness: 'payload',
+            asOf: tcgPlayerUpdatedAt,
+          };
         }
 
         // 2. TCGPlayer server proxy / mock — full sales stats.
         if (cardId) {
           try {
             const tcg = await fetchRawCardPrice(cardId, cardName);
-            if (tcg) return tcg;
+            if (tcg) return { ...tcg, freshness: 'live' };
           } catch {
             // fall through to watchlist tertiary
           }
@@ -106,7 +143,11 @@ export function useCardPrice(opts: UseCardPriceOptions) {
             // Real stored day-change only — deriving previousPrice as
             // lastPrice * 0.95 fabricated a permanent +5.26% chip.
             const p = buildPrice(cardName, grade, stored.lastPrice, 'tcgplayer');
-            return { ...p, percentChange: stored.lastPriceChange ?? 0 };
+            return {
+              ...p,
+              percentChange: stored.lastPriceChange ?? 0,
+              freshness: 'stored',
+            };
           }
         }
 

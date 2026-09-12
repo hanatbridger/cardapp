@@ -63,6 +63,18 @@ function filterHistoryByRange<T extends { date: string }>(
   return filtered.length >= 2 ? filtered : series;
 }
 
+// pokemontcg.io reports the bundled price's refresh date as YYYY/MM/DD.
+// Parsed field by field on purpose: Hermes doesn't accept that shape in
+// Date.parse, and normalising it to ISO would land on the previous day
+// for anyone west of UTC. Null when there is no usable date — we say
+// nothing rather than dating the price wrong.
+function formatAsOf(asOf: string | undefined): string | null {
+  if (!asOf) return null;
+  const [y, m, d] = asOf.split('/').map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
@@ -148,6 +160,7 @@ function CardDetailScreen() {
     cardNumber: card?.number,
     language: card?.language,
     tcgPlayerPrice: card?.tcgPlayerPrice,
+    tcgPlayerUpdatedAt: card?.tcgPlayerUpdatedAt,
     tcgPlayerMidPrice: card?.tcgPlayerMidPrice,
   });
   const { data: history, isLoading: historyLoading } = usePriceHistory({
@@ -259,17 +272,19 @@ function CardDetailScreen() {
     );
   };
 
+  // Scoped to the grade tab on screen. Matching on cardId alone let a
+  // hidden legacy PSA10 row (Home filters those out) show the added state
+  // on the Raw tab, and the toggle then deleted that invisible row
+  // instead of adding the raw one.
   const isInWatchlist = items.some(
-    (i) => i.kind === 'card' && i.cardId === id,
+    (i) => i.kind === 'card' && i.cardId === id && i.grade === selectedGrade,
   );
 
-  // Sync price to watchlist — only update if the grade matches what's saved
+  // Sync price to the watched row for this grade. updatePrice already
+  // scopes by grade and bails when nothing would change.
   useEffect(() => {
     if (price && isInWatchlist && id) {
-      const savedItem = items.find((i) => i.kind === 'card' && i.cardId === id);
-      if (savedItem && savedItem.kind === 'card' && savedItem.grade === selectedGrade) {
-        updatePrice(id, price.currentPrice, price.percentChange, selectedGrade);
-      }
+      updatePrice(id, price.currentPrice, price.percentChange, selectedGrade);
     }
   }, [price?.currentPrice, isInWatchlist, id, selectedGrade]);
 
@@ -300,7 +315,12 @@ function CardDetailScreen() {
     );
   }
 
-  if (cardError || !card) {
+  // Gated on missing DATA, not isError: a failed background refetch
+  // (stale cache + a pokemontcg.io 500) still has the full card in hand,
+  // and tearing the rendered screen down to this error view also
+  // unmounted whatever sheet the user had open. cardError only picks the
+  // copy below, which is reached solely when there is nothing to show.
+  if (!card) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
         <View
@@ -356,8 +376,10 @@ function CardDetailScreen() {
   const handleToggleWatchlist = () => {
     if (isInWatchlist) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      const existing = items.find((i) => i.kind === 'card' && i.cardId === card.id);
-      if (existing && existing.kind === 'card') removeItem(card.id, existing.grade);
+      // The toggle only renders on the Raw tab, so this removes the raw
+      // row and leaves any hidden legacy PSA10 row for when that gate
+      // lifts — the store's canAddMore already ignores those.
+      removeItem(card.id, selectedGrade);
     } else {
       if (!canAddMore()) {
         setWatchlistFullVisible(true);
@@ -390,6 +412,10 @@ function CardDetailScreen() {
       ? Boolean(psa10) && filteredPsaHistory.length > 2
       : Boolean(price) && filteredHistory.length > 2;
 
+  // Only a payload price carries its own as-of date; the JP catalog
+  // reports none, so that case gets no freshness line at all.
+  const asOfLabel = price?.freshness === 'payload' ? formatAsOf(price.asOf) : null;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.surface }}>
       <ScrollView
@@ -401,7 +427,11 @@ function CardDetailScreen() {
             onRefresh={async () => {
               setRefreshing(true);
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              await refetchPrice();
+              // The card payload carries the raw price for most cards, so
+              // refetching the price alone re-reads the same number. Both,
+              // in parallel: the new payload price flows in through the
+              // price query's key on the next render.
+              await Promise.all([refetchCard(), refetchPrice()]);
               setRefreshing(false);
             }}
             tintColor={colors.primary}
@@ -617,7 +647,20 @@ function CardDetailScreen() {
                        'Market Data'}
                     </Text>
                   </Text>
-                  {priceUpdatedAt > 0 && (
+                  {/* A payload price is TCGPlayer's own cached snapshot,
+                      1-7 days behind, and refetching re-reads the same
+                      bundled number — so "Updated just now" and a refresh
+                      control both overstate it. Date it instead, and keep
+                      the relative label + retry for the sources a refetch
+                      can actually move (proxy read, stored fallback).
+                      Pull-to-refresh still refetches the card payload. */}
+                  {price.freshness === 'payload' ? (
+                    asOfLabel ? (
+                      <Text variant="caption" color={colors.onSurfaceMuted}>
+                        {`Market price as of ${asOfLabel}`}
+                      </Text>
+                    ) : null
+                  ) : priceUpdatedAt > 0 ? (
                     <Pressable
                       onPress={() => refetchPrice()}
                       disabled={priceFetching}
@@ -631,10 +674,12 @@ function CardDetailScreen() {
                       <Text variant="caption" color={colors.onSurfaceMuted}>
                         {priceFetching
                           ? 'Updating…'
-                          : `Updated ${formatRelativeTime(priceUpdatedAt, nowTick)}`}
+                          : price.freshness === 'stored'
+                            ? 'Last saved price'
+                            : `Updated ${formatRelativeTime(priceUpdatedAt, nowTick)}`}
                       </Text>
                     </Pressable>
-                  )}
+                  ) : null}
                 </View>
               </Card>
               <Pressable
@@ -722,7 +767,12 @@ function CardDetailScreen() {
               chart: it's the takeaway, the chart is the evidence. Slim
               enough to mount with the fold. */}
           {selectedGrade !== 'PSA10' && (
-            <AIValuation card={card} marketPrice={price?.currentPrice} liveDynamics={cardStats?.dynamics} />
+            <AIValuation
+              card={card}
+              marketPrice={price?.currentPrice}
+              liveDynamics={cardStats?.dynamics}
+              statsSettled={statsSettled}
+            />
           )}
 
           {/* Chart-sized skeleton while the raw history query resolves —

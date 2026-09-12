@@ -3,8 +3,10 @@ import { View } from 'react-native';
 import { IconBrain, IconTrendingUp, IconTrendingDown, IconMinus } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Card } from './Card';
+import { Badge } from './Badge';
+import { Skeleton } from './Skeleton';
 import { useTheme } from '../theme/ThemeProvider';
-import { spacing, radius } from '../theme/tokens';
+import { spacing, radius, typography } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
 import { getCardScore } from '../data/card-scores';
 import { getMarketDynamics } from '../data/ebay-market-dynamics';
@@ -28,7 +30,20 @@ interface AIValuationProps {
   marketPrice?: number;
   /** Real eBay dynamics from the caller; absent/null falls back to seeded mocks. */
   liveDynamics?: LiveMarketDynamics | null;
+  /**
+   * False while the caller's stats query is still in flight. The signal row
+   * holds a skeleton until then, so a seeded signal never renders first and
+   * then changes verdict when the live numbers land.
+   */
+  statsSettled?: boolean;
 }
+
+// Height of the market-signal row, reused by its loading skeleton so the card
+// holds its place while stats settle: two text lines plus the row padding.
+// The sample-data variant runs a few points taller — the badge is the tallest
+// thing on its first line — which is close enough to read as no jump.
+const SIGNAL_ROW_HEIGHT =
+  typography.labelLg.lineHeight + typography.caption.lineHeight + spacing[3] * 2;
 
 type MarketSignal = 'strong_buy' | 'buy' | 'hold' | 'sell' | 'strong_sell';
 
@@ -86,11 +101,17 @@ function computeMarketSignal(
   return { signal: 'hold', label: 'Hold', reason };
 }
 
-export function AIValuation({ card, marketPrice, liveDynamics }: AIValuationProps) {
+export function AIValuation({
+  card,
+  marketPrice,
+  liveDynamics,
+  statsSettled = true,
+}: AIValuationProps) {
   const { colors } = useTheme();
   const formatMoney = useMoney();
 
   const score = getCardScore(card.id);
+  const isLive = Boolean(liveDynamics);
   const dynamics = liveDynamics ?? getMarketDynamics(card.id);
 
   // Compute valuation if we have score + market price
@@ -163,8 +184,12 @@ export function AIValuation({ card, marketPrice, liveDynamics }: AIValuationProp
           </View>
         </View>
 
-        {/* Market Signal — combines valuation + supply/demand */}
-        {marketSignal && (
+        {/* Market Signal — combines valuation + supply/demand. Held as a
+            skeleton until the caller's stats settle: the seeded fallback
+            would otherwise show a verdict that changes when live data lands. */}
+        {!statsSettled ? (
+          <Skeleton height={SIGNAL_ROW_HEIGHT} borderRadius={radius.md} />
+        ) : marketSignal ? (
           <View
             style={{
               flexDirection: 'row',
@@ -177,18 +202,23 @@ export function AIValuation({ card, marketPrice, liveDynamics }: AIValuationProp
           >
             <SignalIcon size={20} color={signalColor} />
             <View style={{ flex: 1 }}>
-              <Text variant="labelLg" color={signalColor}>
-                Market Signal: {marketSignal.label}
-              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+                <Text variant="labelLg" color={signalColor} style={{ flexShrink: 1 }}>
+                  Market Signal: {marketSignal.label}
+                </Text>
+                {/* Seeded fallback stays badged, same convention as
+                    MarketDynamics; live data drops it. */}
+                {!isLive && <Badge variant="neutral">Sample data</Badge>}
+              </View>
               <Text variant="caption" color={colors.onSurfaceMuted}>
                 {marketSignal.reason}
               </Text>
             </View>
           </View>
-        )}
+        ) : null}
 
         <Text variant="caption" color={colors.onSurfaceMuted}>
-          Based on pull cost, desirability{dynamics ? ', and eBay market data' : ' analysis'}. Not financial advice.
+          Based on pull cost, desirability{isLive ? ', and eBay market data' : dynamics ? ', and sample market data' : ' analysis'}. Not financial advice.
         </Text>
       </View>
     </Card>

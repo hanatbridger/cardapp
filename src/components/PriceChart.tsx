@@ -40,6 +40,15 @@ const LABEL_HEIGHT = 20; // space for month labels at bottom
 const PRICE_LABEL_WIDTH = 50; // space for high/low labels on right
 const PAD = 4; // inset so the stroke and dots aren't clipped by the viewport
 
+// History points are date-only strings ("2026-05-17"), which JS parses as
+// UTC midnight — formatted in any timezone west of UTC that reads as the
+// previous day. Build the date from its parts so it lands on LOCAL midnight
+// and labels match the day the snapshot is for.
+const parseDay = (s: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(s);
+};
+
 // Crosshair primitives driven from the UI thread via animatedProps —
 // scrubbing must not wait on the JS thread (see gesture setup below).
 const ALine = Animated.createAnimatedComponent(Line);
@@ -99,7 +108,7 @@ export const PriceChart = React.memo(function PriceChart({
     if (interactive) {
       const seenMonths = new Set<string>();
       for (const p of chartPoints) {
-        const d = new Date(p.date);
+        const d = parseDay(p.date);
         const monthKey = `${d.getFullYear()}-${d.getMonth()}`;
         const label = d.toLocaleDateString('en-US', { month: 'short' });
         if (!seenMonths.has(monthKey)) {
@@ -338,7 +347,7 @@ export const PriceChart = React.memo(function PriceChart({
   if (data.length < 2) return null;
 
   const formatDate = (dateStr: string) => {
-    const d = new Date(dateStr);
+    const d = parseDay(dateStr);
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
