@@ -52,6 +52,8 @@ These terms are CardPulse's own. Each has one canonical definition, on one page.
 - https://getcardpulse.app/methodology — where the prices come from
 - https://getcardpulse.app/pricing — free and Premium, compared
 - https://getcardpulse.app/support — contact
+- https://getcardpulse.app/delete-account — how to delete an account, what is
+  deleted, what is kept
 - https://getcardpulse.app/privacy, https://getcardpulse.app/terms
 
 ## Where the numbers come from

@@ -68,7 +68,9 @@ a {
   color: var(--brand);
   text-underline-offset: 2px;
 
-  &:focus-visible { outline: none; }
+  /* A visible ring, not none: keyboard users have to be able to see
+     where they are, and the deletion routes are reached by link. */
+  &:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 }
 
 h1, h2, h3 {
@@ -318,7 +320,8 @@ table.plans {
 
 .scroll { overflow-x: auto; }
 
-ul.plain {
+ul.plain,
+ol.plain {
   margin: 0;
   padding-left: 1.1rem;
   display: flex;

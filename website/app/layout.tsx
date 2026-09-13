@@ -101,6 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <Link href="/changelog">Changelog</Link>
               <Link href="/support">Support</Link>
               <Link href="/privacy">Privacy</Link>
+              <Link href="/delete-account">Delete account</Link>
               <Link href="/terms">Terms</Link>
             </nav>
             <p>
