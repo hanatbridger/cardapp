@@ -134,11 +134,21 @@ async function runGoogleSignInNative(): Promise<GoogleProfile> {
     return { email, displayName, username };
   } catch (e: any) {
     // Normalize cancellation across SDK versions to the sentinel.
+    // IN_PROGRESS is a second sign-in racing the first — same silent
+    // no-op as the module-level re-entrancy guard above.
+    // `code &&` keeps a code-less error (e.g. Supabase) from matching an
+    // undefined constant via undefined === undefined.
+    const code: string | undefined = e?.code;
     if (
       e?.message === GOOGLE_SIGN_IN_CANCELLED ||
-      e?.code === statusCodes?.SIGN_IN_CANCELLED
+      (code && (code === statusCodes?.SIGN_IN_CANCELLED || code === statusCodes?.IN_PROGRESS))
     ) {
       throw new Error(GOOGLE_SIGN_IN_CANCELLED);
+    }
+    // Android only: hasPlayServices() rejects when Play services is
+    // missing or outdated. Replace the raw SDK message.
+    if (code && code === statusCodes?.PLAY_SERVICES_NOT_AVAILABLE) {
+      throw new Error('Google Play services is required to sign in on this device.');
     }
     throw e;
   }

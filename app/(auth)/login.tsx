@@ -79,7 +79,14 @@ function LoginScreen() {
       signIn({ email, username, displayName }, 'apple');
       router.replace('/(tabs)');
     } catch (e: any) {
-      if (e.code === 'ERR_REQUEST_CANCELED') return;
+      if (e?.code === 'ERR_REQUEST_CANCELED') return;
+      // UnavailabilityError (expo-modules-core) — no native Apple module
+      // on this platform. AuthForm hides the button on Android; this is
+      // the backstop so the raw "not linked" message never reaches users.
+      if (e?.code === 'ERR_UNAVAILABLE') {
+        Alert.alert('Sign In Failed', 'Sign in with Apple is not available on this device.');
+        return;
+      }
       Alert.alert(
         'Sign In Failed',
         e?.message ?? 'Apple Sign In could not be completed. Please try again.',

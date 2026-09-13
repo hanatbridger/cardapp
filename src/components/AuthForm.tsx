@@ -15,7 +15,7 @@ interface AuthFormProps {
   onSubmit: (values: { email: string; password: string; displayName?: string }) => void;
   onApple: () => void;
   /** Google sign-in handler. When provided, a "Continue with Google"
-   *  button renders below the Apple button. */
+   *  button renders above the Apple button (and alone on Android). */
   onGoogle?: () => void;
   loading?: boolean;
   /**
@@ -94,6 +94,32 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
   const appleBg = isDark ? '#FFFFFF' : '#000000';
   const appleFg = isDark ? '#000000' : '#FFFFFF';
 
+  // expo-apple-authentication ships no Android module — signInAsync
+  // throws ERR_UNAVAILABLE there — so the Apple control is hidden on
+  // Android and Google stands alone. iOS and web are unchanged.
+  const AppleButton = Platform.OS !== 'android' ? (
+    <Pressable
+      onPress={onApple}
+      style={({ pressed }) => ({
+        height: 48,
+        borderRadius: radius.lg,
+        backgroundColor: appleBg,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: spacing[2],
+        opacity: pressed ? 0.85 : 1,
+      })}
+      accessibilityRole="button"
+      accessibilityLabel={`${verb} with Apple`}
+    >
+      <IconBrandApple size={20} color={appleFg} />
+      <Text variant="labelLg" color={appleFg}>
+        {`${verb} with Apple`}
+      </Text>
+    </Pressable>
+  ) : null;
+
   // v1 launch path — Apple Sign In only. Skips the email/password
   // fields and the "or" divider, keeping just the system-styled Apple
   // button. AuthForm internals stay intact for the post-launch flow
@@ -102,28 +128,7 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
     return (
       <View style={{ gap: spacing[3] }}>
         {GoogleButton}
-        <Pressable
-          onPress={onApple}
-          style={({ pressed }) => ({
-            height: 48,
-            borderRadius: radius.lg,
-            backgroundColor: appleBg,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: spacing[2],
-            opacity: pressed ? 0.85 : 1,
-          })}
-          accessibilityRole="button"
-          accessibilityLabel={`${verb} with Apple`}
-        >
-          <IconBrandApple size={20} color={appleFg} />
-          <Text variant="labelLg" color={appleFg}>
-            {Platform.OS === 'ios' || Platform.OS === 'web'
-              ? `${verb} with Apple`
-              : `Continue with Apple`}
-          </Text>
-        </Pressable>
+        {AppleButton}
         <Text
           variant="caption"
           color={colors.onSurfaceMuted}
@@ -178,41 +183,23 @@ export function AuthForm({ mode, onSubmit, onApple, onGoogle, loading, appleOnly
         {mode === 'signin' ? 'Sign in' : 'Create account'}
       </Button>
 
-      {/* Divider */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
-        <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
-        <Text variant="caption" color={colors.onSurfaceMuted}>
-          or
-        </Text>
-        <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
-      </View>
+      {/* Divider — only when a social button follows it (Android
+          without onGoogle has none, which would orphan the "or"). */}
+      {(GoogleButton || AppleButton) && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[3] }}>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
+          <Text variant="caption" color={colors.onSurfaceMuted}>
+            or
+          </Text>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.outlineVariant }} />
+        </View>
+      )}
 
       {/* Google Sign In */}
       {GoogleButton}
 
-      {/* Apple Sign In */}
-      <Pressable
-        onPress={onApple}
-        style={({ pressed }) => ({
-          height: 48,
-          borderRadius: radius.lg,
-          backgroundColor: appleBg,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: spacing[2],
-          opacity: pressed ? 0.85 : 1,
-        })}
-        accessibilityRole="button"
-        accessibilityLabel={`${verb} with Apple`}
-      >
-        <IconBrandApple size={20} color={appleFg} />
-        <Text variant="labelLg" color={appleFg}>
-          {Platform.OS === 'ios' || Platform.OS === 'web'
-            ? `${verb} with Apple`
-            : `Continue with Apple`}
-        </Text>
-      </Pressable>
+      {/* Apple Sign In (hidden on Android) */}
+      {AppleButton}
     </View>
   );
 }
