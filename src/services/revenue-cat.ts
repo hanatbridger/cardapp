@@ -32,7 +32,14 @@ import { useUserStore } from '../stores/user-store';
 import { supabase } from './supabase';
 import { captureException } from './sentry';
 
-const API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
+// RevenueCat issues one public SDK key per store app: `appl_` for the
+// App Store app, `goog_` for the Play Store app. Configuring the Android
+// SDK with the Apple key fails at runtime, so each platform reads its own.
+const API_KEY = Platform.select({
+  ios: process.env.EXPO_PUBLIC_REVENUECAT_API_KEY,
+  android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY,
+});
+const KEY_PREFIX = Platform.select({ ios: 'appl_', android: 'goog_' });
 const ENTITLEMENT_ID = 'premium';
 
 function entitlementActive(info: CustomerInfo | null | undefined): boolean {
@@ -47,13 +54,21 @@ let isConfigured = false;
 export async function configureRevenueCat(): Promise<void> {
   if (isConfigured || Platform.OS === 'web') return;
 
-  if (!API_KEY) {
-    // No silent fallback — a missing key on native means IAP is dead.
-    // Log loudly in dev; stay quiet in prod so we don't spam Sentry,
-    // but leave the SDK unconfigured so purchase attempts fail fast.
+  if (!API_KEY || !KEY_PREFIX || !API_KEY.startsWith(KEY_PREFIX)) {
+    // No silent fallback — a missing or wrong-store key on native means
+    // IAP is dead. Report once per launch and leave the SDK unconfigured:
+    // the app runs on the free tier and purchase attempts fail fast
+    // instead of the SDK running against a key for the other store.
+    const envVar = Platform.OS === 'android'
+      ? 'EXPO_PUBLIC_REVENUECAT_ANDROID_API_KEY'
+      : 'EXPO_PUBLIC_REVENUECAT_API_KEY';
+    captureException(
+      new Error(API_KEY ? 'RevenueCat key has wrong store prefix' : 'RevenueCat key missing'),
+      { where: 'configureRevenueCat', platform: Platform.OS, envVar },
+    );
     if (__DEV__) {
       console.warn(
-        '[RevenueCat] EXPO_PUBLIC_REVENUECAT_API_KEY is not set. ' +
+        `[RevenueCat] ${envVar} is missing or does not start with ${KEY_PREFIX}. ` +
         'Purchases and restore will not work. ' +
         'Set it in .env locally and in EAS env for builds.'
       );
