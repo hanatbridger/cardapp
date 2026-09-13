@@ -8,7 +8,11 @@ import { Text, Card, withErrorBoundary } from '../src/components';
 import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 
-const LAST_UPDATED = 'April 8, 2026';
+const LAST_UPDATED = 'September 12, 2026';
+
+// The only address that receives mail for CardPulse. Mirrors SUPPORT_EMAIL
+// in app/help.tsx — keep the two in step.
+const CONTACT_EMAIL = 'hanwong118@gmail.com';
 
 const SECTIONS: { title: string; body: string }[] = [
   {
@@ -29,7 +33,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: '5. Pricing and Market Data',
-    body: 'CardPulse aggregates publicly available pricing information from third-party marketplaces. Prices are estimates based on recent sold listings and are provided for informational purposes only. We make no guarantee as to accuracy, completeness, or timeliness. Market conditions change rapidly and historical prices do not predict future performance.',
+    body: 'CardPulse aggregates publicly available pricing information from third-party marketplaces. Prices are indicative: some are averages of recent sold listings, others are asking prices on live listings, and each is labelled with its source in the App. All of it is provided for informational purposes only. We make no guarantee as to accuracy, completeness, or timeliness. Market conditions change rapidly and historical prices do not predict future performance.',
   },
   {
     title: '6. Not Financial Advice',
@@ -65,7 +69,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: '14. Contact',
-    body: 'Questions about these Terms? Email us at legal@cardpulse.app.',
+    body: `Questions about these Terms? Email us at ${CONTACT_EMAIL}.`,
   },
 ];
 

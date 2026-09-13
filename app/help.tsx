@@ -33,11 +33,11 @@ const FAQ = [
   },
   {
     q: 'How many cards can I track for free?',
-    a: 'Free users can track up to 5 cards. Premium ($4.99/month or $29.99/year — save 50%) unlocks an unlimited watchlist and price alerts on every card.',
+    a: 'Free users can track up to 5 cards. Premium ($4.99/month or $29.99/year — save 50%) removes both caps: an unlimited watchlist and unlimited price alerts.',
   },
   {
     q: 'How do price alerts work?',
-    a: 'Set a target price on any card in your watchlist. When the live market price crosses your target — above or below — you\'ll get a push notification. Premium only.',
+    a: 'Set a target price on any card in your watchlist. When the live market price crosses your target — above or below — you\'ll get a push notification. Free keeps 3 active alerts at a time; Premium removes the cap.',
   },
   {
     q: 'How do I cancel Premium?',
@@ -49,7 +49,7 @@ const FAQ = [
   },
   {
     q: 'How do I delete my account?',
-    a: 'Profile tab → Delete Account. This deletes your CardPulse account from our servers, signs you out, and clears your local watchlist and preferences. The action is immediate and can\'t be undone.',
+    a: 'Profile tab → Delete Account. This deletes your CardPulse account from our servers, signs you out, and clears your profile, preferences, and recent searches from this device. Your watchlist and alerts stay in local storage until you delete the app or clear its data. The action is immediate and can\'t be undone.',
   },
   {
     q: 'Is CardPulse affiliated with The Pokemon Company?',

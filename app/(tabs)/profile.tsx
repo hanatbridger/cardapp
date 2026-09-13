@@ -117,7 +117,7 @@ function ProfileScreen() {
     } catch (e: any) {
       const msg =
         e?.message ??
-        'Something went wrong. Please try again, or email privacy@cardpulse.app for help.';
+        'Something went wrong. Please try again, or email hanwong118@gmail.com for help.';
       if (Platform.OS === 'web') {
         window.alert(`Could not delete account\n\n${msg}`);
       } else {
