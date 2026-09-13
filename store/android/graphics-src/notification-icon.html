@@ -1,0 +1,23 @@
+<meta charset="utf-8">
+<title>CardPulse notification icon 96x96</title>
+<!--
+  Android status-bar notification icon, 96x96 (xxhdpi of 24dp).
+  Pure white silhouette on a fully transparent background: Android discards
+  colour and tints the alpha channel, so the lit facet is deliberately dropped
+  (that is the `mono` variant in src/components/BrandMark.tsx).
+  The path occupies 66.7% of its 1024 viewBox, so the group is scaled 1.25x
+  about the centre to land an 80px mark (20dp) inside the 96px canvas: an 8px
+  inset on every side.
+-->
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 96px; height: 96px; background: transparent; }
+  body { display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  svg { width: 96px; height: 96px; display: block; }
+</style>
+
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(512 512) scale(1.25) translate(-512 -512)">
+    <path d="M 512 170.667 L 853.333 682.667 L 512 853.333 L 170.667 682.667 Z" fill="#FFFFFF"/>
+  </g>
+</svg>

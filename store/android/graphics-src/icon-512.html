@@ -1,0 +1,24 @@
+<meta charset="utf-8">
+<title>CardPulse hi-res listing icon 512x512</title>
+<!--
+  Play listing hi-res icon, 512x512, opaque, full-bleed square.
+  The 512x512 / 32-bit / no-transparency requirement and the fact that Play
+  applies its own corner mask (hence no rounding here) are from memory —
+  confirm in Play Console (Store listing > Graphics) before upload.
+  Reproduces the shipped launcher artwork: flat #5739FF ground with the prism at
+  the assets/logo/app-icon.svg geometry (205 / 819 in a 1024 viewBox), body
+  #F9FAFB and lit facet #A5B0FF. Matches assets/icon.png pixel for pixel in
+  layout, only rescaled.
+-->
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 512px; height: 512px; }
+  body { overflow: hidden; background: #5739FF; }
+  svg { width: 512px; height: 512px; display: block; }
+</style>
+
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="1024" fill="#5739FF"/>
+  <path d="M512 205L819 665.5L512 819L205 665.5L512 205Z" fill="#F9FAFB"/>
+  <path d="M512 205L819 665.5L512 512V205Z" fill="#A5B0FF"/>
+</svg>

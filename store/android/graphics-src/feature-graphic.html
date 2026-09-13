@@ -1,0 +1,89 @@
+<meta charset="utf-8">
+<title>CardPulse feature graphic 1024x500</title>
+<!--
+  Play Store feature graphic, exactly 1024x500.
+  Size and no-transparency requirement are from memory — confirm in Play Console
+  (Store listing > Graphics) before upload.
+  Geometry is the CardPulse prism from src/components/BrandMark.tsx (viewBox 0 0 1024 1024),
+  inverse variant: body #F9FAFB, lit facet #A5B0FF, on brand indigo #5739FF
+  (app.json android.adaptiveIcon.backgroundColor, tokens.ts palette.primary[500]).
+  No device mockups, no screenshots, no ratings, no AI claims.
+  Content is kept inside a 112px horizontal / 76px vertical margin because Play
+  can crop or overlay the outer band on some surfaces.
+-->
+<style>
+  @font-face {
+    font-family: 'Space Grotesk';
+    font-weight: 700;
+    src: url('file:///Users/hanwong/code/cardApp/node_modules/@expo-google-fonts/space-grotesk/700Bold/SpaceGrotesk_700Bold.ttf') format('truetype');
+  }
+  @font-face {
+    font-family: 'Space Grotesk';
+    font-weight: 400;
+    src: url('file:///Users/hanwong/code/cardApp/node_modules/@expo-google-fonts/space-grotesk/400Regular/SpaceGrotesk_400Regular.ttf') format('truetype');
+  }
+
+  :root {
+    --brand: #5739FF;
+    --brand-deep: #462ECC;
+    --mark-body: #F9FAFB;
+    --mark-facet: #A5B0FF;
+    --ink: #FFFFFF;
+    --ink-soft: #E4DFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body { width: 1024px; height: 500px; }
+
+  body {
+    background: linear-gradient(118deg, var(--brand) 0%, var(--brand) 52%, var(--brand-deep) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .safe {
+    width: 800px;
+    height: 348px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 44px;
+  }
+
+  .mark { width: 168px; height: 168px; flex: none; }
+
+  .type { display: flex; flex-direction: column; gap: 14px; }
+
+  .wordmark {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 700;
+    font-size: 84px;
+    line-height: 1;
+    letter-spacing: -3.4px;
+    color: var(--ink);
+  }
+
+  .tagline {
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 400;
+    font-size: 27px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    color: var(--ink-soft);
+  }
+</style>
+
+<div class="safe">
+  <svg class="mark" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 512 170.667 L 853.333 682.667 L 512 853.333 L 170.667 682.667 Z" fill="#F9FAFB"/>
+    <path d="M 512 170.667 L 853.333 682.667 L 512 512 Z" fill="#A5B0FF"/>
+  </svg>
+  <div class="type">
+    <div class="wordmark">CardPulse</div>
+    <div class="tagline">Pokemon card prices, alerts and returns</div>
+  </div>
+</div>

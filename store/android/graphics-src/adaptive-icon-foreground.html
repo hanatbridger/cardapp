@@ -1,0 +1,41 @@
+<meta charset="utf-8">
+<title>CardPulse adaptive icon foreground 1024x1024</title>
+<!--
+  Android adaptive-icon FOREGROUND layer, 1024x1024, fully transparent background.
+  Pairs with app.json android.adaptiveIcon.backgroundColor #5739FF.
+
+  Fixes the shipped assets/adaptive-icon.png. Measured from its pixels: the
+  body is #4B5EFC and the facet #A5B0FF — the older brand indigo still held in
+  assets/logo/mark-color.svg, not the #5739FF that BrandMark's `color` variant
+  now fills (src/components/BrandMark.tsx:27). #4B5EFC on the #5739FF
+  background layer is a 1.25:1 contrast ratio, so the body of the mark is
+  effectively invisible and only the lighter facet reads. The shipped
+  foreground is also badly undersized: its opaque bbox is 376,376..647,647,
+  a 272px mark on a 1024px canvas (max radius 152px against the 338px safe
+  radius), so it renders as a small chip in the centre of the mask.
+  This candidate uses the inverse lockup instead: body #F9FAFB, facet #A5B0FF,
+  the same treatment as assets/icon.png and assets/logo/app-icon.svg.
+
+  Safe zone (Android adaptive-icon geometry, from memory — confirm against the
+  current Android developer docs): the foreground is a 1024 canvas of which the centre 66%
+  (a 676px circle, radius 338) always survives every OEM mask; the visible
+  area under a circular mask is 72% (737px). The mark's farthest vertex sits
+  381.5px from centre at native scale, so it is scaled by 0.78 -> 297.6px,
+  well inside the safe radius. That also keeps the mark's optical weight
+  close to the shipped iOS icon rather than filling the mask edge to edge.
+  Scale 0.88 is the largest value that still fits the safe circle if a bolder
+  mark is preferred.
+-->
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 1024px; height: 1024px; background: transparent; }
+  body { overflow: hidden; }
+  svg { width: 1024px; height: 1024px; display: block; }
+</style>
+
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <g transform="translate(512 512) scale(0.78) translate(-512 -512)">
+    <path d="M 512 170.667 L 853.333 682.667 L 512 853.333 L 170.667 682.667 Z" fill="#F9FAFB"/>
+    <path d="M 512 170.667 L 853.333 682.667 L 512 512 Z" fill="#A5B0FF"/>
+  </g>
+</svg>
