@@ -12,7 +12,7 @@
 
 - Wrap screen roots in `SafeAreaView` from `react-native-safe-area-context`
 - Header height: `HEADER_HEIGHT = 180`
-- Tab bar height: `TAB_BAR_HEIGHT = 85`
+- Tab bar: floating, `FLOATING_TAB_BAR_HEIGHT = 62` + `FLOATING_TAB_BAR_OFFSET = 10` above the safe-area inset; tab screens reserve bottom padding with `useTabBarInset()`
 - Bottom inset: respect via `useSafeAreaInsets().bottom`
 
 ## Touch targets

@@ -7,6 +7,7 @@ import { Haptics } from '../../src/utils/haptics';
 import { IconHome, IconBell, IconUser, IconSearch, IconNews } from '@tabler/icons-react-native';
 import { useTheme } from '../../src/theme/ThemeProvider';
 import { spacing } from '../../src/theme/tokens';
+import { FLOATING_TAB_BAR_OFFSET } from '../../src/constants/layout';
 import { useAlertsStore } from '../../src/stores/alerts-store';
 
 // Liquid-glass floating tab bar — Apple-style frosted glass that FLOATS
@@ -30,6 +31,8 @@ const ICON_STROKE = 2;
 const ITEM_VPAD = 14;
 // Capsule height = icon + item padding + track padding; the Home circle
 // matches it so the two surfaces read as one control.
+// Mirrored as FLOATING_TAB_BAR_HEIGHT (src/constants/layout.ts), which
+// useTabBarInset reads for scroll clearance — keep the two in sync.
 const BAR_HEIGHT = ICON_SIZE + ITEM_VPAD * 2 + TRACK_PAD * 2; // 62
 const BLUR_INTENSITY = 32;
 const FADE_MS = 240;
@@ -210,8 +213,11 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
       shadowOpacity: 0.4,
       shadowRadius: 20,
     },
-    // Android elevation needs a background to cast from.
-    android: { elevation: 16, backgroundColor: trackTint },
+    // No wrapper background on Android: dimezisBlurView frosts the live
+    // backdrop, and a tint here would stack under the fill. Without a
+    // background RN has no outline to cast elevation from, so the
+    // Android bar is shadowless.
+    android: { elevation: 16 },
     web: { boxShadow: '0 10px 20px rgba(0,0,0,0.40)' } as any,
     default: {},
   });
@@ -244,7 +250,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
         alignItems: 'center',
         gap: spacing[2],
         paddingHorizontal: spacing[4],
-        paddingBottom: insets.bottom + 10,
+        paddingBottom: insets.bottom + FLOATING_TAB_BAR_OFFSET,
         pointerEvents: 'box-none',
       }}
     >
@@ -273,6 +279,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
               <BlurView
                 intensity={BLUR_INTENSITY}
                 tint={isDark ? 'dark' : 'light'}
+                experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
                 style={{ ...AbsoluteFill, pointerEvents: 'none' }}
               />
             )}
@@ -319,6 +326,9 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             <BlurView
               intensity={BLUR_INTENSITY}
               tint={isDark ? 'dark' : 'light'}
+              // expo-blur defaults Android to a flat tint (no blur);
+              // Dimezis blurs the nearest react-native-screens Screen.
+              experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
               style={{ ...AbsoluteFill, pointerEvents: 'none' }}
             />
           )}

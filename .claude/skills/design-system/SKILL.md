@@ -207,7 +207,7 @@ Automatic via `prefers-color-scheme` / `useColorScheme()`. Every component must 
 HORIZONTAL_PADDING = 16
 MIN_TOUCH_TARGET   = 44     // Apple HIG minimum
 HEADER_HEIGHT      = 180
-TAB_BAR_HEIGHT     = 85
+FLOATING_TAB_BAR_HEIGHT = 62   // + FLOATING_TAB_BAR_OFFSET = 10; clearance via useTabBarInset()
 ```
 
 ---

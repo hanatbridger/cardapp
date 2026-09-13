@@ -80,7 +80,7 @@ Liquid-glass floating tab bar (Apple-style frosted capsule). Not exported from b
 - **Tints (spec values, deliberately not tokens):** dark — track `rgba(0,0,0,0.10)`, pill `rgba(255,255,255,0.10)`; light — track `rgba(0,0,0,0.05)`, pill `#ffffff`. Icon color `colors.onSurface`; inactive opacity 0.2, active 1.0.
 - **Motion:** pill slides with spring (tension 58, friction 12); snaps (no animation) on first layout. Press pop: pill scales to 1.10 while held, springs back. Icon opacity crossfade 240ms.
 - **Unread badge:** 12pt dot (#ff3b30, 1.5pt ring in the track tint) on the Bell glyph when un-read triggered alerts exist; sits OUTSIDE the opacity fade so it stays bright on idle tabs.
-- **Scroll clearance:** screens reserve `TAB_BAR_HEIGHT` (96) of bottom padding so content scrolls under the bar but nothing hides behind it.
+- **Scroll clearance:** tab screens reserve `useTabBarInset()` of bottom padding (bar 62 + offset 10 + safe-area inset + `spacing[6]`) so content scrolls under the bar but nothing hides behind it.
 - All tabs trigger `Haptics.selectionAsync()` on press; the Explore focused-search overlay still hides the bar via `tabBarStyle.display: 'none'`.
 
 ## Domain components

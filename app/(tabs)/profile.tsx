@@ -12,6 +12,7 @@ import { Text, Card, Button, ScreenBackground, SegmentedControl, CurrencyPickerM
 import { spacing, radius, shadows } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { useTabBarInset } from '../../src/hooks/use-tab-bar-inset';
 import { currencyMeta, DEFAULT_CURRENCY } from '../../src/constants/currencies';
 import { isSuperadminEmail } from '../../src/services/admin-feedback';
 import { useUserStore } from '../../src/stores/user-store';
@@ -81,6 +82,7 @@ const THEME_VALUES = ['system', 'light', 'dark'] as const;
 
 function ProfileScreen() {
   const { colors } = useTheme();
+  const bottomInset = useTabBarInset();
   // Field selectors — the whole-store destructure re-rendered Profile on
   // every user-store write (recent searches, premium sync) even blurred.
   const profile = useUserStore((s) => s.profile);
@@ -149,8 +151,18 @@ function ProfileScreen() {
 
   // Live App Store listing (CardPulse: Card Tracker). ?action=write-review
   // drops the user straight onto the review sheet instead of the listing,
-  // which is what a "Rate" button promises.
+  // which is what a "Rate" button promises. Android opens the Play Store
+  // app via market://, falling back to the web listing when no store app
+  // handles the scheme.
   const handleRate = () => {
+    if (Platform.OS === 'android') {
+      Linking.openURL('market://details?id=com.getcardpulse.app').catch(() =>
+        Linking.openURL(
+          'https://play.google.com/store/apps/details?id=com.getcardpulse.app',
+        ).catch(() => {}),
+      );
+      return;
+    }
     Linking.openURL(
       'https://apps.apple.com/us/app/cardpulse-card-tracker/id6762569336?action=write-review',
     ).catch(() => {});
@@ -160,7 +172,7 @@ function ProfileScreen() {
     <ScreenBackground>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: spacing[24] }}
+        contentContainerStyle={{ paddingBottom: bottomInset }}
       >
         {/* Header — 56-pt row matches Home, Notifications and Explore's
             CollapsingHeader so the title stays at the same y-offset

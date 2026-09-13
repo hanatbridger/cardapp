@@ -127,7 +127,7 @@ Properties: `background`, `backgroundStrong`, `border`, `blur` (4). Used by `Sea
 HORIZONTAL_PADDING = 16     // screen edge padding
 MIN_TOUCH_TARGET   = 44     // Apple HIG minimum
 HEADER_HEIGHT      = 180    // home/list header
-TAB_BAR_HEIGHT     = 85
+FLOATING_TAB_BAR_HEIGHT = 62   // + FLOATING_TAB_BAR_OFFSET = 10; clearance via useTabBarInset()
 CARD_BORDER_RADIUS = 12     // legacy — prefer radius.md
 LARGE_CARD_BORDER_RADIUS = 20  // legacy — prefer radius.xl
 ```

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { View, TextInput, Pressable, ScrollView, ActivityIndicator, Keyboard } from 'react-native';
+import { View, TextInput, Pressable, ScrollView, ActivityIndicator, Keyboard, BackHandler, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import Animated, { FadeIn, FadeOut, SlideInUp } from 'react-native-reanimated';
 import { router, useFocusEffect, useLocalSearchParams, useNavigation } from 'expo-router';
@@ -21,6 +21,7 @@ import {
 import { spacing, radius } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { useTabBarInset } from '../../src/hooks/use-tab-bar-inset';
 import { useUserStore } from '../../src/stores';
 import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useJapaneseSearch, useCollapsingHeader, useDebouncedValue, useTrending } from '../../src/hooks';
 import { MOCK_PRICES, TRENDING_ARTISTS } from '../../src/mocks';
@@ -287,6 +288,23 @@ function SearchScreen() {
     }
     setSearchOrigin('tab');
   };
+
+  // Android hardware back closes the focus overlay the same way Cancel
+  // does. Unhandled, back fell through to the tab navigator (jumping to
+  // Home) and left searchFocused/query stale on this route. The listener
+  // is global, so it steps aside when a notification tap has pushed a
+  // card or switched tabs while the overlay was still open.
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !searchFocused) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!navigation.isFocused()) return false;
+      cancelSearch();
+      return true;
+    });
+    return () => sub.remove();
+    // cancelSearch is recreated each render; it only reads searchOrigin.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchFocused, searchOrigin, navigation]);
 
   const handleFocusedRecentPress = (term: string) => {
     setQuery(term);
@@ -596,10 +614,11 @@ function CardsEmptyState({
   undervaluedPicks: AIPickItem[];
   overvaluedPicks: AIPickItem[];
 }) {
+  const bottomInset = useTabBarInset();
   return (
     <Animated.ScrollView
       style={{ flex: 1 }}
-      contentContainerStyle={{ paddingTop: topInset, paddingBottom: spacing[24] }}
+      contentContainerStyle={{ paddingTop: topInset, paddingBottom: bottomInset }}
       showsVerticalScrollIndicator={false}
       onScroll={onScroll}
       scrollEventThrottle={16}
@@ -652,6 +671,7 @@ function CardResults({
   topInset?: number;
 }) {
   const { colors } = useTheme();
+  const bottomInset = useTabBarInset();
 
   if (loading) {
     return (
@@ -730,7 +750,7 @@ function CardResults({
           </Text>
         </View>
       }
-      contentContainerStyle={{ paddingTop: topInset, paddingBottom: spacing[24] }}
+      contentContainerStyle={{ paddingTop: topInset, paddingBottom: bottomInset }}
       showsVerticalScrollIndicator={false}
       onScroll={onScroll}
       scrollEventThrottle={16}
@@ -754,6 +774,7 @@ function SetResults({
   topInset?: number;
 }) {
   const { colors } = useTheme();
+  const bottomInset = useTabBarInset();
 
   if (loading) {
     return (
@@ -773,7 +794,7 @@ function SetResults({
       contentContainerStyle={{
         paddingHorizontal: HORIZONTAL_PADDING,
         paddingTop: topInset + spacing[2],
-        paddingBottom: spacing[24],
+        paddingBottom: bottomInset,
         gap: spacing[2],
       }}
       onScroll={onScroll}
@@ -862,6 +883,7 @@ function ArtistResults({
   topInset?: number;
 }) {
   const { colors } = useTheme();
+  const bottomInset = useTabBarInset();
 
   // Pre-query state: mirror CardsEmptyState's Trending Searches pattern so
   // Artists feels like a first-class sibling tab. The numbered list with
@@ -871,7 +893,7 @@ function ArtistResults({
     return (
       <Animated.ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingTop: topInset, paddingBottom: spacing[24] }}
+        contentContainerStyle={{ paddingTop: topInset, paddingBottom: bottomInset }}
         onScroll={onScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
@@ -925,7 +947,7 @@ function ArtistResults({
       contentContainerStyle={{
         paddingHorizontal: HORIZONTAL_PADDING,
         paddingTop: topInset + spacing[2],
-        paddingBottom: spacing[24],
+        paddingBottom: bottomInset,
         gap: spacing[2],
       }}
       onScroll={onScroll}

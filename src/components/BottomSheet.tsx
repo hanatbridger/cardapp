@@ -166,9 +166,11 @@ export function BottomSheet({
           />
         </Animated.View>
         {/* box-none (in style, for Fabric): taps above the sheet fall
-            through to the backdrop, taps on the sheet stop at the sheet. */}
+            through to the backdrop, taps on the sheet stop at the sheet.
+            Android: no behavior — adjustResize already shrinks the window
+            for the keyboard, and 'height' compensated a second time. */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={{ flex: 1, justifyContent: 'flex-end', pointerEvents: 'box-none' }}
         >
           <Animated.View

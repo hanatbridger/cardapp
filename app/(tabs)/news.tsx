@@ -12,6 +12,7 @@ import {
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { useTabBarInset } from '../../src/hooks/use-tab-bar-inset';
 import { useNews } from '../../src/hooks/use-news';
 import { requestNotificationPermission } from '../../src/services/notifications';
 import { registerForPushNotifications } from '../../src/services/push';
@@ -23,6 +24,7 @@ let newsPermissionAsked = false;
 
 function NewsScreen() {
   const { colors } = useTheme();
+  const bottomInset = useTabBarInset();
   const { data: articles, isLoading, isError, refetch, isRefetching } = useNews(50);
   const notificationsEnabled = useUserStore((s) => s.preferences.notificationsEnabled);
 
@@ -115,7 +117,7 @@ function NewsScreen() {
             tintColor={colors.primary}
           />
         }
-        contentContainerStyle={{ paddingBottom: spacing[24] }}
+        contentContainerStyle={{ paddingBottom: bottomInset }}
       />
     </ScreenBackground>
   );

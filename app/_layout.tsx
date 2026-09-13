@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Notifications from 'expo-notifications';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from '../src/theme/ThemeProvider';
+import { ThemeProvider, useTheme } from '../src/theme/ThemeProvider';
 import { queryClient } from '../src/lib/query-client';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { PortalHost } from '../src/components/Portal';
@@ -173,6 +174,15 @@ function AuthGate() {
   return null;
 }
 
+// Status bar icons follow the resolved app theme, not the OS scheme, so
+// a pinned light/dark preference keeps them legible. Status bar only:
+// expo-status-bar wraps RN StatusBar, which leaves Android's navigation
+// bar icons on the OS scheme.
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
 function AlertCheckerHost() {
   const router = useRouter();
   useAlertChecker();
@@ -256,6 +266,7 @@ export default function RootLayout() {
       <ErrorBoundary onError={(error, info) => captureException(error, { componentStack: info.componentStack })}>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
+            <ThemedStatusBar />
             <AuthGate />
             <AlertCheckerHost />
             {/* freezeOnBlur: screens buried in the stack stop re-rendering

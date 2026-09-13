@@ -6,6 +6,7 @@ import { useTheme } from '../../src/theme/ThemeProvider';
 import { Text, NotificationItem, EmptyState, ScreenBackground, withErrorBoundary } from '../../src/components';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { useTabBarInset } from '../../src/hooks/use-tab-bar-inset';
 import { useAlertsStore } from '../../src/stores/alerts-store';
 import { CONDITION_LABELS, formatSignedUsd } from '../../src/services/grading-verdict';
 import { formatReturnAlertMessage } from '../../src/services/since-added';
@@ -56,6 +57,7 @@ function triggeredToNotification(t: TriggeredAlert): Notification {
 
 function NotificationsScreen() {
   const { colors } = useTheme();
+  const bottomInset = useTabBarInset();
   const triggered = useAlertsStore((s) => s.triggered);
   const markTriggeredRead = useAlertsStore((s) => s.markTriggeredRead);
   const markAllTriggeredRead = useAlertsStore((s) => s.markAllTriggeredRead);
@@ -146,7 +148,7 @@ function NotificationsScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: spacing[24] }}
+        contentContainerStyle={{ paddingBottom: bottomInset }}
       />
     </ScreenBackground>
   );
