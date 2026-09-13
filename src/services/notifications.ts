@@ -1,10 +1,44 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { lightColors } from '../theme/tokens';
 
 let handlerConfigured = false;
 
+// Android notification channel ids. The server push payloads in
+// api/cron/snapshot-prices.ts and api/cron/news-push.ts reference the same
+// strings; an unknown id falls back to the default channel rather than
+// dropping, so the client and server can roll out in either order.
+export const ALERTS_CHANNEL_ID = 'alerts';
+export const NEWS_CHANNEL_ID = 'news';
+
 /**
- * Configure the foreground notification handler. Call once at app start.
+ * Create the Android notification channels. Without them every notification
+ * lands in the auto-created "Miscellaneous" channel, and on Android 13+ the
+ * permission prompt cannot appear until at least one channel exists.
+ * setNotificationChannelAsync is an upsert, so repeat calls are safe.
+ */
+function configureAndroidChannels() {
+  if (Platform.OS !== 'android') return;
+  Promise.all([
+    Notifications.setNotificationChannelAsync(ALERTS_CHANNEL_ID, {
+      name: 'Price and grading alerts',
+      importance: Notifications.AndroidImportance.HIGH,
+      lightColor: lightColors.primary,
+    }),
+    Notifications.setNotificationChannelAsync(NEWS_CHANNEL_ID, {
+      name: 'News',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      lightColor: lightColors.primary,
+    }),
+  ]).catch((e) => {
+    // eslint-disable-next-line no-console
+    console.warn('[notifications] channel setup failed', e);
+  });
+}
+
+/**
+ * Configure the foreground notification handler and, on Android, the
+ * notification channels. Call once at app start.
  * No-op on web — expo-notifications doesn't expose web push.
  */
 export function configureNotificationHandler() {
@@ -18,6 +52,7 @@ export function configureNotificationHandler() {
       shouldShowAlert: true,
     }),
   });
+  configureAndroidChannels();
   handlerConfigured = true;
 }
 
@@ -54,7 +89,10 @@ export async function presentLocalNotification(
   try {
     await Notifications.scheduleNotificationAsync({
       content: { title, body, data: data ?? {} },
-      trigger: null, // fire immediately
+      // Fire immediately. Android routes through the alerts channel; iOS
+      // has no channels and keeps the plain null trigger.
+      trigger:
+        Platform.OS === 'android' ? { channelId: ALERTS_CHANNEL_ID } : null,
     });
   } catch (e) {
     // Don't crash the app if notifications fail — log and move on.

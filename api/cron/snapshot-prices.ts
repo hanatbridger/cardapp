@@ -342,6 +342,12 @@ async function checkAlerts(
     const messages = batch.map(({ target, title, body }) => ({
       to: target.push_token,
       sound: 'default',
+      // Android: route to the high-importance channel the app creates in
+      // src/services/notifications.ts, and deliver through FCM at high
+      // priority so Doze does not hold the alert. iOS ignores channelId,
+      // and 'high' is the APNs priority it already got by default.
+      channelId: 'alerts',
+      priority: 'high',
       title,
       body,
       data: { type: 'alert', cardId: target.card_id },

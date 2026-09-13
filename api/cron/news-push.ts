@@ -257,6 +257,9 @@ export default async function handler(req: Request): Promise<Response> {
     const batch = batchTokens.map((to) => ({
       to,
       sound: 'default',
+      // Android only (ignored by iOS): the default-importance channel the
+      // app creates in src/services/notifications.ts.
+      channelId: 'news',
       title: 'Pokémon card news',
       body: top.title,
       data: { type: 'news', url: top.url },
