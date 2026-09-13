@@ -675,19 +675,12 @@ function CardDetailScreen() {
                       <PriceChange percent={price.percentChange} size="md" />
                     )}
                   </View>
-                  {/* Real listed-price spread from the card payload —
-                      present for virtually every card, tracked or not. */}
-                  {card.tcgPlayerLowPrice !== undefined && card.tcgPlayerHighPrice !== undefined && (
-                    <Text variant="caption" color={colors.onSurfaceMuted}>
-                      Listed {formatMoney(card.tcgPlayerLowPrice)} – {formatMoney(card.tcgPlayerHighPrice)} on TCGPlayer
-                    </Text>
-                  )}
-                  <Text variant="caption" color={colors.onSurfaceMuted}>
+                  <Text variant="bodySm" color={colors.onSurfaceVariant}>
                     {price.lastSaleDate
                       ? `Last sale ${formatMoney(price.lastSalePrice)} on ${price.lastSaleDate} via `
                       : 'Price via '}
                     <Text
-                      variant="caption"
+                      variant="bodySm"
                       color={colors.primary}
                       onPress={() => {
                         // PSA 10 path is short-circuited above by the
@@ -724,7 +717,7 @@ function CardDetailScreen() {
                       Pull-to-refresh still refetches the card payload. */}
                   {price.freshness === 'payload' ? (
                     asOfLabel ? (
-                      <Text variant="caption" color={colors.onSurfaceMuted}>
+                      <Text variant="bodySm" color={colors.onSurfaceMuted}>
                         {`Market price as of ${asOfLabel}`}
                       </Text>
                     ) : null
@@ -736,10 +729,10 @@ function CardDetailScreen() {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}
                     >
                       <IconRefresh
-                        size={11}
+                        size={14}
                         color={colors.onSurfaceMuted}
                       />
-                      <Text variant="caption" color={colors.onSurfaceMuted}>
+                      <Text variant="bodySm" color={colors.onSurfaceMuted}>
                         {priceFetching
                           ? 'Updating…'
                           : price.freshness === 'stored'
