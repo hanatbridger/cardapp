@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Pressable } from 'react-native';
+import { View } from 'react-native';
 import { IconChevronDown, IconCheck } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { PriceChange } from './PriceChange';
 import { BottomSheet } from './BottomSheet';
+import { Touchable } from './Touchable';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
 import { HORIZONTAL_PADDING } from '../constants/layout';
@@ -91,23 +92,21 @@ export function MarketIndexBar() {
           );
         })}
 
-        <Pressable
+        {/* Touchable, not Pressable: in this header RN's Pressable drops
+            the tap on iOS (Fabric) — the same failure the search button
+            beside it had. See Touchable.tsx. */}
+        <Touchable
           onPress={() => setPickerOpen(true)}
           hitSlop={12}
           accessibilityRole="button"
           accessibilityLabel={`Market trends window, ${active.spoken}${asOfLabel ? `, prices through ${asOfLabel}` : ''}. Change`}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: spacing[1],
-            opacity: pressed ? 0.6 : 1,
-          })}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1] }}
         >
           <Text variant="labelSm" color={colors.onSurfaceVariant}>
             {active.label}
           </Text>
           <IconChevronDown size={12} color={colors.onSurfaceMuted} />
-        </Pressable>
+        </Touchable>
       </View>
 
       <View style={{ height: 1, backgroundColor: colors.outline }} />
@@ -126,7 +125,7 @@ export function MarketIndexBar() {
         {WINDOWS.map((w) => {
           const selected = w.key === windowKey;
           return (
-            <Pressable
+            <Touchable
               key={w.key}
               onPress={() => {
                 setWindowKey(w.key);
@@ -135,21 +134,20 @@ export function MarketIndexBar() {
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={`Show ${w.spoken} change`}
-              style={({ pressed }) => ({
+              style={{
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 paddingVertical: spacing[3],
                 paddingHorizontal: spacing[2],
                 borderRadius: radius.md,
-                backgroundColor: pressed ? colors.surfaceVariant : 'transparent',
-              })}
+              }}
             >
               <Text variant="bodyMd" color={selected ? colors.primary : colors.onSurface}>
                 Last {w.spoken}
               </Text>
               {selected ? <IconCheck size={20} color={colors.primary} /> : null}
-            </Pressable>
+            </Touchable>
           );
         })}
       </BottomSheet>
