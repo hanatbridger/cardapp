@@ -44,6 +44,7 @@
     },
     "android": {
       "package": "com.getcardpulse.app",
+    "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#5739FF"
