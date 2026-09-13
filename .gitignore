@@ -17,6 +17,8 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+# Play Console service-account key for eas submit
+credentials/
 
 # Metro
 .metro-health-check*
