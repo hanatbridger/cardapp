@@ -2,7 +2,7 @@
   "expo": {
     "name": "CardPulse",
     "slug": "CardPulse",
-    "version": "1.0.19",
+    "version": "1.0.20",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "cardpulse",
