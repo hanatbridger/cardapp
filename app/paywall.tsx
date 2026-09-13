@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Pressable, Alert, Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { View, ScrollView, Pressable, Alert, Linking, Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import Animated, { Easing, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import Purchases from 'react-native-purchases';
 import {
   IconX,
   IconCheck,
@@ -104,6 +105,24 @@ function notify(title: string, message: string, onDismiss?: () => void) {
   }
 }
 
+const PLAY_SUBSCRIPTIONS_URL =
+  'https://play.google.com/store/account/subscriptions?package=com.getcardpulse.app';
+
+// Android only. Purchases.showManageSubscriptions() is iOS-only in
+// react-native-purchases (throws UnsupportedPlatformError on Android),
+// so open RevenueCat's managementURL, or Play's subscription page when
+// the SDK is unconfigured or has no URL for this user yet.
+async function openPlaySubscriptions() {
+  let url = PLAY_SUBSCRIPTIONS_URL;
+  try {
+    const info = await Purchases.getCustomerInfo();
+    if (info.managementURL) url = info.managementURL;
+  } catch {
+    // Not configured / offline — the Play fallback still works.
+  }
+  Linking.openURL(url).catch(() => {});
+}
+
 /** Same band as every other sheet — see components/BottomSheet.tsx. */
 const ENTER_MS = 260;
 const EXIT_MS = 220;
@@ -200,7 +219,7 @@ function PaywallScreen() {
           setPurchasing(false);
           notify(
             'Get Premium in the app',
-            'CardPulse Premium is purchased in the iOS app. Download CardPulse and subscribe there — your premium unlocks across your devices.',
+            'CardPulse Premium is purchased in the mobile app. Download CardPulse and subscribe there — your premium unlocks across your devices.',
           );
           return;
         }
@@ -232,7 +251,7 @@ function PaywallScreen() {
       } else {
         notify(
           'No Subscription Found',
-          "We didn't find an active CardPulse subscription. If you subscribed on another device, sign in with the same Apple ID and try again.",
+          `We didn't find an active CardPulse subscription. If you subscribed on another device, sign in with the same ${Platform.OS === 'android' ? 'Google account' : 'Apple ID'} and try again.`,
         );
       }
     } catch {
@@ -473,8 +492,26 @@ function PaywallScreen() {
             color={colors.onSurfaceMuted}
             style={{ textAlign: 'center', maxWidth: 320 }}
           >
-            Subscriptions auto-renew until cancelled. Manage in Settings ▸ Apple ID ▸
-            Subscriptions. By subscribing you agree to our{' '}
+            Subscriptions auto-renew until cancelled.{' '}
+            {Platform.OS === 'ios' ? (
+              'Manage in Settings ▸ Apple ID ▸ Subscriptions.'
+            ) : Platform.OS === 'android' ? (
+              <>
+                Manage in{' '}
+                <Text
+                  variant="caption"
+                  color={colors.primary}
+                  onPress={openPlaySubscriptions}
+                  accessibilityRole="link"
+                >
+                  Google Play ▸ Subscriptions
+                </Text>
+                .
+              </>
+            ) : (
+              'Manage in the App Store or Google Play, wherever you subscribed.'
+            )}{' '}
+            By subscribing you agree to our{' '}
             <Text
               variant="caption"
               color={colors.primary}

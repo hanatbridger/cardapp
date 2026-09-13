@@ -25,7 +25,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: '4. Subscriptions and Billing',
-    body: 'CardPulse Premium is offered as an auto-renewing subscription. Payment is charged to your Apple ID at confirmation of purchase. Your subscription automatically renews unless cancelled at least 24 hours before the end of the current period. You can manage and cancel subscriptions in your Apple ID account settings. No refunds are provided for partial subscription periods, except as required by applicable law.',
+    body: 'CardPulse Premium is offered as an auto-renewing subscription. Payment is charged to your Apple ID (App Store) or Google account (Google Play) at confirmation of purchase. Your subscription automatically renews unless cancelled at least 24 hours before the end of the current period. You can manage and cancel subscriptions in your Apple ID account settings or in Google Play under Payments & subscriptions, depending on where you subscribed. No refunds are provided for partial subscription periods, except as required by applicable law.',
   },
   {
     title: '5. Pricing and Market Data',

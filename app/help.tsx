@@ -41,15 +41,15 @@ const FAQ = [
   },
   {
     q: 'How do I cancel Premium?',
-    a: 'Manage or cancel anytime in your Apple ID settings (Settings → [your name] → Subscriptions). Cancellations take effect at the end of the current billing period — you keep Premium access until then.',
+    a: 'Manage or cancel anytime where you subscribed. iPhone: Settings → [your name] → Subscriptions. Android: Google Play → profile icon → Payments & subscriptions → Subscriptions. Cancellations take effect at the end of the current billing period — you keep Premium access until then.',
   },
   {
     q: 'How do I sign in?',
-    a: 'CardPulse uses Sign in with Apple at launch. Tap the Apple button on the welcome screen — Apple handles the rest, no separate password to remember. Email/password sign-in is coming in a future update.',
+    a: 'Tap Sign in with Apple (iPhone) or Sign in with Google on the welcome screen. Your Apple or Google account handles the rest — no separate password to remember.',
   },
   {
     q: 'How do I delete my account?',
-    a: 'Profile tab → Delete Account. This signs you out, clears your local watchlist and preferences, and disconnects your Apple Sign In session. The action is immediate and can\'t be undone.',
+    a: 'Profile tab → Delete Account. This deletes your CardPulse account from our servers, signs you out, and clears your local watchlist and preferences. The action is immediate and can\'t be undone.',
   },
   {
     q: 'Is CardPulse affiliated with The Pokemon Company?',

@@ -8,7 +8,7 @@ import { Text, Card, withErrorBoundary } from '../src/components';
 import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 
-const LAST_UPDATED = 'May 1, 2026';
+const LAST_UPDATED = 'September 12, 2026';
 
 const SECTIONS: { title: string; body: string }[] = [
   {
@@ -17,7 +17,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: '2. Information We Collect',
-    body: 'Account information: email address, display name, username, and an Apple-provided private relay email if you sign in with Apple. Usage information: cards you view, search queries, watchlist contents, price alerts you set, and onboarding state. Device information: device model, OS version, app version, language, time zone, and anonymous device identifier. Purchase information: subscription status only — credit card details are handled by Apple and never reach our servers.',
+    body: 'Account information: email address, display name, username, and an Apple-provided private relay email if you sign in with Apple, or your Google account name and email if you sign in with Google. Usage information: price and grading alerts you set (card, target price or grading threshold, and alert direction) and the push notification token used to deliver them. Your watchlist, search history, and onboarding state stay on your device. Device information: device model, OS version, app version, language, and time zone. Purchase information: subscription status only — payment details are handled by Apple or Google and never reach our servers.',
   },
   {
     title: '3. How We Use Your Information',
@@ -33,7 +33,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: '6. Third-Party Services (Sub-Processors)',
-    body: 'CardPulse uses the following third-party services that may receive limited data:\n\n• Apple Inc. — Sign in with Apple (authentication), App Store (purchases and subscription billing), Push Notifications (price alerts).\n• Supabase, Inc. — authentication backend (US region). Receives your account information (email, display name, Apple-provided user ID). Does not receive your watchlist or search history — those are stored only on your device.\n• Sentry — crash reporting and performance monitoring. Receives anonymized error logs and device info; IP addresses are stripped before transmission.\n• RevenueCat — subscription receipt validation. Receives an anonymous user ID and Apple receipt; never receives your name or email.\n• Vercel, Inc. — Edge function hosting for our pricing proxies (TCGPlayer Market Price, Collectrics daily movers, eBay Browse). These functions only proxy public price data and never see your account.\n• mycollectrics.com — public Pokémon TCG price leaderboard (read-only, no user data sent).\n• TCGPlayer — raw card market price data (read-only, no user data sent).\n• eBay Browse API — recent sold-listing data for graded cards (read-only, no user data sent).\n\nEach provider operates under its own privacy policy.',
+    body: 'CardPulse uses the following third-party services that may receive limited data:\n\n• Apple Inc. — Sign in with Apple (authentication), App Store (purchases and subscription billing), Push Notifications (price alerts).\n• Google LLC — Google Sign-In (authentication), Google Play (purchases and subscription billing), Firebase Cloud Messaging (price alerts on Android).\n• Supabase, Inc. — authentication and database backend (US region). Receives your account information (email, display name, Apple- or Google-provided user ID) and the price and grading alerts you set, including card, target, and push token, so alerts can fire while the App is closed. Does not receive your watchlist or search history — those are stored only on your device.\n• Sentry — crash reporting and performance monitoring. Receives error logs, device info, and your account email and username so reports can be tied to your account; IP addresses are stripped before transmission.\n• RevenueCat — subscription receipt validation. Receives your CardPulse account ID and your App Store or Google Play receipt; never receives your name or email.\n• Vercel, Inc. — Edge function hosting for our pricing proxies (TCGPlayer Market Price, Collectrics daily movers, eBay Browse). These functions only proxy public price data and never see your account.\n• mycollectrics.com — public Pokémon TCG price leaderboard (read-only, no user data sent).\n• TCGPlayer — raw card market price data (read-only, no user data sent).\n• eBay Browse API — recent sold-listing data for graded cards (read-only, no user data sent).\n\nEach provider operates under its own privacy policy.',
   },
   {
     title: '7. Data Retention and Deletion',
@@ -49,7 +49,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: '10. Data Security',
-    body: 'We use industry-standard security measures including encryption in transit (TLS 1.2+) and at rest, role-based access controls, and continuous monitoring. Authentication tokens are stored on-device using the platform\'s secure storage (iOS Keychain via AsyncStorage). No system is 100% secure; you are responsible for keeping your Apple ID credentials confidential.',
+    body: 'We use industry-standard security measures including encryption in transit (TLS 1.2+) and at rest, role-based access controls, and continuous monitoring. Authentication tokens are stored on your device in the App\'s private storage. No system is 100% secure; you are responsible for keeping your Apple or Google account credentials confidential.',
   },
   {
     title: '11. Children\'s Privacy',
