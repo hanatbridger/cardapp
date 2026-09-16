@@ -73,6 +73,16 @@ function displayName(name: string, number: string): string {
   return number && name.endsWith(suffix) ? name.slice(0, -suffix.length) : name;
 }
 
+/**
+ * "ME: 30th Celebration" → "30th Celebration". TCGPlayer prefixes set
+ * names with the series code; pokemontcg.io set names, which sit beside
+ * these in the Sets tab, carry none. Display only — normSetName strips
+ * the same prefix, so the dedupe keys are unchanged.
+ */
+function displaySetName(name: string): string {
+  return name.replace(/^[A-Za-z]{1,5}[0-9]*:\s*/, '') || name;
+}
+
 export function toEnCard(p: EnProduct): PokemonCard {
   return {
     id: `${CARD_PREFIX}${p.productId}`,
@@ -82,7 +92,7 @@ export function toEnCard(p: EnProduct): PokemonCard {
     types: [],
     set: {
       id: `${SET_PREFIX}${p.setNameId}`,
-      name: p.setName,
+      name: displaySetName(p.setName),
       series: p.series,
       releaseDate: p.releaseDate,
       images: { symbol: '', logo: '' },
@@ -105,7 +115,7 @@ export function toEnCard(p: EnProduct): PokemonCard {
 export function toGapSet(g: GapSet): PokemonSet {
   return {
     id: `${SET_PREFIX}${g.setNameId}`,
-    name: g.name,
+    name: displaySetName(g.name),
     series: g.series,
     printedTotal: g.cardCount,
     total: g.cardCount,
