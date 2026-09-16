@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, ScrollView, Pressable, ActivityIndicator, Image, useWindowDimensions } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
@@ -14,7 +14,7 @@ import {
 import { spacing, radius } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
-import { useCardSearch, useSet, useCollapsingHeader } from '../../src/hooks';
+import { useCardSearch, useSet, useGapSetCards, useCollapsingHeader } from '../../src/hooks';
 import type { PokemonCard } from '../../src/types/card';
 
 const RARITIES = [
@@ -45,16 +45,46 @@ function SetDetailScreen() {
   const [rarity, setRarity] = useState<string | undefined>(undefined);
   const { scrollHandler, headerAnimatedStyle, headerHeight } = useCollapsingHeader();
 
-  const setQuery = useSet(id);
-  const set = setQuery.data;
+  // English gap sets ('entp-set-{setNameId}') come from TCGPlayer via
+  // /api/en-gap; pokemontcg.io has no entry for them, so its hooks stay
+  // disabled (no id, no filter).
+  const isGap = Boolean(id?.startsWith('entp-set-'));
 
-  const cardsQuery = useCardSearch('', { setId: id, rarity });
-  const cards = cardsQuery.data?.cards ?? [];
+  const setQuery = useSet(isGap ? undefined : id);
+  const cardsQuery = useCardSearch('', isGap ? {} : { setId: id, rarity });
+  const gap = useGapSetCards(isGap ? id : undefined);
+  const set = isGap ? gap.data?.set : setQuery.data;
+
+  // Gap rarities are TCGPlayer's names (Pikachu Rare, Classic Collection),
+  // so chips come from what the set actually holds, most common first,
+  // and filter client-side.
+  const gapRarities = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of gap.data?.cards ?? []) {
+      if (c.rarity) counts.set(c.rarity, (counts.get(c.rarity) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([r]) => r);
+  }, [gap.data]);
+  const gapCards = useMemo(
+    () => (gap.data?.cards ?? []).filter((c) => !rarity || c.rarity === rarity),
+    [gap.data, rarity],
+  );
+
+  const cards = isGap ? gapCards : cardsQuery.data?.cards ?? [];
+  // One rarity is no filter at all (Classic Collection): hide the row.
+  const rarities = isGap ? (gapRarities.length >= 2 ? gapRarities : []) : RARITIES;
+  // A partial gap set already says "Showing X of Y"; only add a count when
+  // a rarity chip narrows it.
+  const totalCount = isGap
+    ? gap.data && (gap.data.complete || rarity) ? gapCards.length : undefined
+    : cardsQuery.data?.totalCount;
+  const listLoading = isGap ? gap.isLoading : cardsQuery.isLoading;
+  const listError = isGap ? gap.isError : cardsQuery.isError;
   // The search hook keeps the previous filter's results on screen while
   // the next request is in flight, so after a rarity tap the grid and the
   // count still describe the old chip. Mark that pass as pending instead
-  // of letting it read as the answer.
-  const stale = cardsQuery.isPlaceholderData;
+  // of letting it read as the answer. Gap filtering is synchronous.
+  const stale = isGap ? false : cardsQuery.isPlaceholderData;
 
   const handleCardPress = (card: PokemonCard) => {
     router.push(`/card/${card.id}`);
@@ -129,48 +159,50 @@ function SetDetailScreen() {
             )}
 
             {/* Rarity filter */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: spacing[2], paddingRight: spacing[4] }}
-            >
-              <Pressable
-                onPress={() => setRarity(undefined)}
-                style={{
-                  paddingHorizontal: spacing[3],
-                  paddingVertical: spacing[1],
-                  borderRadius: radius.full,
-                  backgroundColor: !rarity ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
-                  borderWidth: 1,
-                  borderColor: !rarity ? withAlpha(colors.primary, 0.4) : colors.outlineVariant,
-                }}
+            {rarities.length > 0 && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: spacing[2], paddingRight: spacing[4] }}
               >
-                <Text variant="labelMd" color={!rarity ? colors.primary : colors.onSurfaceVariant}>
-                  All
-                </Text>
-              </Pressable>
-              {RARITIES.map((r) => {
-                const active = rarity === r;
-                return (
-                  <Pressable
-                    key={r}
-                    onPress={() => setRarity(active ? undefined : r)}
-                    style={{
-                      paddingHorizontal: spacing[3],
-                      paddingVertical: spacing[1],
-                      borderRadius: radius.full,
-                      backgroundColor: active ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
-                      borderWidth: 1,
-                      borderColor: active ? withAlpha(colors.primary, 0.4) : colors.outlineVariant,
-                    }}
-                  >
-                    <Text variant="labelMd" color={active ? colors.primary : colors.onSurfaceVariant}>
-                      {r}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                <Pressable
+                  onPress={() => setRarity(undefined)}
+                  style={{
+                    paddingHorizontal: spacing[3],
+                    paddingVertical: spacing[1],
+                    borderRadius: radius.full,
+                    backgroundColor: !rarity ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
+                    borderWidth: 1,
+                    borderColor: !rarity ? withAlpha(colors.primary, 0.4) : colors.outlineVariant,
+                  }}
+                >
+                  <Text variant="labelMd" color={!rarity ? colors.primary : colors.onSurfaceVariant}>
+                    All
+                  </Text>
+                </Pressable>
+                {rarities.map((r) => {
+                  const active = rarity === r;
+                  return (
+                    <Pressable
+                      key={r}
+                      onPress={() => setRarity(active ? undefined : r)}
+                      style={{
+                        paddingHorizontal: spacing[3],
+                        paddingVertical: spacing[1],
+                        borderRadius: radius.full,
+                        backgroundColor: active ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
+                        borderWidth: 1,
+                        borderColor: active ? withAlpha(colors.primary, 0.4) : colors.outlineVariant,
+                      }}
+                    >
+                      <Text variant="labelMd" color={active ? colors.primary : colors.onSurfaceVariant}>
+                        {r}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            )}
 
             {stale ? (
               <ActivityIndicator
@@ -179,9 +211,17 @@ function SetDetailScreen() {
                 style={{ alignSelf: 'flex-start' }}
                 accessibilityLabel="Loading cards"
               />
-            ) : cardsQuery.data ? (
+            ) : totalCount !== undefined ? (
               <Text variant="caption" color={colors.onSurfaceMuted}>
-                {cardsQuery.data.totalCount} cards
+                {totalCount} cards
+              </Text>
+            ) : null}
+
+            {/* A gap set loaded partially (a page failed or the set is over
+                the page cap) says so rather than passing as the whole set. */}
+            {isGap && gap.data && !gap.data.complete ? (
+              <Text variant="caption" color={colors.onSurfaceMuted}>
+                Showing {gap.data.cards.length} of {gap.data.totalCount} cards
               </Text>
             ) : null}
           </View>
@@ -218,7 +258,7 @@ function SetDetailScreen() {
           </View>
         )}
         ListEmptyComponent={
-          cardsQuery.isLoading ? (
+          listLoading ? (
             <View style={{ padding: spacing[8], alignItems: 'center' }}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text variant="bodySm" color={colors.onSurfaceMuted} style={{ marginTop: spacing[2] }}>
@@ -228,7 +268,11 @@ function SetDetailScreen() {
           ) : (
             <View style={{ padding: spacing[8], alignItems: 'center' }}>
               <Text variant="bodySm" color={colors.onSurfaceMuted}>
-                {cardsQuery.isError ? 'Failed to load cards' : 'No cards found'}
+                {listError
+                  ? isGap
+                    ? 'Could not load cards'
+                    : 'Failed to load cards'
+                  : 'No cards found'}
               </Text>
             </View>
           )

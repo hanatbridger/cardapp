@@ -15,6 +15,7 @@
 // want to hammer their endpoint per page render.
 
 import {
+  enGapProductId,
   fetchMarketPrice,
   priceResponse,
   resolveCardPrice,
@@ -207,6 +208,9 @@ export default async function handler(req: Request): Promise<Response> {
   // Japanese catalogue ids carry the TCGPlayer product id; the fallback
   // can use it directly even though TCGPlayer itself has no price.
   const jpProductId = cardId.startsWith('jptp-') ? cardId.slice(5) : null;
+  // English gap-set ids ('entp-{pid}') short-circuit the pokemontcg.io
+  // resolver entirely: it can only 404 for them, after retries.
+  const enPid = enGapProductId(cardId);
 
   // Probe — `&probe=1` with the cron bearer: the primary's answer next to
   // JustTCG's raw answer for the same card, uncached and unrecorded, so
@@ -215,7 +219,7 @@ export default async function handler(req: Request): Promise<Response> {
     const expected = process.env.CRON_SECRET;
     const auth = req.headers.get('authorization') ?? '';
     if (!expected || auth !== `Bearer ${expected}`) return json(401, { error: 'unauthorized' }, 'no-store');
-    const productId = (await resolveProductId(cardId).catch(() => null)) ?? jpProductId;
+    const productId = enPid ?? (await resolveProductId(cardId).catch(() => null)) ?? jpProductId;
     const details = productId ? await fetchMarketPrice(productId).catch(() => null) : null;
     const justtcg = await probeJustTcg({
       tcgplayerId: productId,
@@ -236,7 +240,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const productId = (await resolveProductId(cardId)) ?? jpProductId;
+    const productId = enPid ?? (await resolveProductId(cardId)) ?? jpProductId;
     if (!productId) {
       const fb = await justTcgFallback(cardId, null, meta);
       if (fb) return json(200, fb);

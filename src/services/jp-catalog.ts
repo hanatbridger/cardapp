@@ -46,7 +46,7 @@ function toEnglishQuery(query: string): string {
 }
 
 /** "011/018" → "011"; keeps plain numbers untouched. */
-function shortNumber(n: string): string {
+export function shortNumber(n: string): string {
   const slash = n.indexOf('/');
   return slash > 0 ? n.slice(0, slash) : n;
 }
@@ -93,12 +93,18 @@ async function fetchFrom(origin: string, path: string): Promise<any | null> {
   }
 }
 
-async function fetchJson(path: string): Promise<any | null> {
+/**
+ * GET a catalogue proxy path (deployed origin, then the dev :3001 api
+ * server on web). Null on any failure. Shared with en-gap-catalog.ts.
+ */
+export async function fetchCatalogJson(path: string): Promise<any | null> {
   const primary = await fetchFrom(PROXY_ORIGIN, path);
   if (primary) return primary;
   if (DEV_LOCAL_ORIGIN) return fetchFrom(DEV_LOCAL_ORIGIN, path);
   return null;
 }
+
+const fetchJson = fetchCatalogJson;
 
 export async function searchJapaneseCatalog(query: string): Promise<PokemonCard[]> {
   const q = toEnglishQuery(query);

@@ -23,15 +23,20 @@ import { withAlpha } from '../../src/utils/withAlpha';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { useTabBarInset } from '../../src/hooks/use-tab-bar-inset';
 import { useUserStore } from '../../src/stores';
-import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useJapaneseSearch, useCollapsingHeader, useDebouncedValue, useTrending } from '../../src/hooks';
+import { useCardSearch, useSetSearch, useArtistSearch, useSealedSearch, useJapaneseSearch, useGapCardSearch, useGapSets, useCollapsingHeader, useDebouncedValue, useTrending } from '../../src/hooks';
 import { MOCK_PRICES, TRENDING_ARTISTS } from '../../src/mocks';
 import { CARD_SCORES } from '../../src/data/card-scores';
 import { getValuation } from '../../src/services/price-prediction';
+import { normCardNumber, normSetName } from '../../src/services/en-gap-catalog';
 import type { PokemonCard } from '../../src/types/card';
 import type { PokemonSet, ArtistResult } from '../../src/services/pokemon-tcg';
 import type { SealedProduct } from '../../src/types/sealed';
 
 type Mode = 'cards' | 'sets' | 'artists';
+
+// Stable fallbacks so memos keyed on result arrays don't recompute each render.
+const EMPTY_CARDS: PokemonCard[] = [];
+const EMPTY_SETS: PokemonSet[] = [];
 
 /**
  * Strips the TCGPlayer-only decorations off a product name so it reads as
@@ -141,7 +146,7 @@ function SearchScreen() {
 
   // Card search
   const cardSearch = useCardSearch(mode === 'cards' ? debouncedQuery : '', {});
-  const cardResults = cardSearch.data?.cards ?? [];
+  const cardResults = cardSearch.data?.cards ?? EMPTY_CARDS;
 
   // Sealed-product search — runs in parallel with the card search when the
   // Cards tab is active. Catalog lives client-side so this is essentially
@@ -158,10 +163,38 @@ function SearchScreen() {
   const jpSearch = useJapaneseSearch(mode === 'cards' && debouncedQuery.length >= 2 ? debouncedQuery : '');
   const jpResults = jpSearch.data ?? [];
 
+  // English sets TCGPlayer lists before pokemontcg.io indexes them (e.g.
+  // 30th Celebration on release day). The proxy scopes this to those sets,
+  // so duplicates only arise in the cache window after pokemontcg.io
+  // catches up; drop a gap row when a pokemontcg.io row has the same set
+  // name and number. Newest set first, merged on top of the Cards section.
+  const gapSearch = useGapCardSearch(mode === 'cards' && debouncedQuery.length >= 2 ? debouncedQuery : '');
+  const gapResults = useMemo(() => {
+    const key = (c: PokemonCard) => `${normSetName(c.set.name)}|${normCardNumber(c.number)}`;
+    const known = new Set(cardResults.map(key));
+    return (gapSearch.data ?? [])
+      .filter((c) => !known.has(key(c)))
+      .sort((a, b) => b.set.releaseDate.localeCompare(a.set.releaseDate));
+  }, [gapSearch.data, cardResults]);
+
   // Set search — empty query shows recent sets, but only once the user is
   // actually on the Sets tab (it used to fetch on Explore mount for everyone).
   const setSearch = useSetSearch(mode === 'sets' ? debouncedQuery : '', mode === 'sets');
-  const setResults = setSearch.data?.sets ?? [];
+  const setResults = setSearch.data?.sets ?? EMPTY_SETS;
+
+  // Gap sets sit above pokemontcg.io's list (they are newer). A failed
+  // gap fetch resolves to [] and never blocks or errors the tab.
+  const gapSets = useGapSets(mode === 'sets');
+  const visibleSets = useMemo(() => {
+    const needle = normSetName(debouncedQuery);
+    const known = new Set(setResults.map((s) => normSetName(s.name)));
+    const gaps = (gapSets.data ?? []).filter(
+      (s) =>
+        (debouncedQuery.length === 0 || normSetName(s.name).includes(needle)) &&
+        !known.has(normSetName(s.name)),
+    );
+    return gaps.length > 0 ? [...gaps, ...setResults] : setResults;
+  }, [gapSets.data, setResults, debouncedQuery]);
 
   // Artist search — requires ≥2 chars. Unlike sets, an empty query returns
   // nothing (there are thousands of artists and no meaningful default sort),
@@ -185,10 +218,13 @@ function SearchScreen() {
   // empty first, so hold the spinner while a side query could still turn
   // the empty feed into rows — otherwise the list renders a false
   // "No results found" and then pops the rows in.
-  const sidePending = sealedSearch.isFetching || jpSearch.isFetching;
+  const sidePending = sealedSearch.isFetching || jpSearch.isFetching || gapSearch.isFetching;
+  // Gap rows go on top of the Cards section, so hold the spinner until they
+  // land rather than pushing rendered rows down under the user's finger.
   const cardsLoading =
     cardsSettling ||
-    (cardResults.length + sealedResults.length + jpResults.length === 0 && sidePending);
+    (gapSearch.isFetching && !gapSearch.data) ||
+    (cardResults.length + sealedResults.length + jpResults.length + gapResults.length === 0 && sidePending);
 
   // Undervalued / Overvalued picks — proxied from collectrics via
   // /api/trending. Fed off the same daily card-leaderboard feed as the
@@ -457,6 +493,7 @@ function SearchScreen() {
           totalCount={cardSearch.data?.totalCount ?? 0}
           sealedResults={sealedResults}
           jpResults={jpResults}
+          gapResults={gapResults}
           query={query}
           onCardPress={handleCardPress}
           onSealedPress={handleSealedPress}
@@ -467,8 +504,13 @@ function SearchScreen() {
 
       {showSetResults && (
         <SetResults
-          loading={setSearch.isPending || setSearch.isPlaceholderData || debouncedQuery !== query}
-          sets={setResults}
+          loading={
+            setSearch.isPending ||
+            setSearch.isPlaceholderData ||
+            debouncedQuery !== query ||
+            (gapSets.isPending && !gapSets.isError)
+          }
+          sets={visibleSets}
           query={query}
           onSetPress={handleSetPress}
           onScroll={scrollHandler}
@@ -652,6 +694,7 @@ function CardResults({
   totalCount,
   sealedResults,
   jpResults,
+  gapResults,
   query,
   onCardPress,
   onSealedPress,
@@ -664,6 +707,8 @@ function CardResults({
   totalCount: number;
   sealedResults: SealedProduct[];
   jpResults: PokemonCard[];
+  /** English gap-set singles, shown first in the Cards section. */
+  gapResults: PokemonCard[];
   query: string;
   onCardPress: (card: PokemonCard) => void;
   onSealedPress: (product: SealedProduct) => void;
@@ -688,8 +733,9 @@ function CardResults({
   // Sealed Products below. Either section is omitted when it has no hits
   // so the UI doesn't render a header over an empty region.
   const feed: SearchFeedItem[] = [];
-  if (results.length > 0) {
-    feed.push({ kind: 'section', id: 'sec-cards', label: 'Cards', count: totalCount });
+  if (results.length + gapResults.length > 0) {
+    feed.push({ kind: 'section', id: 'sec-cards', label: 'Cards', count: totalCount + gapResults.length });
+    gapResults.forEach((c) => feed.push({ kind: 'card', id: `card-${c.id}`, card: c }));
     results.forEach((c) => feed.push({ kind: 'card', id: `card-${c.id}`, card: c }));
   }
   if (sealedResults.length > 0) {

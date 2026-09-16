@@ -12,56 +12,28 @@
 //   GET /api/jp-search?q=rayquaza   → search, up to 40 card products
 //   GET /api/jp-search?pid=613850   → single product (detail screen)
 
+import {
+  CORS,
+  DETAILS_URL,
+  SEARCH_URL,
+  UA,
+  fetchWithTimeout,
+  json as catalogJson,
+  mapRow,
+  type JpProduct,
+} from './_lib/tcg-catalog';
+
 export const config = { runtime: 'edge' };
 
-interface JpProduct {
-  productId: number;
-  name: string;
-  setName: string;
-  number: string;
-  rarity: string | null;
-  marketPrice: number | null;
-  imageUrl: string;
-}
-
-const SEARCH_URL = 'https://mp-search-api.tcgplayer.com/v1/search/request';
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-
 function json(status: number, body: unknown, cacheable = true): Response {
-  return new Response(JSON.stringify(body), {
+  // Catalog + market prices move slowly; 6h CDN cache matches the
+  // other catalog proxies.
+  return catalogJson(
     status,
-    headers: {
-      'Content-Type': 'application/json',
-      // Catalog + market prices move slowly; 6h CDN cache matches the
-      // other catalog proxies.
-      'Cache-Control': cacheable
-        ? 'public, s-maxage=21600, stale-while-revalidate=86400'
-        : 'no-store',
-      ...CORS,
-    },
-  });
+    body,
+    cacheable ? 'public, s-maxage=21600, stale-while-revalidate=86400' : 'no-store',
+  );
 }
-
-async function fetchWithTimeout(
-  input: string,
-  init: RequestInit = {},
-  ms = 6000,
-): Promise<Response> {
-  const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), ms);
-  try {
-    return await fetch(input, { ...init, signal: ctl.signal });
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-const UA = { 'user-agent': 'Mozilla/5.0 (CardPulse JP Catalog)' };
 
 /**
  * Collector nicknames the catalog does not carry in any field.
@@ -111,30 +83,6 @@ async function nicknameProducts(
   return narrowed.length > 0 ? narrowed : found;
 }
 
-function imageUrl(productId: number, size: number): string {
-  return `https://tcgplayer-cdn.tcgplayer.com/product/${productId}_in_${size}x${size}.jpg`;
-}
-
-function mapRow(p: any): JpProduct | null {
-  const productId = Number(p?.productId);
-  const name = p?.productName;
-  if (!Number.isFinite(productId) || typeof name !== 'string' || !name) {
-    return null;
-  }
-  const marketPrice = Number(p?.marketPrice);
-  return {
-    productId,
-    name,
-    setName: typeof p?.setName === 'string' ? p.setName : '',
-    number: typeof p?.customAttributes?.number === 'string'
-      ? p.customAttributes.number
-      : '',
-    rarity: typeof p?.rarityName === 'string' ? p.rarityName : null,
-    marketPrice: Number.isFinite(marketPrice) && marketPrice > 0 ? marketPrice : null,
-    imageUrl: imageUrl(productId, 400),
-  };
-}
-
 async function searchProducts(q: string): Promise<JpProduct[]> {
   const res = await fetchWithTimeout(
     `${SEARCH_URL}?q=${encodeURIComponent(q)}&isList=false`,
@@ -177,7 +125,7 @@ async function searchProducts(q: string): Promise<JpProduct[]> {
 
 async function getProduct(pid: string): Promise<JpProduct | null> {
   const res = await fetchWithTimeout(
-    `https://mp-search-api.tcgplayer.com/v1/product/${pid}/details`,
+    `${DETAILS_URL}/${pid}/details`,
     { headers: UA },
   );
   if (res.status === 404) return null;

@@ -177,9 +177,14 @@ export async function fetchRawCardPriceHistory(
   tcgplayerProductId?: string,
 ): Promise<PriceHistory> {
   if (LIVE.rawHistory) {
-    // Japanese catalog ids carry the TCGPlayer productId directly.
-    const jpPid = cardId.startsWith('jptp-') ? cardId.slice(5) : null;
-    const pid = tcgplayerProductId ?? jpPid;
+    // Japanese and English gap-set catalog ids carry the TCGPlayer
+    // productId directly.
+    const catalogPid = cardId.startsWith('jptp-')
+      ? cardId.slice(5)
+      : cardId.startsWith('entp-')
+        ? cardId.slice(5)
+        : null;
+    const pid = tcgplayerProductId ?? catalogPid;
     const param = pid
       ? `productId=${encodeURIComponent(pid)}`
       : `id=${encodeURIComponent(cardId)}`;

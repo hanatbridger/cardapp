@@ -40,6 +40,17 @@ export interface PriceResponse {
   asOf?: string;
 }
 
+/**
+ * English gap-set catalogue ids ('entp-716465', api/en-gap.ts) carry the
+ * TCGPlayer product id directly; no pokemontcg.io lookup exists for them.
+ * The ids stay valid after pokemontcg.io indexes the set, so saved cards
+ * keep pricing.
+ */
+export function enGapProductId(cardId: string): string | null {
+  const m = /^entp-(\d{1,12})$/.exec(cardId);
+  return m ? m[1] : null;
+}
+
 export async function resolveProductId(cardId: string): Promise<string | null> {
   // prices.pokemontcg.io intermittently 5xxs or stalls. A single attempt
   // turned one blip into a null price the CDN then served for 30
@@ -110,7 +121,7 @@ export async function resolveCardPrice(
   cardId: string,
 ): Promise<{ productId: string; details: TcgDetails } | null> {
   try {
-    const productId = await resolveProductId(cardId);
+    const productId = enGapProductId(cardId) ?? (await resolveProductId(cardId));
     if (!productId) return null;
     const details = await fetchMarketPrice(productId);
     if (!details?.marketPrice) return null;

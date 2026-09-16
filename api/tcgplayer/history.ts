@@ -107,6 +107,11 @@ export default async function handler(req: Request): Promise<Response> {
   if (!cardId && !productIdParam) {
     return json(400, { error: 'id or productId required' });
   }
+  // productId lands in TCGPlayer URL paths and service-role snapshot
+  // writes below, and entp-/jptp- cards send it from the client.
+  if (productIdParam && !/^\d{1,12}$/.test(productIdParam)) {
+    return json(400, { error: 'bad productId' }, false);
+  }
 
   // Env var name compatibility: SUPABASE_ANON_KEY for server-only
   // use; EXPO_PUBLIC_SUPABASE_ANON_KEY is the same value but named

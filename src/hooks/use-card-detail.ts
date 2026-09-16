@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCard } from '../services/pokemon-tcg';
 import { getJapaneseCard } from '../services/tcgdex';
 import { getJapaneseProduct } from '../services/jp-catalog';
+import { getGapProduct } from '../services/en-gap-catalog';
 import { MOCK_CARDS } from '../mocks/cards';
 import { queryClient } from '../lib/query-client';
 import type { PokemonCard } from '../types/card';
@@ -43,6 +44,16 @@ export function useCardDetail(cardId: string) {
   return useQuery({
     queryKey: ['cards', cardId],
     queryFn: async () => {
+      // English gap-set cards (TCGPlayer, not yet on pokemontcg.io) —
+      // id is 'entp-{productId}'. Kept after pokemontcg.io catches up so
+      // saved cards still resolve.
+      if (cardId.startsWith('entp-')) {
+        const pid = cardId.slice(5);
+        if (!/^\d{1,12}$/.test(pid)) throw new Error('Card not found');
+        const card = await getGapProduct(pid);
+        if (!card) throw new Error('Card not found');
+        return card;
+      }
       // Japanese cards (tcgdex) — id is 'jp-{tcgdexId}'
       if (cardId.startsWith('jptp-')) {
         const card = await getJapaneseProduct(cardId.slice(5));
