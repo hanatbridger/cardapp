@@ -15,15 +15,27 @@
 //   GET /api/en-gap?set=24722     → { set, products, totalResults, complete }
 //   GET /api/en-gap?pid=716465    → { product } one English single
 //
+// Sealed (TCGPlayer lists, the Collectrics sealed catalogue behind
+// api/sealed-search.ts does not). Client ids are 'tps-{productId}'.
+//   GET /api/en-gap?sealed=1&q=etb     → { products: EnSealedProduct[] }
+//     sealed products in sets released within 180 days, Cases excluded,
+//     minus every productId Collectrics lists for that set.
+//   GET /api/en-gap?sealed=1&pid=704143 → { product } one English sealed
+//     product; no coverage check, so saved ids keep resolving.
+//
 // Only q/set/pid go upstream; no user data is forwarded.
 
 import {
+  CASE_RE,
   CORS,
   MAX_PAGE_SIZE,
   fetchProductDetails,
   findSetMeta,
+  getCollectricsSealedPids,
   getGapSets,
+  getRecentSealedSets,
   isEnCard,
+  isEnSealed,
   json,
   mapRow,
   searchCatalog,
@@ -38,6 +50,22 @@ interface EnProduct extends JpProduct {
   /** 'YYYY/MM/DD' */
   releaseDate: string;
   series: string;
+}
+
+interface EnSealedProduct {
+  /** Discriminator; clients reject rows without it (an older deploy serves singles). */
+  kind: 'sealed';
+  productId: number;
+  name: string;
+  /** Raw TCGPlayer set name, e.g. 'ME: 30th Celebration'. */
+  setName: string;
+  setNameId: number;
+  setCode: string;
+  /** 'YYYY/MM/DD' */
+  releaseDate: string;
+  /** TCGPlayer marketPrice; null when absent or non-positive. */
+  marketPrice: number | null;
+  imageUrl: string;
 }
 
 // Gap sets change at most daily. Worst-case pokemontcg.io catch-up lag:
@@ -71,6 +99,25 @@ function slashDate(iso: unknown): string {
   return typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}/.test(iso)
     ? iso.slice(0, 10).replace(/-/g, '/')
     : '';
+}
+
+function toEnSealed(
+  row: any,
+  meta: { setNameId: number; setCode: string; releaseDate: string },
+): EnSealedProduct | null {
+  const p = mapRow(row);
+  if (!p) return null;
+  return {
+    kind: 'sealed',
+    productId: p.productId,
+    name: p.name,
+    setName: p.setName,
+    setNameId: meta.setNameId,
+    setCode: meta.setCode,
+    releaseDate: meta.releaseDate,
+    marketPrice: p.marketPrice,
+    imageUrl: p.imageUrl,
+  };
 }
 
 async function handleSets(): Promise<Response> {
@@ -216,6 +263,127 @@ async function handleProduct(pid: string): Promise<Response> {
   return json(200, { product }, PRODUCT_CACHE);
 }
 
+const SEALED_MAX_PAGES = 4;
+const COLLECTRICS_DEADLINE_MS = 8000;
+
+function withDeadline<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('deadline')), ms);
+  });
+  p.catch(() => {});
+  return Promise.race([p, deadline]).finally(() => clearTimeout(timer));
+}
+
+async function handleSealedSearch(q: string): Promise<Response> {
+  let sets: GapSet[];
+  try {
+    sets = await getRecentSealedSets();
+  } catch (e) {
+    console.error('[en-gap] sets for sealed search', e);
+    return json(503, { error: 'catalog unavailable' }, NO_STORE);
+  }
+  if (sets.length === 0) return json(200, { products: [] }, SEARCH_CACHE);
+
+  const byId = new Map(sets.map((g) => [g.setNameId, g]));
+  let rows: any[];
+  // A partial listing (a later page failed) is cached briefly only.
+  let degraded = false;
+  try {
+    const page = (from: number) =>
+      searchCatalog({
+        q,
+        productLine: 'pokemon',
+        sealedOnly: true,
+        setNames: sets.map((g) => g.name),
+        from,
+        size: MAX_PAGE_SIZE,
+      });
+    const first = await page(0);
+    rows = [...first.rows];
+    // Cases and Collectrics-listed rows are filtered after paging, so a
+    // two-page cap loses real gap products on broad queries. Up to 4
+    // pages (200 rows), fetched in parallel.
+    const pages = Math.min(Math.ceil(first.totalResults / MAX_PAGE_SIZE), SEALED_MAX_PAGES);
+    const rest = await Promise.allSettled(
+      Array.from({ length: Math.max(0, pages - 1) }, (_, i) => page((i + 1) * MAX_PAGE_SIZE)),
+    );
+    for (const r of rest) {
+      if (r.status === 'fulfilled') rows.push(...r.value.rows);
+      else degraded = true;
+    }
+  } catch (e) {
+    console.error('[en-gap] sealed search', e);
+    return json(502, { error: 'catalog unavailable' }, NO_STORE);
+  }
+
+  const candidates: Array<{ set: GapSet; product: EnSealedProduct; index: number }> = [];
+  const seen = new Set<number>();
+  rows.forEach((row, index) => {
+    const set = byId.get(Number(row?.setId)) ?? sets.find((g) => g.name === row?.setName);
+    if (!set) return;
+    const product = toEnSealed(row, {
+      setNameId: set.setNameId,
+      setCode: set.abbreviation,
+      releaseDate: set.releaseDate,
+    });
+    if (!product || CASE_RE.test(product.name) || seen.has(product.productId)) return;
+    seen.add(product.productId);
+    candidates.push({ set, product, index });
+  });
+
+  // Collectrics check only for the sets that actually have hits. Fail
+  // closed per set: without the check a row could duplicate a cx- product.
+  const codes = [...new Set(candidates.map((c) => c.set.abbreviation.trim().toUpperCase()))];
+  const listed = new Map<string, Set<number>>();
+  // Capped so a slow Collectrics fails closed inside the Edge response
+  // window; the fetch keeps running and lands in the per-isolate memo.
+  const settled = await Promise.allSettled(
+    codes.map((c) => withDeadline(getCollectricsSealedPids(c), COLLECTRICS_DEADLINE_MS)),
+  );
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') listed.set(codes[i], r.value);
+    else {
+      degraded = true;
+      console.error(`[en-gap] collectrics pids ${codes[i] || '(no code)'}`, r.reason);
+    }
+  });
+
+  const products = candidates
+    .filter((c) => {
+      const pids = listed.get(c.set.abbreviation.trim().toUpperCase());
+      return pids !== undefined && !pids.has(c.product.productId);
+    })
+    // Newest set first, TCGPlayer relevance within a set.
+    .sort((a, b) => b.set.releaseDate.localeCompare(a.set.releaseDate) || a.index - b.index)
+    .map((c) => c.product);
+  return json(200, { products }, degraded ? SHORT_CACHE : SEARCH_CACHE);
+}
+
+async function handleSealedProduct(pid: string): Promise<Response> {
+  let details: any | null;
+  try {
+    details = await fetchProductDetails(pid);
+  } catch (e) {
+    console.error('[en-gap] sealed details', e);
+    return json(502, { error: 'catalog unavailable' }, NO_STORE);
+  }
+  if (!details || !isEnSealed(details)) {
+    return json(404, { error: 'product not found' }, NOT_FOUND_CACHE);
+  }
+  const setNameId = Number(details.setId);
+  const meta = Number.isFinite(setNameId)
+    ? await findSetMeta(setNameId).catch(() => null)
+    : null;
+  const product = toEnSealed(details, {
+    setNameId: Number.isFinite(setNameId) ? setNameId : 0,
+    setCode: typeof details.setCode === 'string' ? details.setCode : '',
+    releaseDate: meta?.releaseDate || slashDate(details?.customAttributes?.releaseDate),
+  });
+  if (!product) return json(404, { error: 'product not found' }, NOT_FOUND_CACHE);
+  return json(200, { product }, PRODUCT_CACHE);
+}
+
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS });
@@ -228,6 +396,16 @@ export default async function handler(req: Request): Promise<Response> {
   const set = url.searchParams.get('set')?.trim() ?? '';
   const pid = url.searchParams.get('pid')?.trim() ?? '';
 
+  if (url.searchParams.get('sealed') === '1') {
+    if (pid) {
+      if (!ID_RE.test(pid)) return json(400, { error: 'bad pid' }, NO_STORE);
+      return handleSealedProduct(pid);
+    }
+    if (q.length < 2 || q.length > 60) {
+      return json(400, { error: 'q must be 2-60 chars' }, NO_STORE);
+    }
+    return handleSealedSearch(q);
+  }
   if (sets === '1') return handleSets();
   if (set) {
     if (!ID_RE.test(set)) return json(400, { error: 'bad set' }, NO_STORE);

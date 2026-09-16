@@ -1,16 +1,29 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { searchSealedProducts, getSealedProduct, SEALED_TYPE_LABEL } from '../mocks/sealed';
 import { fetchSealedPrice, fetchSealedPriceHistory } from '../services/tcgplayer';
 import type { SealedPriceHistoryPoint } from '../services/tcgplayer';
 import { searchSealedLive, fetchSealedLiveStats } from '../services/sealed-live';
 import type { SealedLiveHit, SealedLiveStats } from '../services/sealed-live';
+import {
+  gapSealedHistoryQuery,
+  gapSealedPid,
+  gapSealedPriceQuery,
+  gapSealedProductQuery,
+  searchGapSealed,
+  sealedTcgPid,
+} from '../services/en-gap-catalog';
 import type { SealedPrice, SealedProduct, SealedType } from '../types/sealed';
 
 /**
- * Sealed-product hooks. Two id namespaces coexist:
+ * Sealed-product hooks. Three id namespaces coexist:
  *
  *   `cx-{collectricsId}`  → live data via /api/sealed-search +
  *                           /api/sealed-stats (collectrics-backed)
+ *   `tps-{productId}`     → TCGPlayer sealed products Collectrics does not
+ *                           list, via /api/en-gap?sealed=1 +
+ *                           /api/tcgplayer/history (en-gap-catalog.ts);
+ *                           product, history and price are separate queries
  *   everything else       → the curated mock catalog in mocks/sealed.ts
  *                           (`{setId}-{type}` ids like 'swsh7-bb')
  *
@@ -38,8 +51,18 @@ const TYPE_PATTERNS: Array<[RegExp, SealedType]> = [
   [/\btin\b/i, 'tin'],
 ];
 
-function inferSealedType(productName: string): SealedType {
-  for (const [re, type] of TYPE_PATTERNS) {
+// TCGPlayer-only (`tps-`) SKUs Collectrics never names: multi-unit
+// displays and blisters. Applied before TYPE_PATTERNS for tps rows only,
+// so cx- badges are unchanged.
+const TPS_TYPE_PATTERNS: Array<[RegExp, SealedType]> = [
+  [/booster box|display box/i, 'booster-box'],
+  [/\bdisplay\b/i, 'booster-case'],
+  [/single pack blister/i, 'booster-pack'],
+  [/blister/i, 'booster-bundle'],
+];
+
+function inferSealedType(productName: string, tps = false): SealedType {
+  for (const [re, type] of tps ? [...TPS_TYPE_PATTERNS, ...TYPE_PATTERNS] : TYPE_PATTERNS) {
     if (re.test(productName)) return type;
   }
   return 'collection-box';
@@ -68,12 +91,15 @@ function toSealedProduct(
   productName: string,
   setName: string,
   imageUrl: string,
+  tcgplayerProductId?: string,
+  /** tps only: TCGPlayer 'YYYY/MM/DD'. */
+  releaseDate?: string,
 ): SealedProduct {
   const name = composeName(productName, setName);
-  return {
+  const product: SealedProduct = {
     id,
     name,
-    type: inferSealedType(productName),
+    type: inferSealedType(productName, Boolean(tcgplayerProductId)),
     contents: 'Factory sealed',
     setId: '',
     setName,
@@ -82,6 +108,12 @@ function toSealedProduct(
     imageUrl,
     tcgplayerUrl: tcgSearchUrl(name),
   };
+  if (tcgplayerProductId) {
+    if (releaseDate) product.releaseDate = releaseDate.replace(/\//g, '-');
+    product.tcgplayerProductId = tcgplayerProductId;
+    product.tcgplayerUrl = `https://www.tcgplayer.com/product/${tcgplayerProductId}`;
+  }
+  return product;
 }
 
 function liveHitToProduct(hit: SealedLiveHit): SealedProduct {
@@ -171,41 +203,98 @@ function useCollectricsStats<T>(
  */
 export function useSealedSearch(query: string, typeFilter?: SealedType) {
   const q = query.trim();
-  return useQuery({
+  // Browsing by type used to skip the live path entirely and serve
+  // the seeded catalog, so a type chip showed sample prices while
+  // the identical product found by typing showed a real one. With no
+  // text query, the type's own label is the query ("Booster Box",
+  // "Elite Trainer Box") — collectrics returns real inventory for
+  // each of them.
+  const liveQuery = q.length >= 2 ? q : typeFilter ? SEALED_TYPE_LABEL[typeFilter] : '';
+  const cx = useQuery({
     queryKey: ['sealed', 'search', q, typeFilter ?? null],
-    queryFn: async (): Promise<SealedProduct[]> => {
-      // Browsing by type used to skip the live path entirely and serve
-      // the seeded catalog, so a type chip showed sample prices while
-      // the identical product found by typing showed a real one. With no
-      // text query, the type's own label is the query ("Booster Box",
-      // "Elite Trainer Box") — collectrics returns real inventory for
-      // each of them.
-      const liveQuery = q.length >= 2 ? q : typeFilter ? SEALED_TYPE_LABEL[typeFilter] : '';
-      if (liveQuery.length >= 2) {
-        const live = await searchSealedLive(liveQuery);
-        // Collectrics repeats a product across printings/conditions;
-        // one row per name keeps the list readable.
-        const seen = new Set<string>();
-        const mapped = live
-          .map(liveHitToProduct)
-          .filter((p) => {
-            const key = p.name.toLowerCase();
-            if (seen.has(key)) return false;
-            seen.add(key);
-            return true;
-          })
-          .filter((p) => !typeFilter || p.type === typeFilter);
-        // Only fall through to the seeded catalog when live genuinely
-        // has nothing — a thin live result is still real data.
-        if (mapped.length > 0) return mapped;
-      }
-      return searchSealedProducts(q, typeFilter);
+    queryFn: async (): Promise<{ mapped: SealedProduct[]; pids: string[] }> => {
+      if (liveQuery.length < 2) return { mapped: [], pids: [] };
+      const live = await searchSealedLive(liveQuery).catch((): SealedLiveHit[] => []);
+      // Collectrics repeats a product across printings/conditions;
+      // one row per name keeps the list readable.
+      const seen = new Set<string>();
+      const mapped = live
+        .map(liveHitToProduct)
+        .filter((p) => {
+          const key = p.name.toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .filter((p) => !typeFilter || p.type === typeFilter);
+      const pids = live
+        .map((hit) => sealedTcgPid('', hit.imageUrl))
+        .filter((pid): pid is string => pid !== null);
+      return { mapped, pids };
     },
     // Match card search's 2-char floor so the two result streams kick in
     // at the same keystroke — avoids sealed results flashing before cards.
     enabled: q.length >= 2 || Boolean(typeFilter),
     staleTime: 5 * 60 * 1000,
   });
+  // Separate query: TCGPlayer gap rows never hold back Collectrics rows.
+  const gapEnabled = liveQuery.length >= 2 && (q.length >= 2 || Boolean(typeFilter));
+  const gap = useQuery({
+    queryKey: ['sealed', 'tps-search', liveQuery],
+    queryFn: () => searchGapSealed(liveQuery),
+    enabled: gapEnabled,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const cxData = cx.data;
+  const gapData = gap.data;
+  const gapLoading = gapEnabled && gap.isLoading;
+  const data = useMemo((): SealedProduct[] | undefined => {
+    if (!cxData) return undefined;
+    const { mapped, pids } = cxData;
+    // The server already drops products Collectrics lists for the set;
+    // this catches one filed under another set code (pid in the cx image
+    // url), with the composed name as a fallback.
+    const cxPids = new Set(pids);
+    const seen = new Set(mapped.map((p) => p.name.toLowerCase()));
+    const gapRows = (gapData ?? [])
+      .filter((g) => !cxPids.has(g.pid))
+      .map((g) =>
+        toSealedProduct(`tps-${g.pid}`, g.name, g.setName, g.imageUrl, g.pid, g.releaseDate),
+      )
+      .filter((p) => {
+        const key = p.name.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .filter((p) => !typeFilter || p.type === typeFilter);
+    // TCGPlayer relevance lets loose matches through; only rows naming
+    // every query word go above Collectrics, the rest go after.
+    const tokens = liveQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    const onTopic = (p: SealedProduct) => {
+      const hay = `${p.name} ${p.setName}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    };
+    const merged = [
+      ...gapRows.filter(onTopic),
+      ...mapped,
+      ...gapRows.filter((p) => !onTopic(p)),
+    ];
+    // Only fall through to the seeded catalog when live genuinely
+    // has nothing — a thin live result is still real data.
+    if (merged.length > 0) return merged;
+    // Gap rows still coming: no seeded rows that would flash and vanish.
+    if (gapLoading) return [];
+    return searchSealedProducts(q, typeFilter);
+  }, [cxData, gapData, gapLoading, liveQuery, q, typeFilter]);
+
+  return {
+    data,
+    isFetching: cx.isFetching || gap.isFetching,
+    isLoading: cx.isLoading,
+  };
 }
 
 /**
@@ -215,16 +304,23 @@ export function useSealedSearch(query: string, typeFilter?: SealedType) {
  */
 export function useSealedProduct(id: string | undefined) {
   const cid = collectricsId(id);
+  const tps = gapSealedPid(id);
   const live = useCollectricsStats(cid, (stats) =>
     stats ? statsToProduct(`cx-${cid}`, stats) : null,
   );
+  const tpsQuery = useQuery({
+    ...gapSealedProductQuery(tps ?? ''),
+    enabled: Boolean(tps),
+    select: (p): SealedProduct | null =>
+      toSealedProduct(`tps-${p.pid}`, p.name, p.setName, p.imageUrl, p.pid, p.releaseDate),
+  });
   const mock = useQuery({
     queryKey: ['sealed', 'product', id],
     queryFn: () => getSealedProduct(id!) ?? null,
-    enabled: Boolean(id) && !cid,
+    enabled: Boolean(id) && !cid && !tps,
     staleTime: Infinity,
   });
-  return cid ? live : mock;
+  return cid ? live : tps ? tpsQuery : mock;
 }
 
 /**
@@ -234,19 +330,22 @@ export function useSealedProduct(id: string | undefined) {
  */
 export function useSealedPrice(id: string | undefined, tcgplayerProductId?: string) {
   const cid = collectricsId(id);
+  const tps = gapSealedPid(id);
   const live = useCollectricsStats(cid, (stats) =>
     stats ? statsToPrice(`cx-${cid}`, stats) : null,
   );
+  const qc = useQueryClient();
+  const tpsQuery = useQuery({ ...gapSealedPriceQuery(qc, tps ?? ''), enabled: Boolean(tps) });
   const mock = useQuery({
     queryKey: ['sealed', 'price', id, tcgplayerProductId ?? null],
     queryFn: () => fetchSealedPrice(id!, tcgplayerProductId),
-    enabled: Boolean(id) && !cid,
+    enabled: Boolean(id) && !cid && !tps,
     // Sealed prices move slower than singles so we cache for a full day —
     // still invalidated on manual refresh via the detail screen's pull-to-refresh.
     staleTime: DAY,
     retry: false,
   });
-  return cid ? live : mock;
+  return cid ? live : tps ? tpsQuery : mock;
 }
 
 /**
@@ -258,16 +357,23 @@ export function useSealedPriceHistory(
   tcgplayerProductId?: string,
 ) {
   const cid = collectricsId(id);
+  const tps = gapSealedPid(id);
   const live = useCollectricsStats(
     cid,
     (stats): SealedPriceHistoryPoint[] => stats?.history ?? [],
   );
+  const qc = useQueryClient();
+  const tpsQuery = useQuery({
+    ...gapSealedHistoryQuery(qc, tps ?? ''),
+    enabled: Boolean(tps),
+    select: (h): SealedPriceHistoryPoint[] => h,
+  });
   const mock = useQuery({
     queryKey: ['sealed', 'history', id, tcgplayerProductId ?? null],
     queryFn: () => fetchSealedPriceHistory(id!, tcgplayerProductId),
-    enabled: Boolean(id) && !cid,
+    enabled: Boolean(id) && !cid && !tps,
     staleTime: DAY,
     retry: false,
   });
-  return cid ? live : mock;
+  return cid ? live : tps ? tpsQuery : mock;
 }

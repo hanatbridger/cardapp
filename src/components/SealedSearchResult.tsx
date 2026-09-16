@@ -96,7 +96,8 @@ export const SealedSearchResult = React.memo(function SealedSearchResult({ produ
       </View>
 
       <View style={{ flex: 1, gap: spacing['0.5'] }}>
-        <Text variant="labelLg" numberOfLines={1}>{product.name}</Text>
+        {/* tps- variant SKUs differ only in a trailing [bracket]. */}
+        <Text variant="labelLg" numberOfLines={product.id.startsWith('tps-') ? 2 : 1}>{product.name}</Text>
         <Text variant="caption" color={colors.onSurfaceVariant} numberOfLines={1}>
           {product.setName} · {product.contents}
         </Text>

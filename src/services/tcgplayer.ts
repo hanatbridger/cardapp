@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import { getSealedPrice } from '../mocks/sealed';
 import { getPrice, getMockPriceHistory } from '../mocks/prices';
 import { fetchWithTimeout } from './api-client';
+import { gapSealedPid } from './en-gap-catalog';
 import type { SealedPrice } from '../types/sealed';
 import type { CardPrice, PriceHistory } from '../types/card';
 
@@ -56,11 +57,13 @@ const LIVE = {
 /**
  * Whether sealed pricing for a given product comes from a live endpoint
  * (vs seeded mocks). `cx-` ids are collectrics-backed via
- * /api/sealed-stats (see sealed-live.ts) and are always live; catalog
- * ids stay on the global TCGPlayer-proxy flag until that route ships.
+ * /api/sealed-stats (see sealed-live.ts) and `tps-` ids are TCGPlayer-
+ * backed via /api/en-gap?sealed=1 (see en-gap-catalog.ts); both are
+ * always live. Catalog ids stay on the global TCGPlayer-proxy flag until
+ * that route ships.
  */
 export function isSealedPriceLive(productId?: string): boolean {
-  if (productId?.startsWith('cx-')) return true;
+  if (productId?.startsWith('cx-') || gapSealedPid(productId)) return true;
   return LIVE.sealedPrice;
 }
 

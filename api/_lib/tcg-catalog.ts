@@ -82,6 +82,8 @@ export interface CatalogSearch {
    * on search rows, so this filter is the only reliable sealed exclusion.
    */
   cardsOnly?: boolean;
+  /** productTypeName ['Sealed Products']; mutually exclusive with cardsOnly. */
+  sealedOnly?: boolean;
   from: number;
   size: number;
   sort?: { field: string; order: 'asc' | 'desc' };
@@ -91,7 +93,10 @@ export async function searchCatalog(
   s: CatalogSearch,
 ): Promise<{ rows: any[]; totalResults: number; aggregations: any }> {
   const term: Record<string, string[]> = { productLineName: [s.productLine] };
+  if (s.cardsOnly && s.sealedOnly) throw new Error('cardsOnly and sealedOnly are exclusive');
   if (s.cardsOnly) term.productTypeName = ['Cards'];
+  // TCGPlayer's Pokemon line has exactly two types: 'Cards', 'Sealed Products'.
+  if (s.sealedOnly) term.productTypeName = ['Sealed Products'];
   if (s.setNames) term.setName = s.setNames;
   const res = await fetchWithTimeout(
     `${SEARCH_URL}?q=${encodeURIComponent(s.q)}&isList=false`,
@@ -144,6 +149,19 @@ export async function fetchProductDetails(pid: string): Promise<any | null> {
 export function isEnCard(details: any): boolean {
   return details?.productLineName === 'Pokemon' && details?.productTypeName === 'Cards';
 }
+
+/** English sealed product; the twin of isEnCard. */
+export function isEnSealed(details: any): boolean {
+  return details?.productLineName === 'Pokemon' && details?.productTypeName === 'Sealed Products';
+}
+
+/**
+ * Multi-unit distributor cases ('... Elite Trainer Box Case', '... Sleeved
+ * Booster Case (48 ct)', '... Collection case'). Collectrics tracks none,
+ * their market prices are the least reliable, and relevance ranks them
+ * above the retail products, so sealed search leaves them out.
+ */
+export const CASE_RE = /\bcase\b/i;
 
 export interface TcgSetName {
   setNameId: number;
@@ -527,4 +545,120 @@ export async function findSetMeta(setNameId: number): Promise<GapSet | null> {
     isSupplemental: row.isSupplemental,
     cardCount: 0,
   };
+}
+
+/* ---------------- Recent sealed (TCGPlayer lists, Collectrics lacks) ---------------- */
+
+const MAX_SEALED_SET_AGE_DAYS = 180;
+
+/**
+ * Sets whose sealed products the TCGPlayer sealed search covers: released
+ * (no presale), under 180 days old, not a promo/energy run. Independent of
+ * pokemontcg.io, because Collectrics' sealed coverage is. Pure, so a fixture
+ * can pin it; `today` is UTC 'YYYY-MM-DD'.
+ */
+export function recentSealedSetFilter(tcgSets: TcgSetName[], today: string): TcgSetName[] {
+  const oldest = new Date(Date.parse(`${today}T00:00:00Z`) - MAX_SEALED_SET_AGE_DAYS * DAY_MS)
+    .toISOString()
+    .slice(0, 10);
+  return tcgSets.filter((t) => {
+    if (!t.releaseDate) return false;
+    const d = dayOf(t.releaseDate);
+    return d <= today && d >= oldest && !NON_CARD_SET_DENY.test(t.name);
+  });
+}
+
+/**
+ * Recent sets as GapSet rows (cardCount 0), newest first. Like findSetMeta,
+ * waits ~2s on the full state for series, then resolves from SetNames
+ * alone (series ''), so a pokemontcg.io outage does not fail sealed search.
+ */
+export async function getRecentSealedSets(): Promise<GapSet[]> {
+  let state: CatalogState | null = null;
+  try {
+    state = await loadCatalogState(SET_META_DEADLINE_MS);
+  } catch {
+    state = null;
+  }
+  const tcgSets = state?.tcgSets ?? (await fetchTcgSetNames());
+  const ptcgSets = state?.ptcgSets ?? [];
+  const today = new Date().toISOString().slice(0, 10);
+  return recentSealedSetFilter(tcgSets, today)
+    .map((t) => ({
+      setNameId: t.setNameId,
+      name: t.name,
+      abbreviation: t.abbreviation,
+      releaseDate: dayOf(t.releaseDate!).replace(/-/g, '/'),
+      series: seriesFor(t.name, tcgSets, ptcgSets),
+      isSupplemental: t.isSupplemental,
+      cardCount: 0,
+    }))
+    .sort((a, b) => b.releaseDate.localeCompare(a.releaseDate) || a.name.localeCompare(b.name));
+}
+
+const COLLECTRICS_SEARCH_URL = 'https://mycollectrics.com/api/search/cards';
+/** Same UA as api/sealed-search.ts. */
+const COLLECTRICS_UA = { 'user-agent': 'Mozilla/5.0 (CardPulse Sealed Proxy)' };
+const COLLECTRICS_PAGE = 200;
+const COLLECTRICS_MAX_PAGES = 5;
+const COLLECTRICS_TTL_MS = 60 * 60 * 1000;
+const PID_IN_IMAGE_RE = /\/product\/(\d+)_in_/;
+
+const collectricsMemo = new Map<string, { at: number; pids: Set<number> }>();
+const collectricsInflight = new Map<string, Promise<Set<number>>>();
+
+async function loadCollectricsSealedPids(code: string): Promise<Set<number>> {
+  const pids = new Set<number>();
+  let offset = 0;
+  for (let page = 0; page < COLLECTRICS_MAX_PAGES; page++) {
+    // An empty q with setCode returns the whole set listing (verified
+    // 2026-09-16: setCode=PBL gives total 151, 14 sealed rows).
+    const res = await fetchWithTimeout(
+      `${COLLECTRICS_SEARCH_URL}?q=&setCode=${encodeURIComponent(code)}&limit=${COLLECTRICS_PAGE}&offset=${offset}`,
+      { headers: COLLECTRICS_UA },
+    );
+    if (!res.ok) throw new Error(`collectrics ${code} ${res.status}`);
+    const data = await res.json();
+    const rows: any[] = Array.isArray(data?.results) ? data.results : [];
+    for (const r of rows) {
+      // Sealed rows: null card-number AND null rarity-name (api/sealed-search.ts).
+      if (r?.['card-number'] != null || r?.['rarity-name'] != null) continue;
+      // sealed-search.ts hides unpriced rows; counting them here would
+      // hide the product from both lists.
+      const price = r?.['raw-price'];
+      if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) continue;
+      const m = PID_IN_IMAGE_RE.exec(String(r?.['image-url'] ?? ''));
+      if (m) pids.add(Number(m[1]));
+    }
+    offset += rows.length;
+    const total = Number(data?.total) || 0;
+    if (rows.length === 0 || offset >= total) break;
+  }
+  return pids;
+}
+
+/**
+ * TCGPlayer productIds of the sealed products Collectrics lists for a set
+ * code (Collectrics set-code equals the TCGPlayer abbreviation). The pid
+ * comes from the row's TCGPlayer image url. Memoised per isolate for 1h;
+ * concurrent callers share one fetch; failures throw and are not memoised.
+ */
+export async function getCollectricsSealedPids(setCode: string): Promise<Set<number>> {
+  const code = setCode.trim().toUpperCase();
+  if (!code) throw new Error('collectrics: empty set code');
+  const hit = collectricsMemo.get(code);
+  if (hit && Date.now() - hit.at < COLLECTRICS_TTL_MS) return hit.pids;
+  let run = collectricsInflight.get(code);
+  if (!run) {
+    run = loadCollectricsSealedPids(code)
+      .then((pids) => {
+        collectricsMemo.set(code, { at: Date.now(), pids });
+        return pids;
+      })
+      .finally(() => {
+        collectricsInflight.delete(code);
+      });
+    collectricsInflight.set(code, run);
+  }
+  return run;
 }

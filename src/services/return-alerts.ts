@@ -6,6 +6,7 @@ import {
   type BatchPrices,
 } from '../hooks/use-batch-prices';
 import { fetchSealedLiveStats, type SealedLiveStats } from './sealed-live';
+import { gapSealedPid, gapSealedPriceQuery } from './en-gap-catalog';
 import { presentLocalNotification } from './notifications';
 import { useWatchlistStore, type WatchlistItem } from '../stores/watchlist-store';
 import { useAlertsStore } from '../stores/alerts-store';
@@ -52,11 +53,25 @@ async function liveCardPrices(cardIds: string[]): Promise<BatchPrices> {
 
 /**
  * Live price for a sealed product, or undefined. Only collectrics-backed
- * (`cx-`) products have one; the curated catalog prices from seeds, and
- * a seeded price must never fire an alert. Shares the cache entry
- * useSealedPrice observes (['sealed', 'cx-stats', cid]).
+ * (`cx-`) and TCGPlayer-backed (`tps-`) products have one; the curated
+ * catalog prices from seeds, and a seeded price must never fire an alert.
+ * Shares the cache entries useSealedPrice observes (['sealed', 'cx-stats',
+ * cid] and ['sealed', 'tps-price', pid]).
  */
 async function liveSealedPrice(productId: string): Promise<number | undefined> {
+  const tps = gapSealedPid(productId);
+  if (tps) {
+    try {
+      // The same current price the detail screen and watchlist row show.
+      const current = (await queryClient.fetchQuery(gapSealedPriceQuery(queryClient, tps)))
+        ?.currentPrice;
+      return typeof current === 'number' && Number.isFinite(current) && current > 0
+        ? current
+        : undefined;
+    } catch {
+      return undefined;
+    }
+  }
   const cid = productId.startsWith('cx-') ? productId.slice(3) : '';
   if (!/^\d{1,12}$/.test(cid)) return undefined;
   try {

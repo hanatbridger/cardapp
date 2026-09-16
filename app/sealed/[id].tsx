@@ -28,6 +28,7 @@ import { formatRelativeTime } from '../../src/utils/format';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
 import { SEALED_TYPE_LABEL } from '../../src/mocks/sealed';
 import { isSealedPriceLive } from '../../src/services/tcgplayer';
+import { gapSealedPid, sealedTcgPid } from '../../src/services/en-gap-catalog';
 import { useSealedProduct, useSealedPrice, useSealedPriceHistory, useMoney } from '../../src/hooks';
 import { useWatchlistStore } from '../../src/stores';
 
@@ -48,12 +49,28 @@ function SealedDetailScreen() {
   const items = useWatchlistStore((s) => s.items);
   const addItem = useWatchlistStore((s) => s.addItem);
   const removeItem = useWatchlistStore((s) => s.removeItem);
-  const isWatched = product ? items.some((i) => i.kind === 'sealed' && i.productId === product.id) : false;
+  // Same product under another id also counts: a tps- item saved before
+  // Collectrics listed it and the cx- row it now appears as share one
+  // TCGPlayer pid, so one product cannot be watched twice.
+  const productPid = product ? sealedTcgPid(product.id, product.imageUrl) : null;
+  const watchedItem = product
+    ? items.find(
+        (i) =>
+          i.kind === 'sealed' &&
+          (i.productId === product.id ||
+            // pid match only across namespaces: cx- rows for one product
+            // in several printings share an image, and stay separate.
+            (productPid !== null &&
+              (gapSealedPid(product.id) !== null) !== (gapSealedPid(i.productId) !== null) &&
+              sealedTcgPid(i.productId, i.imageUrl) === productPid)),
+      )
+    : undefined;
+  const isWatched = watchedItem !== undefined;
 
   const handleToggleWatch = () => {
     if (!product) return;
-    if (isWatched) {
-      removeItem(product.id);
+    if (watchedItem) {
+      removeItem(watchedItem.kind === 'sealed' ? watchedItem.productId : product.id);
     } else {
       addItem({
         kind: 'sealed',
