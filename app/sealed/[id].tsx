@@ -404,10 +404,9 @@ function SealedDetailScreen() {
               Why track sealed?
             </Text>
             <Text variant="bodySm" color={colors.onSurfaceVariant}>
-              Factory-sealed {SEALED_TYPE_LABEL[product.type].toLowerCase()}s tend to move as one
-              unit — every copy is identical, so price is a single number rather than the 7-grade
-              matrix we compute for singles. Watching a sealed SKU gives you the cleanest signal
-              on how the {product.setName} set is trending overall.
+              Every sealed copy is identical, so there is no condition or grade to price: one
+              market price covers the product. Watching it is a simple read on how interest in{' '}
+              {product.setName} is moving.
             </Text>
           </View>
         </ScrollView>
