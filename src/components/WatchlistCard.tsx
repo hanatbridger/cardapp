@@ -185,7 +185,9 @@ export const WatchlistCard = React.memo(function WatchlistCard({
             {rarity}
           </Text>
         )}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], flexWrap: 'wrap' }}>
+        {/* Pills sit a step below the text lines: at the column's 4pt
+            gap the pill's fill read as touching the rarity line. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], flexWrap: 'wrap', marginTop: spacing[1] }}>
           <GradeBadge grade={grade} />
           {valuationLabel && (
             <View

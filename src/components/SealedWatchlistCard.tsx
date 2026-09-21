@@ -129,7 +129,8 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
         <Text variant="caption" color={colors.onSurfaceVariant} numberOfLines={1}>
           {setName}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], flexWrap: 'wrap' }}>
+        {/* Same step above the pills as WatchlistCard. */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], flexWrap: 'wrap', marginTop: spacing[1] }}>
           <Badge variant="info">{SEALED_TYPE_LABEL[productType]}</Badge>
           {/* Sealed products off the curated catalog still price from
               seeded mocks (tcgplayer.ts LIVE.sealedPrice). The detail
