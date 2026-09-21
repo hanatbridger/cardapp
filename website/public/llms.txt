@@ -1,7 +1,7 @@
 # CardPulse
 
-> A watchlist app for Pokémon trading cards on iPhone: an app for tracking what
-> the cards are worth. Live market prices on every card you watch, a push
+> A watchlist app for Pokémon trading cards on iPhone, for tracking what the
+> cards are worth. Live market prices on every card you watch, a push
 > notification when a card hits a price you set, and the return on each card
 > since the day you added it.
 
