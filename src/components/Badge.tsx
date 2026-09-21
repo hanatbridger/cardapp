@@ -12,7 +12,9 @@ import { withAlpha } from '../utils/withAlpha';
 //                (spacing[1] / spacing[3]) at the owner's request,
 //                2026-09-20, so every pill shares roomier side padding.
 //   radius     = 12px
-//   font       = SG 500, 12px, letterSpacing -0.1
+//   font       = SG 500, 12px, letterSpacing -0.1 in the book. CardPulse
+//                overrides to 10px (typography.labelXs, tracking 0.2) at
+//                the owner's request, 2026-09-20.
 //
 // Every chip carries categorical meaning. Tiers defined on page 05:
 //   Tier 1 — Price Movement: gain, loss
@@ -36,8 +38,8 @@ export const pillGeometry = {
 } as const;
 
 /** Pill label style — pair with `<Text variant={pillTextVariant}>`. */
-export const pillTextVariant = 'caption' as const;
-export const pillTextStyle = { letterSpacing: -0.1, fontWeight: '500' } as const;
+export const pillTextVariant = 'labelXs' as const;
+export const pillTextStyle = { fontWeight: '500' } as const;
 
 /**
  * Interactive selector chips (filters, pickers, range toggles). They share

@@ -237,6 +237,10 @@ export const typography = {
   labelLg:   { fontSize: 14, fontWeight: '500' as const, lineHeight: 14 * 1.4, letterSpacing: 0.1 },
   labelMd:   { fontSize: 12, fontWeight: '500' as const, lineHeight: 12 * 1.4, letterSpacing: 0.25 },
   labelSm:   { fontSize: 11, fontWeight: '500' as const, lineHeight: 11 * 1.3, letterSpacing: 0.5 },
+  // Pill labels only (Badge and pillGeometry pills). Owner decision
+  // 2026-09-20: 10pt, one step under the 11pt floor everything else keeps.
+  // Light positive tracking holds legibility at this size.
+  labelXs:   { fontSize: 10, fontWeight: '500' as const, lineHeight: 10 * 1.4, letterSpacing: 0.2 },
   caption:   { fontSize: 12, fontWeight: '500' as const, lineHeight: 12 * 1.4, letterSpacing: 0.4 },
   overline:  { fontSize: 11, fontWeight: '500' as const, lineHeight: 11 * 1.3, letterSpacing: 1.5 },
 } as const;

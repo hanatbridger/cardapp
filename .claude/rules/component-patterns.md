@@ -29,7 +29,7 @@ Variants: `displayLg/Md/Sm`, `headingLg/Md/Sm`, `bodyLg/Md/Sm`, `labelLg/Md/Sm`,
 - Vertical stack: label / field / hint or error
 
 ### `<Badge variant="..." dot>` — pulse chip
-Renders the brand book chip recipe: `{ramp-400}` at 18% alpha fill, `{ramp-200}` text, 12px radius, SG 500 12/-0.1. Every chip carries categorical meaning — do not invent free-form labels.
+Renders the brand book chip recipe: `{ramp-400}` at 18% alpha fill, `{ramp-200}` text, 12px radius. CardPulse overrides (2026-09-20): 4/12 padding and 10pt `labelXs` text. Hand-built pills spread `pillGeometry` and use `pillTextVariant` from `Badge.tsx` so geometry cannot drift. Every chip carries categorical meaning — do not invent free-form labels.
 
 - **Tier 1 — price movement:** `gain`, `loss` (use `▲`/`▼` prefix in children)
 - **Tier 2 — valuation verdict:** `undervalued`, `overvalued`

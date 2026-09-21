@@ -29,7 +29,7 @@
 ## Text sizing
 
 - Body default: `bodyMd` (16) — meets accessibility minimum
-- Never go below 11pt (`labelSm`/`overline`)
+- Never go below 11pt (`labelSm`/`overline`). One exception, by owner decision 2026-09-20: pill labels use `labelXs` (10pt) via `pillTextVariant` in `Badge.tsx`
 - Support Dynamic Type via `Text` variants — sizes already meet iOS minimums
 
 ## Lists
