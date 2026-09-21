@@ -22,6 +22,14 @@
       "env": {
         "RCT_USE_PREBUILT_RNCORE": "0"
       }
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "environment": "production",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {
