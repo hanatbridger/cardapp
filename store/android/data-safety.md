@@ -39,6 +39,18 @@ mycollectrics.com, eBay Browse), which receive card queries and no user data.
 Each type below is answered as the form asks: **collected / shared /
 ephemeral / required or optional / purposes**.
 
+Play's purpose list has no "Crash reporting", "Diagnostics", "Purchases" or
+"Customer support" option. As entered in Play Console on 2026-09-21:
+crash reporting and diagnostics map to **Analytics** (Play's definition
+covers "monitor app health, diagnose and fix bugs or crashes"); purchases
+and customer support map to **App functionality**. Saved purposes: Name —
+App functionality, Analytics, Account management; Email — Analytics,
+Account management; User IDs — App functionality, Account management;
+Purchase history — App functionality, Account management; Photos, Other
+user-generated content, Device or other IDs — App functionality; Crash logs,
+Diagnostics — Analytics. The form is saved as a draft: Play will not accept
+it until the Target audience declaration is complete.
+
 ### 2.1 Personal info > Name
 
 | Field | Answer |
