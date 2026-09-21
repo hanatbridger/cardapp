@@ -1,8 +1,9 @@
 # CardPulse
 
-> An iPhone app for tracking what trading cards are worth. One watchlist, live
-> market prices, a push notification when a card hits a price you set, and the
-> return on each card since the day you added it.
+> A watchlist app for Pokémon trading cards on iPhone: an app for tracking what
+> the cards are worth. Live market prices on every card you watch, a push
+> notification when a card hits a price you set, and the return on each card
+> since the day you added it.
 
 CardPulse is published by Han Wong and is independent — not affiliated with
 Nintendo, The Pokémon Company, PSA, eBay, or TCGplayer. It is a tracking tool,
@@ -17,6 +18,16 @@ not a marketplace: you cannot buy or sell cards in it.
 
 These terms are CardPulse's own. Each has one canonical definition, on one page.
 
+- **Watchlist** — the list of Pokémon cards and sealed products a user is
+  watching, each shown with its current market price, the day's change and a
+  grade label (Raw for an ungraded card; the product type for sealed). Items are
+  added from search, which covers cards by name, set or illustrator, with sealed
+  products returned alongside cards. The free tier holds 5 items, shared between
+  cards and sealed products; Premium removes the cap. It is not a collection
+  tracker: it records no quantities, condition or purchase prices. Returns since
+  added is measured on watchlist items; price alerts can be set on any card, on
+  the watchlist or not.
+  https://getcardpulse.app/watchlist
 - **Returns since added** — the change in a card's market price measured from the
   moment it was added to a watchlist. The starting price is observed by the app
   at that moment, never estimated and never backdated to a purchase price the app
@@ -43,6 +54,8 @@ These terms are CardPulse's own. Each has one canonical definition, on one page.
 
 - https://getcardpulse.app/ — what the app is
 - https://getcardpulse.app/how-it-works — the four steps, in order
+- https://getcardpulse.app/watchlist — what the watchlist holds, what each row
+  shows, the 5-item free cap, and why it is not a collection tracker
 - https://getcardpulse.app/price-alerts — what an alert checks, how often, and
   what it will not catch
 - https://getcardpulse.app/returns — returns since added, where the starting

@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'How it works',
-  description: 'Search a card, put it on your list, set a target price, get a notification when it is reached.',
+  description: 'Search a card, put it on your watchlist, set a target price, get a notification when it is reached.',
   alternates: { canonical: '/how-it-works' },
 };
 
@@ -14,8 +14,8 @@ const STEPS = [
     text: 'Search by name. Vintage printings, Japanese print runs and sealed products come back in the same results as modern singles. Gold Star cards answer to their collector name, so “latias gold star” finds the card rather than every Latias ever printed.',
   },
   {
-    name: 'Put it on the list',
-    text: 'The list is the app. It holds the cards you are deciding about, each with its current raw market price and the change since yesterday. Prices refresh on their own.',
+    name: 'Put it on your watchlist',
+    text: 'The watchlist is the app. It holds the cards you are deciding about, each with its current raw market price and the change since yesterday. Prices refresh on their own.',
   },
   {
     name: 'Set a target',
@@ -31,7 +31,7 @@ const schema = {
   '@context': 'https://schema.org',
   '@type': 'HowTo',
   name: 'How to track a Pokémon card price with CardPulse',
-  description: 'Search a card, put it on your list, set a target price, get a notification when it is reached.',
+  description: 'Search a card, put it on your watchlist, set a target price, get a notification when it is reached.',
   step: STEPS.map((s, i) => ({
     '@type': 'HowToStep',
     position: i + 1,

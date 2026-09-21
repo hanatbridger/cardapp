@@ -63,7 +63,7 @@ export default function Home() {
       <section className="hero">
         <div>
           <h1>Know when a card hits your price.</h1>
-          <p className="sub">One list of the cards you&rsquo;re watching. Live market prices. A push the moment your number comes up.</p>
+          <p className="sub">One watchlist. Live market prices. A push the moment your number comes up.</p>
           <div className="actions">
             <AppStoreBadge height={58} />
           </div>
@@ -73,8 +73,9 @@ export default function Home() {
 
       <section className="showcase">
         <div>
-          <h2>One list, not a collection.</h2>
+          <h2>A watchlist, not a collection.</h2>
           <p className="say">Track what you don&rsquo;t own yet.</p>
+          <p className="more"><a href="/watchlist">What the watchlist holds</a></p>
         </div>
         <div className="iso-stack" aria-hidden="true">
           <div className="iso-plane">

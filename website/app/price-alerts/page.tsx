@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Faq } from '@/components/Faq';
 
 // Each answer restates something the sections above already say — no
@@ -44,6 +45,8 @@ export default function Page() {
           The raw, ungraded market price for the card. Not a graded price, not an
           average across grades, not a listing price. If you set a target of $300
           below, the alert fires when the raw market price is at or under $300.
+          An alert can be set on any card, whether or not it is on your{' '}
+          <Link href="/watchlist">watchlist</Link>.
         </p>
       </section>
 

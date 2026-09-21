@@ -4,7 +4,7 @@ import { Faq } from '@/components/Faq';
 const FAQ = [
   {
     q: 'Is CardPulse free?',
-    a: 'Yes. The free tier holds five cards or sealed products and three active price alerts, with no ads. Search, price history, market dynamics, recent sales, daily movers, the grading verdict and the news feed are the same on both tiers.',
+    a: 'Yes. The free tier holds five cards or sealed products on the watchlist and three active price alerts, with no ads. Search, price history, market dynamics, recent sales, daily movers, the grading verdict and the news feed are the same on both tiers.',
   },
   {
     q: 'What does CardPulse Premium add?',
@@ -22,7 +22,7 @@ const FAQ = [
 
 export const metadata: Metadata = {
   title: 'Price',
-  description: 'Free for 5 cards and 3 alerts. Premium is $4.99 a month or $29.99 a year, removes both caps, and adds returns since added and AI predictions.',
+  description: 'Free for 5 watchlist items and 3 alerts. Premium is $4.99 a month or $29.99 a year, removes both caps, and adds returns since added and AI predictions.',
   alternates: { canonical: '/pricing' },
 };
 
@@ -32,7 +32,8 @@ export default function Page() {
       <p className="eyebrow">Price</p>
       <h1>Two caps, and a subscription that removes them</h1>
       <p className="lede">
-        Two caps, and two features that read your own numbers back to you.
+        Two caps, five watchlist items and three active alerts, and two
+        features that read your own numbers back to you.
         Everything else is the same on both tiers.
       </p>
 
@@ -43,7 +44,7 @@ export default function Page() {
               <tr><th>&nbsp;</th><th>Free</th><th>Premium</th></tr>
             </thead>
             <tbody>
-              <tr><td>Cards and sealed products on the list</td><td>5 total</td><td>Unlimited</td></tr>
+              <tr><td>Cards and sealed products on the watchlist</td><td>5 total</td><td>Unlimited</td></tr>
               <tr><td>Active price alerts</td><td>3</td><td>Unlimited</td></tr>
               <tr><td><a href="/returns">Returns since added</a></td><td>Preview</td><td>Yes, with 20% pushes</td></tr>
               <tr><td>AI predictions</td><td>Preview</td><td>Yes</td></tr>
@@ -58,7 +59,7 @@ export default function Page() {
           Preview means the card is there with its layout intact and its
           figures replaced by placeholders behind the upgrade prompt. $4.99 a month
           or $29.99 a year. Cards and sealed products share the same
-          five free slots. Two cards are already on the list the first time you
+          five free watchlist slots. Two cards are already on the watchlist the first time you
           open the app and they count toward the five.
         </p>
       </section>

@@ -19,7 +19,7 @@ export const metadata: Metadata = {
     template: '%s — CardPulse',
   },
   description:
-    'iPhone app. One list of the cards you are watching, the current market price for each, and a push notification when a card hits the price you set. Free for 5 cards and 3 alerts.',
+    'iPhone app. A watchlist of Pokémon cards with the current market price for each, and a push when a card hits your price. Free for 5 watchlist items and 3 alerts.',
   alternates: { canonical: '/' },
   // Google Search Console ownership, for hanwong118@gmail.com. A public
   // value by design — it proves control of the site by being published
@@ -30,7 +30,7 @@ export const metadata: Metadata = {
     siteName: 'CardPulse',
     title: 'CardPulse — Pokémon card price tracker with target-price alerts',
     description:
-      'Track what a Pokémon card is worth. Get a push when it hits your price.',
+      'A watchlist app for Pokémon trading cards. See what each card is worth. Get a push when it hits your price.',
   },
 };
 
@@ -59,11 +59,15 @@ const schema = {
       operatingSystem: 'iOS',
       url: APP_STORE,
       publisher: { '@id': 'https://getcardpulse.app/#org' },
+      // The canonical entity sentence. Matches how the App Store listing
+      // describes the app, so crawlers and assistants reconcile the two.
+      description:
+        'A watchlist app for Pokémon trading cards: live market prices for the cards you are watching, and a push notification when one hits your target price.',
       // What the app actually does, in the app's own words. Without this
       // the entity is three prices and a category — nothing a rich result
       // or an assistant can enumerate.
       featureList: [
-        'Watchlist of trading cards with live market prices',
+        'Watchlist: the trading cards you are watching, each with its live market price',
         'Target-price alerts with push notifications',
         'Returns since added: what a card has made or lost since you added it',
         'eBay market dynamics: active listings, sales a day, demand pressure',
@@ -97,6 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               CardPulse
             </div>
             <nav>
+              <Link href="/how-it-works">How it works</Link>
               <Link href="/about">About</Link>
               <Link href="/changelog">Changelog</Link>
               <Link href="/support">Support</Link>

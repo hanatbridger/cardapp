@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'Returns since added',
@@ -61,7 +62,7 @@ export default function Page() {
       <section className="block">
         <h2>How do I track what a Pokémon card is worth over time?</h2>
         <p>
-          Add the card to your watchlist. CardPulse records the market price at
+          Add the card to your <Link href="/watchlist">watchlist</Link>. CardPulse records the market price at
           that moment and keeps a daily close for the card from then on, so every
           later price has something to be measured against. The card page then
           shows the starting price, the date, and the return since.

@@ -87,7 +87,11 @@ export function Masthead() {
           <span className="brand-word">CardPulse</span>
         </Link>
         <nav id="site-nav" data-open={open ? '' : undefined} onClick={() => setOpen(false)}>
-          <Link href="/how-it-works">How it works</Link>
+          {/* Five links is the ceiling: the scrolled capsule is 660px and
+              a sixth link pushes Get the app past its edge. Watchlist
+              replaced How it works, which the watchlist page now covers
+              and links to. */}
+          <Link href="/watchlist">Watchlist</Link>
           <Link href="/price-alerts">Alerts</Link>
           <Link href="/returns">Returns</Link>
           <Link href="/methodology">Sources</Link>
