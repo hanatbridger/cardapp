@@ -44,7 +44,7 @@
     },
     "android": {
       "package": "com.getcardpulse.app",
-    "googleServicesFile": "./google-services.json",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#5739FF"
@@ -89,6 +89,16 @@
         "expo-image-picker",
         {
           "photosPermission": "CardPulse uses your photo library only to attach a screenshot to feedback you send us."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "android": {
+            "image": "./assets/adaptive-icon.png",
+            "backgroundColor": "#5739FF",
+            "imageWidth": 200
+          }
         }
       ]
     ],
