@@ -11,6 +11,15 @@ or "watch list" queries in `.claude/keyword-corpus.txt`, 10,081 phrases), so the
 search-facing fields (subtitle, keywords) carry the tracker / price / worth
 wording people type.
 
+## Status (2026-09-20)
+
+Version 1.0.22 exists in App Store Connect as "Prepare for Submission" with
+the subtitle, keywords, promotional text and What's New below already saved.
+It has no build: the Expo free plan's iOS builds for September are used up
+(reset 2026-10-01) and this Mac has no Xcode for a local build. Attach a 1.0.22
+build and submit when one exists. What's New on 1.0.22: "Behind-the-scenes
+improvements. No changes to how the app works."
+
 ## Which fields need a new version
 
 | Field | Limit | Editable |
