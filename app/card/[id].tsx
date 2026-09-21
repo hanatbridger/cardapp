@@ -33,6 +33,7 @@ import {
   ComingSoonPanel,
   BottomSheet,
   withErrorBoundary,
+  chipGeometry,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
 import { formatRelativeTime } from '../../src/utils/format';
@@ -926,13 +927,12 @@ function CardDetailScreen() {
                       <Pressable
                         key={range}
                         onPress={() => setTimeRangeIndex(i)}
-                        // Visual chip is ~28x30pt; hitSlop brings the
-                        // effective target to the 44pt HIG minimum.
+                        // Visual chip is ~42x22pt; hitSlop 8 lifts it to
+                        // ~38pt tall (neighbours' slop overlaps by design).
                         hitSlop={8}
                         style={{
-                          paddingHorizontal: spacing[2],
+                          ...chipGeometry,
                           paddingVertical: spacing[1],
-                          borderRadius: radius.md,
                           backgroundColor: i === timeRangeIndex ? withAlpha(colors.primary, 0.12) : 'transparent',
                         }}
                       >

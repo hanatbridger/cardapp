@@ -7,6 +7,7 @@ import { spacing, radius } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
 import { useMoney } from '../hooks/use-money';
 import { Text } from './Text';
+import { chipGeometry } from './Badge';
 import { Card } from './Card';
 import { Button } from './Button';
 import { GradingAlertModal } from './GradingAlertModal';
@@ -249,9 +250,8 @@ export function GradingVerdict({
                   accessibilityLabel={`Condition ${CONDITION_LABELS[c]}`}
                   hitSlop={4}
                   style={{
-                    paddingHorizontal: spacing[3],
+                    ...chipGeometry,
                     paddingVertical: spacing[2],
-                    borderRadius: radius.full,
                     backgroundColor: selected ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
                     borderWidth: 1,
                     borderColor: selected ? withAlpha(colors.primary, 0.4) : colors.outline,

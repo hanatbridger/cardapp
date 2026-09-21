@@ -4,7 +4,7 @@ export { Card } from './Card';
 export { CollapsibleCard } from './CollapsibleCard';
 export { ScrimCta } from './ScrimCta';
 export { Input } from './Input';
-export { Badge } from './Badge';
+export { Badge, pillGeometry, pillTextVariant, pillTextStyle, chipGeometry } from './Badge';
 export { GradeBadge } from './GradeBadge';
 export { PriceChange } from './PriceChange';
 export { SinceAddedLabel } from './SinceAddedLabel';

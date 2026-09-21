@@ -8,7 +8,9 @@ import { withAlpha } from '../utils/withAlpha';
 // Brand book v1.1 chip recipe:
 //   background = {ramp-400} at 18% alpha
 //   color      = {ramp-200}
-//   padding    = 4px 10px
+//   padding    = 4px 10px in the book. CardPulse overrides to 4px 12px
+//                (spacing[1] / spacing[3]) at the owner's request,
+//                2026-09-20, so every pill shares roomier side padding.
 //   radius     = 12px
 //   font       = SG 500, 12px, letterSpacing -0.1
 //
@@ -17,6 +19,36 @@ import { withAlpha } from '../utils/withAlpha';
 //   Tier 2 — Valuation:      undervalued, overvalued (reuse gain/loss colors)
 //   Tier 3 — Grading Status: graded (PSA 10 etc), ungraded
 //   Tier 4 — Signals / Scarcity: live, trophy
+
+/**
+ * Single source of pill geometry. Badge spreads it; any pill that must keep
+ * its own View (solid promo fill etc.) spreads it too, so every pill in the
+ * app shares one padding, radius and gap.
+ */
+export const pillGeometry = {
+  flexDirection: 'row',
+  alignItems: 'center',
+  alignSelf: 'flex-start',
+  paddingHorizontal: spacing[3],
+  paddingVertical: spacing[1],
+  borderRadius: radius.md, // 12px per book
+  gap: spacing[1],
+} as const;
+
+/** Pill label style — pair with `<Text variant={pillTextVariant}>`. */
+export const pillTextVariant = 'caption' as const;
+export const pillTextStyle = { letterSpacing: -0.1, fontWeight: '500' } as const;
+
+/**
+ * Interactive selector chips (filters, pickers, range toggles). They share
+ * the pill's horizontal padding so both read as one family, but deliberately
+ * keep per-site vertical padding and text variant: each sits in a different
+ * density context and sizes its touch target (with hitSlop) locally.
+ */
+export const chipGeometry = {
+  paddingHorizontal: spacing[3],
+  borderRadius: radius.full,
+} as const;
 
 type BookVariant =
   | 'gain'
@@ -95,14 +127,8 @@ export function Badge({
     <View
       style={[
         {
-          flexDirection: 'row',
-          alignItems: 'center',
-          alignSelf: 'flex-start',
+          ...pillGeometry,
           backgroundColor: withAlpha(ramp.fill, 0.18),
-          borderRadius: radius.md, // 12px per book
-          paddingHorizontal: 10,
-          paddingVertical: 4,
-          gap: spacing[1],
         },
         style,
       ]}
@@ -118,11 +144,7 @@ export function Badge({
           }}
         />
       )}
-      <Text
-        variant="caption"
-        color={ramp.text}
-        style={{ letterSpacing: -0.1, fontWeight: '500' }}
-      >
+      <Text variant={pillTextVariant} color={ramp.text} style={pillTextStyle}>
         {children}
       </Text>
     </View>

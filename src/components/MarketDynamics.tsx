@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Text } from './Text';
 import { Card } from './Card';
-import { Badge } from './Badge';
+import { Badge, pillGeometry, pillTextStyle, pillTextVariant } from './Badge';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius, palette } from '../theme/tokens';
 import { withAlpha } from '../utils/withAlpha';
@@ -60,14 +60,19 @@ function StatCell({
       <Text variant="labelLg">{value.toFixed(value >= 100 ? 0 : 1)}</Text>
       <View
         style={{
+          ...pillGeometry,
+          alignSelf: 'center',
+          maxWidth: '100%',
           backgroundColor: withAlpha(isGood ? colors.success : colors.danger, 0.15),
-          borderRadius: radius.full,
-          paddingHorizontal: spacing[1],
-          paddingVertical: 1,
         }}
       >
-        <Text variant="caption" color={isGood ? colors.success : colors.danger}>
-          {change.text} vs 30d
+        <Text
+          variant={pillTextVariant}
+          color={isGood ? colors.success : colors.danger}
+          style={{ ...pillTextStyle, fontVariant: ['tabular-nums'], flexShrink: 1 }}
+          numberOfLines={1}
+        >
+          {change.text}
         </Text>
       </View>
     </View>
@@ -185,15 +190,10 @@ function GaugeSection({
 export function DynamicsChip() {
   const { colors } = useTheme();
   return (
-    <View
-      style={{
-        backgroundColor: withAlpha(colors.primary, 0.12),
-        borderRadius: radius.full,
-        paddingHorizontal: spacing[1],
-        paddingVertical: 1,
-      }}
-    >
-      <Text variant="caption" color={colors.primary}>7d avg</Text>
+    <View style={{ ...pillGeometry, backgroundColor: withAlpha(colors.primary, 0.12) }}>
+      <Text variant={pillTextVariant} color={colors.primary} style={pillTextStyle}>
+        7d avg
+      </Text>
     </View>
   );
 }
@@ -220,7 +220,7 @@ export function MarketDynamics({ cardId, live, bare }: MarketDynamicsProps) {
       <View style={{ gap: spacing[4] }}>
         {/* Header */}
         {!bare && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: spacing[2] }}>
           <Text variant="headingSm">eBay Market Dynamics</Text>
           <DynamicsChip />
           {/* Seeded fallback keeps the disclosure badge (same
@@ -229,7 +229,9 @@ export function MarketDynamics({ cardId, live, bare }: MarketDynamicsProps) {
         </View>
         )}
 
-        {/* 3-stat summary row */}
+        {/* 3-stat summary row. Pills carry only the percent so they keep
+            full pill padding at caption size; the baseline is named once. */}
+        <View style={{ gap: spacing[1] }}>
         <View
           style={{
             flexDirection: 'row',
@@ -258,6 +260,10 @@ export function MarketDynamics({ cardId, live, bare }: MarketDynamicsProps) {
             value={dynamics.soldPerDay7d}
             baseline={dynamics.soldPerDay30d}
           />
+        </View>
+        <Text variant="caption" color={colors.onSurfaceMuted} style={{ textAlign: 'center' }}>
+          Change vs 30-day average
+        </Text>
         </View>
 
         {/* Demand Pressure gauge */}

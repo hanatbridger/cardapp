@@ -10,6 +10,7 @@ import {
   AnimatedListItem,
   CollapsingHeader,
   withErrorBoundary,
+  chipGeometry,
 } from '../../src/components';
 import { spacing, radius } from '../../src/theme/tokens';
 import { withAlpha } from '../../src/utils/withAlpha';
@@ -168,9 +169,8 @@ function SetDetailScreen() {
                 <Pressable
                   onPress={() => setRarity(undefined)}
                   style={{
-                    paddingHorizontal: spacing[3],
+                    ...chipGeometry,
                     paddingVertical: spacing[1],
-                    borderRadius: radius.full,
                     backgroundColor: !rarity ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
                     borderWidth: 1,
                     borderColor: !rarity ? withAlpha(colors.primary, 0.4) : colors.outlineVariant,
@@ -187,9 +187,8 @@ function SetDetailScreen() {
                       key={r}
                       onPress={() => setRarity(active ? undefined : r)}
                       style={{
-                        paddingHorizontal: spacing[3],
+                        ...chipGeometry,
                         paddingVertical: spacing[1],
-                        borderRadius: radius.full,
                         backgroundColor: active ? withAlpha(colors.primary, 0.15) : colors.surfaceVariant,
                         borderWidth: 1,
                         borderColor: active ? withAlpha(colors.primary, 0.4) : colors.outlineVariant,

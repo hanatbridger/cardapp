@@ -11,6 +11,7 @@ import {
   EmptyState,
   Skeleton,
   withErrorBoundary,
+  chipGeometry,
 } from '../src/components';
 import { spacing, radius } from '../src/theme/tokens';
 import { withAlpha } from '../src/utils/withAlpha';
@@ -50,9 +51,8 @@ function StatusPills({
             accessibilityRole="button"
             accessibilityLabel={`Mark ${STATUS_LABEL[s]}`}
             style={{
-              paddingHorizontal: spacing[2],
+              ...chipGeometry,
               paddingVertical: spacing[1],
-              borderRadius: radius.full,
               backgroundColor: active ? withAlpha(colors.primary, 0.18) : 'transparent',
               borderWidth: 1,
               borderColor: active ? colors.primary : colors.outline,

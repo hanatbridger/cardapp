@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import { IconTrendingUp, IconTrendingDown } from '@tabler/icons-react-native';
 import { Text } from './Text';
+import { pillGeometry, pillTextStyle, pillTextVariant } from './Badge';
 import { GradeBadge } from './GradeBadge';
 import { PriceChange } from './PriceChange';
 import { SinceAddedLabel } from './SinceAddedLabel';
@@ -185,21 +186,20 @@ export const WatchlistCard = React.memo(function WatchlistCard({
           </Text>
         )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[1], flexWrap: 'wrap' }}>
-          <GradeBadge grade={grade} size="sm" />
+          <GradeBadge grade={grade} />
           {valuationLabel && (
             <View
               style={{
+                ...pillGeometry,
                 backgroundColor: valuationLabel === 'undervalued'
                   ? withAlpha(colors.success, 0.12)
                   : withAlpha(colors.danger, 0.12),
-                borderRadius: radius.full,
-                paddingHorizontal: spacing[2],
-                paddingVertical: spacing['0.5'],
               }}
             >
               <Text
-                variant="labelSm"
+                variant={pillTextVariant}
                 color={valuationLabel === 'undervalued' ? colors.success : colors.danger}
+                style={pillTextStyle}
               >
                 {valuationLabel === 'undervalued' ? 'Undervalued' : 'Overvalued'}
               </Text>

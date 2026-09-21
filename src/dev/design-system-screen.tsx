@@ -546,11 +546,6 @@ function DesignSystemScreen() {
                       <GradeBadge grade="PSA10" />
                       <GradeBadge grade="UNGRADED" />
                     </View>
-                    <Text variant="labelMd" color={colors.onSurfaceMuted}>Small</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[2] }}>
-                      <GradeBadge grade="PSA10" size="sm" />
-                      <GradeBadge grade="UNGRADED" size="sm" />
-                    </View>
                   </View>
                 </Card>
               </View>

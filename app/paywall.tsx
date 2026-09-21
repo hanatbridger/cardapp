@@ -19,6 +19,9 @@ import {
   Button,
   Card,
   withErrorBoundary,
+  pillGeometry,
+  pillTextStyle,
+  pillTextVariant,
 } from '../src/components';
 import { useUserStore } from '../src/stores/user-store';
 import { spacing, radius } from '../src/theme/tokens';
@@ -440,15 +443,8 @@ function PaywallScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
                     <Text variant="labelLg">{plan.label}</Text>
                     {badge && (
-                      <View
-                        style={{
-                          paddingHorizontal: spacing[2],
-                          paddingVertical: 2,
-                          borderRadius: radius.sm,
-                          backgroundColor: colors.success,
-                        }}
-                      >
-                        <Text variant="labelSm" color={colors.onPrimary}>
+                      <View style={{ ...pillGeometry, alignSelf: 'center', backgroundColor: colors.success }}>
+                        <Text variant={pillTextVariant} color={colors.onPrimary} style={pillTextStyle}>
                           {badge}
                         </Text>
                       </View>

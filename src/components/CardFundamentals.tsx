@@ -3,6 +3,7 @@ import { View, Pressable } from 'react-native';
 import { router } from 'expo-router';
 import { IconChevronRight } from '@tabler/icons-react-native';
 import { Text } from './Text';
+import { pillGeometry, pillTextStyle, pillTextVariant } from './Badge';
 import { Card } from './Card';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -205,8 +206,8 @@ export function CardFundamentals({ card, marketPrice, livePop, bare }: CardFunda
         <Text variant="bodySm" color={colors.onSurfaceVariant}>Artist Score</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing[2] }}>
           {artistScore.score >= 9 && (
-            <View style={{ backgroundColor: withAlpha(colors.warning, 0.2), borderRadius: radius.full, paddingHorizontal: spacing[2], paddingVertical: spacing['0.5'] }}>
-              <Text variant="labelSm" color={colors.warning}>Top Artist</Text>
+            <View style={{ ...pillGeometry, alignSelf: 'center', backgroundColor: withAlpha(colors.warning, 0.2) }}>
+              <Text variant={pillTextVariant} color={colors.warning} style={pillTextStyle}>Top Artist</Text>
             </View>
           )}
           <ScoreBar score={artistScore.score} />
