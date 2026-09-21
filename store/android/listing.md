@@ -18,10 +18,13 @@ CardPulse: TCG Card Watchlist
 ## Short description
 
 ```
-One list of the cards you watch, live prices, a push when one hits your price.
+A watchlist for Pokemon cards: live prices and a push when one hits your price.
 ```
 
-78 / 80 characters.
+79 / 80 characters. Leads with the watchlist noun (the entity term the app
+name and full description use); keeps "Pokemon" and "prices" as the
+searchable terms. The corpus has no "watchlist" queries, so the noun is here
+for consistency, not for search.
 
 ## Full description
 
@@ -101,16 +104,17 @@ CardPulse is an independent collector tool. It is not affiliated with, endorsed 
 Measured, not estimated. Every fenced block above was extracted and its
 length taken with Node:
 
-```js
-const src = fs.readFileSync('store/android/listing.md', 'utf8');
-[...src.matchAll(/```\n([\s\S]*?)\n```/g)].forEach((m, i) =>
-  console.log(i, m[1].length));
+```sh
+node -e 'const src = require("fs").readFileSync("store/android/listing.md", "utf8");
+[...src.matchAll(/```\n([\s\S]*?)\n```/g)].forEach((m, i) => console.log(i, m[1].length));'
 ```
+
+Output on 2026-09-20: `0 29`, `1 79`, `2 3989`.
 
 | Field | Limit | Count | Margin |
 |---|---|---|---|
 | App name | 30 | 29 | 1 |
-| Short description | 80 | 78 | 2 |
+| Short description | 80 | 79 | 1 |
 | Full description | 4000 | 3989 | 11 |
 
 Newlines count as one character each, which is how Play Console counts
