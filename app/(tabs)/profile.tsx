@@ -23,10 +23,9 @@ interface SettingsRowProps {
   value?: string;
   onPress?: () => void;
   destructive?: boolean;
-  badge?: string;
 }
 
-function SettingsRow({ icon, label, value, onPress, destructive, badge }: SettingsRowProps) {
+function SettingsRow({ icon, label, value, onPress, destructive }: SettingsRowProps) {
   const { colors } = useTheme();
   return (
     <Pressable
@@ -50,18 +49,6 @@ function SettingsRow({ icon, label, value, onPress, destructive, badge }: Settin
       >
         {label}
       </Text>
-      {badge && (
-        <View
-          style={{
-            backgroundColor: colors.primary,
-            borderRadius: radius.full,
-            paddingHorizontal: spacing[2],
-            paddingVertical: spacing['0.5'],
-          }}
-        >
-          <Text variant="labelSm" color={colors.onPrimary}>{badge}</Text>
-        </View>
-      )}
       {value && (
         <Text variant="bodySm" color={colors.onSurfaceMuted}>{value}</Text>
       )}

@@ -16,8 +16,6 @@ interface SegmentedControlProps {
    * the eBay live proxy is live).
    */
   disabledIndices?: number[];
-  /** Tiny right-aligned label rendered next to a disabled option (e.g. "Soon"). */
-  disabledBadge?: string;
   onDisabledPress?: (index: number) => void;
 }
 
@@ -26,7 +24,6 @@ export function SegmentedControl({
   selected,
   onSelect,
   disabledIndices,
-  disabledBadge,
   onDisabledPress,
 }: SegmentedControlProps) {
   const { colors, glass } = useTheme();
@@ -84,26 +81,6 @@ export function SegmentedControl({
             >
               {option}
             </Text>
-            {isDisabled && disabledBadge && (
-              <View
-                style={{
-                  paddingHorizontal: spacing[1] + 2,
-                  paddingVertical: 1,
-                  borderRadius: radius.full,
-                  backgroundColor: colors.surfaceVariant,
-                  borderWidth: 1,
-                  borderColor: colors.outlineVariant,
-                }}
-              >
-                <Text
-                  variant="labelSm"
-                  color={colors.onSurfaceMuted}
-                  style={{ fontSize: 10, lineHeight: 12 }}
-                >
-                  {disabledBadge}
-                </Text>
-              </View>
-            )}
           </Pressable>
         );
       })}
