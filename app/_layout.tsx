@@ -148,13 +148,17 @@ function AuthGate() {
     const root = segments[0];
     const onOnboarding = root === 'onboarding';
     const inAuth = root === '(auth)';
+    // Sign-up links the legal pages ("By creating an account, you agree
+    // to..."), so a signed-out user must be able to open them. They are
+    // pushed over (auth), and back returns to Sign-up.
+    const onLegal = root === 'terms' || root === 'privacy';
 
     if (!hasCompletedOnboarding) {
       if (!onOnboarding) router.replace('/onboarding');
       return;
     }
     if (!isAuthenticated) {
-      if (!inAuth) router.replace('/(auth)/login');
+      if (!inAuth && !onLegal) router.replace('/(auth)/login');
       return;
     }
     // Onboarded + authed: bounce away from auth/onboarding screens.
