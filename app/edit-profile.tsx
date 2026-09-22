@@ -14,9 +14,11 @@ import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { safeGoBack } from '../src/utils/safeGoBack';
 import { useUserStore } from '../src/stores';
 import { useCollapsingHeader } from '../src/hooks';
+import { useKeyboardAvoidance } from '../src/hooks/use-keyboard-avoidance';
 
 function EditProfileScreen() {
   const { colors } = useTheme();
+  const keyboardAvoidance = useKeyboardAvoidance();
   const { profile, updateProfile, authProvider } = useUserStore();
   const [displayName, setDisplayName] = useState(profile.displayName);
   const [email, setEmail] = useState(profile.email);
@@ -49,7 +51,7 @@ function EditProfileScreen() {
         }
       />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        {...keyboardAvoidance}
         style={{ flex: 1 }}
       >
         <Animated.ScrollView

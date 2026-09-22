@@ -24,6 +24,7 @@ import { IconX } from '@tabler/icons-react-native';
 import { Text } from './Text';
 import { Portal } from './Portal';
 import { useTheme } from '../theme/ThemeProvider';
+import { useKeyboardAvoidance } from '../hooks/use-keyboard-avoidance';
 import { spacing, radius, shadows } from '../theme/tokens';
 
 interface BottomSheetProps {
@@ -67,6 +68,7 @@ export function BottomSheet({
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const keyboardAvoidance = useKeyboardAvoidance();
   const onOpenedRef = useRef(onOpened);
   onOpenedRef.current = onOpened;
   const onCloseRef = useRef(onClose);
@@ -167,10 +169,11 @@ export function BottomSheet({
         </Animated.View>
         {/* box-none (in style, for Fabric): taps above the sheet fall
             through to the backdrop, taps on the sheet stop at the sheet.
-            Android: no behavior — adjustResize already shrinks the window
-            for the keyboard, and 'height' compensated a second time. */}
+            Android pads too: edge-to-edge means adjustResize no longer
+            shrinks the window, so without it the keyboard covered the
+            field and the submit button (see useKeyboardAvoidance). */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          {...keyboardAvoidance}
           style={{ flex: 1, justifyContent: 'flex-end', pointerEvents: 'box-none' }}
         >
           <Animated.View

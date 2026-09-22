@@ -13,9 +13,11 @@ import {
 } from '../../src/services/google-auth';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
+import { useKeyboardAvoidance } from '../../src/hooks/use-keyboard-avoidance';
 
 function LoginScreen() {
   const { colors } = useTheme();
+  const keyboardAvoidance = useKeyboardAvoidance();
   const signIn = useUserStore((s) => s.signIn);
 
   // Email/password is hidden at v1 launch — see AuthForm appleOnly.
@@ -97,7 +99,7 @@ function LoginScreen() {
   return (
     <ScreenBackground edges={['top', 'bottom']}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        {...keyboardAvoidance}
         style={{ flex: 1 }}
       >
         <ScrollView

@@ -12,10 +12,12 @@ import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { safeGoBack } from '../src/utils/safeGoBack';
 import { useCollapsingHeader } from '../src/hooks';
+import { useKeyboardAvoidance } from '../src/hooks/use-keyboard-avoidance';
 import { supabase } from '../src/services/supabase';
 
 function ChangePasswordScreen() {
   const { colors } = useTheme();
+  const keyboardAvoidance = useKeyboardAvoidance();
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -91,7 +93,7 @@ function ChangePasswordScreen() {
         animatedStyle={headerAnimatedStyle}
       />
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        {...keyboardAvoidance}
         style={{ flex: 1 }}
       >
         <Animated.ScrollView
