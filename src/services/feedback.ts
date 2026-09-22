@@ -5,10 +5,14 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from './supabase';
+import { captureException } from './sentry';
 
 export type FeedbackKind = 'bug' | 'idea' | 'general';
 
-export type FeedbackResult = { ok: true } | { ok: false; error: string };
+/** `screenshotFailed`: the message went in, the attached image did not. */
+export type FeedbackResult =
+  | { ok: true; screenshotFailed?: boolean }
+  | { ok: false; error: string };
 
 const BUCKET = 'feedback-shots';
 
@@ -68,9 +72,24 @@ export async function submitFeedback(input: {
     const user = data?.user;
     if (!user) return { ok: false, error: 'Sign in to send feedback.' };
 
-    const screenshot = input.screenshot
-      ? await uploadShot(user.id, input.screenshot)
-      : null;
+    // A failed screenshot must not cost the message: an upload error
+    // used to throw before the insert, so neither arrived. The row is
+    // insert-only for clients (no update grant), so the upload still runs
+    // first and the row records why the image is missing.
+    let screenshot: string | null = null;
+    let screenshotError: string | null = null;
+    if (input.screenshot) {
+      try {
+        screenshot = await uploadShot(user.id, input.screenshot);
+      } catch (e: any) {
+        const message: string = e?.message || 'Screenshot upload failed';
+        screenshotError = message;
+        captureException(e instanceof Error ? e : new Error(message), {
+          where: 'submitFeedback.uploadShot',
+          platform: Platform.OS,
+        });
+      }
+    }
 
     const { error } = await supabase.from('feedback').insert({
       user_id: user.id,
@@ -79,10 +98,12 @@ export async function submitFeedback(input: {
       message: input.message,
       screenshot,
       app_version: Constants.expoConfig?.version ?? null,
-      context: context(),
+      context: screenshotError
+        ? { ...context(), screenshot_error: screenshotError }
+        : context(),
     });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return screenshotError ? { ok: true, screenshotFailed: true } : { ok: true };
   } catch (e: any) {
     return { ok: false, error: e?.message || 'Could not send that — please try again.' };
   }

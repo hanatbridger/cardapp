@@ -38,6 +38,7 @@ function FeedbackScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [sent, setSent] = useState(false);
+  const [shotFailed, setShotFailed] = useState(false);
   const dismissTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Clear the auto-dismiss timer on unmount — otherwise it fires after
@@ -92,7 +93,12 @@ function FeedbackScreen() {
     setBusy(false);
     if (res.ok) {
       setSent(true);
-      dismissTimer.current = setTimeout(() => safeGoBack('/profile'), 1400);
+      setShotFailed(!!res.screenshotFailed);
+      // Longer when there is a second line to read.
+      dismissTimer.current = setTimeout(
+        () => safeGoBack('/profile'),
+        res.screenshotFailed ? 3200 : 1400,
+      );
     } else {
       setError(res.error);
     }
@@ -121,7 +127,9 @@ function FeedbackScreen() {
               <IconCircleCheck size={44} color={colors.success} />
               <Text variant="headingSm">Thanks — got it.</Text>
               <Text variant="bodySm" color={colors.onSurfaceVariant}>
-                We read every one of these.
+                {shotFailed
+                  ? "Sent, but the screenshot didn't upload."
+                  : 'We read every one of these.'}
               </Text>
             </View>
           ) : (
