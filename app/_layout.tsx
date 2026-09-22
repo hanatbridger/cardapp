@@ -12,13 +12,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { PortalHost } from '../src/components/Portal';
 import { useUserStore } from '../src/stores/user-store';
 import { useAlertChecker } from '../src/hooks/use-alert-checker';
-import {
-  configureNotificationHandler,
-} from '../src/services/notifications';
-import {
-  defineBackgroundAlertTask,
-  registerBackgroundAlertTask,
-} from '../src/services/background-alerts';
+import { registerBackgroundAlertTask } from '../src/services/background-alerts';
 import { initSentry, captureException } from '../src/services/sentry';
 import {
   configureRevenueCat,
@@ -58,11 +52,9 @@ configureRevenueCat()
 // Configure the native Google Sign-In SDK (no-op on web).
 configureGoogleSignin();
 
-// Define the background task at module-eval time so the OS can dispatch
-// into it when the app is woken up. Configure the foreground notification
-// handler in the same pass — both are no-ops on web.
-defineBackgroundAlertTask();
-configureNotificationHandler();
+// The background alert task and the notification handler are defined in
+// index.js, not here: this module never runs when the OS wakes the app
+// for the task without rendering it.
 
 // Register this device's Expo push token with the backend so the server
 // can deliver news pushes even when the app is closed. No-op unless

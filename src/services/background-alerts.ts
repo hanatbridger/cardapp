@@ -13,8 +13,10 @@ export const PRICE_ALERT_TASK = 'cardpulse-price-alert-check';
 let taskDefined = false;
 
 /**
- * Defines the background task. Must run at module-eval time on native so
- * iOS/Android can wake the app and dispatch into it. Skipped on web.
+ * Defines the background task. Must run at bundle evaluation on native so
+ * iOS/Android can wake the app and dispatch into it, which is why index.js
+ * calls it rather than a route module (routes only load when rendered, and
+ * a background wake renders nothing). Skipped on web.
  */
 export function defineBackgroundAlertTask() {
   if (taskDefined || Platform.OS === 'web') return;
