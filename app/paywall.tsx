@@ -3,7 +3,7 @@ import { View, ScrollView, Pressable, Alert, Linking, Platform, StyleSheet, useW
 import Animated, { Easing, FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import Purchases from 'react-native-purchases';
+import Purchases, { PURCHASES_ERROR_CODE } from 'react-native-purchases';
 import {
   IconX,
   IconCheck,
@@ -239,6 +239,16 @@ function PaywallScreen() {
       );
     } catch (e: any) {
       setPurchasing(false);
+      // A pending payment is not a failure: Google Play holds slow cards
+      // and cash methods, and iOS Ask to Buy waits on a parent. The
+      // CustomerInfo listener unlocks premium once the store confirms.
+      if (e?.code === PURCHASES_ERROR_CODE.PAYMENT_PENDING_ERROR) {
+        notify(
+          'Payment Pending',
+          `Premium unlocks automatically when ${Platform.OS === 'ios' ? 'the App Store' : 'Google Play'} confirms it.`,
+        );
+        return;
+      }
       notify('Purchase Failed', e.message || 'Something went wrong. Please try again.');
     }
   };
