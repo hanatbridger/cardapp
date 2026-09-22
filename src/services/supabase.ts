@@ -72,9 +72,43 @@ export async function signInWithApple(identityToken: string, nonce?: string) {
   return data;
 }
 
-/** Sign out of Supabase + clear the local session. */
-export async function signOutFromSupabase() {
-  await supabase.auth.signOut();
+/**
+ * Sign out of Supabase + clear the local session.
+ *
+ * signOut() revokes the session server-side and removes the stored
+ * session only once that request succeeds. Offline, or with Supabase
+ * unreachable, it resolves { error } and leaves the session on disk, so
+ * the next cold start signed the user straight back in. scope 'local'
+ * does not avoid this: auth-js still POSTs /logout for it. So on any
+ * failure, clear the stored session locally — no network, and it emits
+ * SIGNED_OUT exactly as a completed sign-out does. The server-side
+ * session is left unrevoked, but nothing on the device holds its tokens.
+ *
+ * Throws only if that local clear fails too.
+ */
+export async function signOutFromSupabase(): Promise<void> {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (!error) return;
+  } catch {
+    // Same fallback as a returned error.
+  }
+  await clearLocalSession();
+}
+
+/**
+ * auth-js has no public network-free sign-out, so call the private
+ * _removeSession() that signOut() itself runs after /logout succeeds
+ * (drops the session, code-verifier and user keys, emits SIGNED_OUT).
+ * Checked at runtime: if an auth-js upgrade renames it, sign-out throws
+ * (and gets reported) instead of silently keeping the session.
+ */
+async function clearLocalSession(): Promise<void> {
+  const auth = supabase.auth as unknown as { _removeSession?: () => Promise<void> };
+  if (typeof auth._removeSession !== 'function') {
+    throw new Error('Supabase local sign-out unavailable: auth-js _removeSession missing');
+  }
+  await auth._removeSession();
 }
 
 /**

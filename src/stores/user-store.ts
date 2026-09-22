@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { safeStorage } from './safe-storage';
 import type { GradeType } from '../constants/grades';
 import type { CurrencyCode } from '../constants/currencies';
-import { setUser as setSentryUser } from '../services/sentry';
+import { setUser as setSentryUser, captureException } from '../services/sentry';
 import { supabase, signOutFromSupabase, deleteUserAccount } from '../services/supabase';
 import { signOutFromGoogle } from '../services/google-auth';
 
@@ -60,6 +60,12 @@ const DEFAULT_PROFILE: UserProfile = {
   displayName: '',
   username: '',
   email: '',
+};
+
+const reportSignOutFailure = (where: string) => (e: unknown) => {
+  captureException(e instanceof Error ? e : new Error(String(e)), {
+    where: `user-store.${where}`,
+  });
 };
 
 export const useUserStore = create<UserStore>()(
@@ -119,16 +125,18 @@ export const useUserStore = create<UserStore>()(
 
       signOut: async () => {
         setSentryUser(null);
-        // End the Supabase session before clearing local state. We
-        // swallow Supabase errors here — sign-out should never fail
-        // the user-facing flow; worst case the local state is gone but
-        // a stale token sits on disk until the next refresh attempt.
+        // End the Supabase session before clearing local state. An
+        // offline or failed network sign-out already falls back to a
+        // local clear inside signOutFromSupabase; it throws only if that
+        // fails too. Sign-out still never fails the user-facing flow, but
+        // report it — the session then survives on disk and the next
+        // launch signs back in.
         // The native Google SDK signs out alongside it — otherwise
         // Android's Continue with Google silently reuses this account.
         // signOutFromGoogle never throws.
         await Promise.all([
           signOutFromGoogle(),
-          signOutFromSupabase().catch(() => {}),
+          signOutFromSupabase().catch(reportSignOutFailure('signOut')),
         ]);
         set({
           profile: DEFAULT_PROFILE,
@@ -149,12 +157,13 @@ export const useUserStore = create<UserStore>()(
         setSentryUser(null);
         // Server delete also invalidates the session; sign out of
         // the local client to clear AsyncStorage. Errors here are
-        // best-effort — the auth row is already gone. Revoke the Google
-        // grant too, so the next Continue with Google asks again instead
-        // of silently creating a new account for the same Google user.
+        // best-effort (reported, not thrown) — the auth row is already
+        // gone. Revoke the Google grant too, so the next Continue with
+        // Google asks again instead of silently creating a new account
+        // for the same Google user.
         await Promise.all([
           signOutFromGoogle({ revoke: true }),
-          signOutFromSupabase().catch(() => {}),
+          signOutFromSupabase().catch(reportSignOutFailure('deleteAccount')),
         ]);
         set({
           profile: { displayName: '', username: '', email: '' },
