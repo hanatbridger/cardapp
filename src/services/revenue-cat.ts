@@ -244,11 +244,20 @@ export function registerRevenueCatIdentitySync(): void {
  * Get available subscription offerings.
  */
 export async function getOfferings(): Promise<PurchasesOffering | null> {
-  if (Platform.OS === 'web') return null;
+  // Unconfigured is already reported once by configureRevenueCat; the
+  // SDK would only reject again here.
+  if (Platform.OS === 'web' || !isConfigured) return null;
   try {
     const offerings = await Purchases.getOfferings();
     return offerings.current;
-  } catch {
+  } catch (e: any) {
+    // Null leaves the paywall with no packages, so a store with no
+    // products attached (CONFIGURATION_ERROR on every call) failed
+    // silently. Report it.
+    captureException(
+      e instanceof Error ? e : new Error(String(e?.message ?? e)),
+      { where: 'getOfferings', code: e?.code },
+    );
     return null;
   }
 }

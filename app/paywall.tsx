@@ -152,8 +152,8 @@ function PaywallScreen() {
   // Match by identifier ($rc_monthly/$rc_annual are identifier values,
   // NOT packageType — packageType is the MONTHLY/ANNUAL enum), then by
   // packageType, then positional only when neither matched.
-  const packageForPlan = (plan: PlanId) => {
-    const packages = offerings?.availablePackages;
+  const packageForPlan = (plan: PlanId, source: any = offerings) => {
+    const packages = source?.availablePackages;
     if (!packages?.length) return undefined;
     const identifier = plan === 'monthly' ? '$rc_monthly' : '$rc_annual';
     const type = plan === 'monthly' ? 'MONTHLY' : 'ANNUAL';
@@ -199,11 +199,21 @@ function PaywallScreen() {
   }
 
   const purchase = async () => {
-    const pkg = packageForPlan(selected);
+    let pkg = packageForPlan(selected);
 
     if (!pkg && Platform.OS !== 'web') {
-      notify('Error', 'Subscription products are not available yet. Please try again later.');
-      return;
+      // Offerings load once on mount, so a failed or empty fetch (flaky
+      // network, store products not live yet) kept this CTA dead until
+      // the paywall was reopened. Fetch again before giving up.
+      setPurchasing(true);
+      const fresh = await getOfferings();
+      if (fresh) setOfferings(fresh);
+      pkg = packageForPlan(selected, fresh);
+      if (!pkg) {
+        setPurchasing(false);
+        notify('Error', 'Subscription products are not available yet. Please try again later.');
+        return;
+      }
     }
 
     setPurchasing(true);
