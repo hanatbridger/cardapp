@@ -160,14 +160,30 @@ export async function identifyUser(userId: string): Promise<void> {
 
 /**
  * Reset user on sign-out.
+ *
+ * Sign-out reaches this from two places (the local store's sign-out and
+ * the SIGNED_OUT event) that can land together or in either order, so
+ * overlapping calls share one logOut, and an already-anonymous user is
+ * skipped — logOut on an anonymous user rejects with
+ * LOG_OUT_ANONYMOUS_USER_ERROR. Never throws.
  */
-export async function resetUser(): Promise<void> {
-  if (Platform.OS === 'web') return;
-  try {
-    await Purchases.logOut();
-  } catch (e) {
-    // ignore — user may not have been identified
+let resetInFlight: Promise<void> | null = null;
+
+export function resetUser(): Promise<void> {
+  if (Platform.OS === 'web' || !isConfigured) return Promise.resolve();
+  if (!resetInFlight) {
+    resetInFlight = (async () => {
+      try {
+        if (await Purchases.isAnonymous()) return;
+        await Purchases.logOut();
+      } catch {
+        // ignore — nothing to undo; the next sign-in's logIn re-identifies
+      } finally {
+        resetInFlight = null;
+      }
+    })();
   }
+  return resetInFlight;
 }
 
 /**
@@ -204,6 +220,16 @@ export function registerRevenueCatIdentitySync(): void {
       // this one's entitlement on a shared device.
       resetUser();
     }
+  });
+
+  // Also reset straight off the store's sign-out, not only SIGNED_OUT:
+  // an offline sign-out used to leave the Supabase session on disk and
+  // emit no event, so RevenueCat stayed identified as the old account
+  // and the next cold start restored its entitlement. Subscribing here,
+  // rather than calling in from user-store, keeps the import edge
+  // one-way. resetUser dedupes against the SIGNED_OUT call above.
+  useUserStore.subscribe((state, prev) => {
+    if (prev.isAuthenticated && !state.isAuthenticated) resetUser();
   });
 }
 
