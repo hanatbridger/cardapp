@@ -48,9 +48,11 @@ import {
   useAlertsStore,
   MAX_FREE_ALERTS,
   isPriceAlert,
+  resyncAlertTargets,
   type PriceAlert,
 } from '../../src/stores/alerts-store';
 import { requestNotificationPermission } from '../../src/services/notifications';
+import { registerForPushNotifications } from '../../src/services/push';
 import { useCardDetail, useCardPrice, usePriceHistory, useMoney, useRelatedCards, useCardStats, useEbayListings } from '../../src/hooks';
 
 // No 1D: history is one snapshot per day, so a 1-day window can never
@@ -1297,6 +1299,11 @@ function CardDetailScreen() {
               // alert. We still record the alert even if denied — the
               // in-app notifications screen works without OS permission.
               const granted = await requestNotificationPermission();
+              // A first grant here leaves the device with no push token,
+              // so addAlert's server mirror was skipped. Register now and
+              // re-mirror, as the News tab does, or the cron cannot push
+              // this alert until the next cold start.
+              if (granted) registerForPushNotifications().then(() => resyncAlertTargets());
               if (!granted && Platform.OS !== 'web') {
                 Alert.alert(
                   'Notifications disabled',

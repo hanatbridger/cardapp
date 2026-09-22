@@ -15,9 +15,11 @@ import {
   useAlertsStore,
   isGradingAlert,
   MAX_FREE_ALERTS,
+  resyncAlertTargets,
   type GradingAlert,
 } from '../stores/alerts-store';
 import { requestNotificationPermission } from '../services/notifications';
+import { registerForPushNotifications } from '../services/push';
 import {
   computeGradingVerdict,
   CONDITION_ORDER,
@@ -146,6 +148,10 @@ export function GradingVerdict({
     // The alert is kept even if denied — the in-app notifications screen
     // works without OS permission.
     const granted = await requestNotificationPermission();
+    // A first grant here leaves the device with no push token, so the
+    // server mirror was skipped. Register now and re-mirror, as the News
+    // tab does, or the cron cannot push this alert until the next launch.
+    if (granted) registerForPushNotifications().then(() => resyncAlertTargets());
     if (!granted && Platform.OS !== 'web') {
       Alert.alert(
         'Notifications disabled',
