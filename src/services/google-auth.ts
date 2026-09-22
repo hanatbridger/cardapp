@@ -172,3 +172,29 @@ export async function signInWithGoogleWeb(): Promise<void> {
   });
   if (error) throw error;
 }
+
+/**
+ * Sign out of the native Google SDK. Ending the Supabase session alone
+ * leaves the SDK's cached account in place, and on Android signIn() then
+ * returns that account at once without the chooser — the user could not
+ * switch Google accounts without clearing app data. `revoke` also
+ * removes CardPulse's grant from the Google account (account deletion).
+ *
+ * Harmless when no Google account is signed in (Apple/email users).
+ * No-op on web or if the SDK never configured. Never throws: a Google
+ * SDK failure must not block the app's own sign-out.
+ */
+export async function signOutFromGoogle({ revoke = false } = {}): Promise<void> {
+  if (Platform.OS === 'web' || !configured) return;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { GoogleSignin } = require('@react-native-google-signin/google-signin');
+    if (revoke) {
+      // Revoke failing (offline, no current user) must not skip signOut.
+      await GoogleSignin.revokeAccess().catch(() => {});
+    }
+    await GoogleSignin.signOut();
+  } catch {
+    // Best-effort — see above.
+  }
+}
