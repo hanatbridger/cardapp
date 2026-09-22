@@ -26,7 +26,32 @@ if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.warn('[supabase] EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY missing. Auth will fail.');
 }
 
+/**
+ * Signal carried by every /logout and token-refresh request. A sign-out
+ * that overruns aborts it, so those requests are cancelled rather than
+ * left running: RN Android's OkHttp client has no timeouts, and one that
+ * landed after the local clear could re-save the old session (refresh)
+ * or wipe a newer sign-in's session (logout).
+ */
+let sessionRequests = new AbortController();
+
+const SESSION_REQUEST = /\/auth\/v1\/(?:logout|token\?grant_type=refresh_token)/;
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  return input instanceof URL ? input.href : input.url;
+}
+
+// Pass-through, plus the sessionRequests signal on session requests.
+function supabaseFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
+  if (!init?.signal && SESSION_REQUEST.test(requestUrl(input))) {
+    return fetch(input, { ...init, signal: sessionRequests.signal });
+  }
+  return fetch(input, init);
+}
+
 export const supabase: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  global: { fetch: supabaseFetch },
   auth: {
     storage: AsyncStorage,
     autoRefreshToken: true,
@@ -72,6 +97,8 @@ export async function signInWithApple(identityToken: string, nonce?: string) {
   return data;
 }
 
+const SIGN_OUT_TIMEOUT_MS = 8000;
+
 /**
  * Sign out of Supabase + clear the local session.
  *
@@ -84,14 +111,33 @@ export async function signInWithApple(identityToken: string, nonce?: string) {
  * SIGNED_OUT exactly as a completed sign-out does. The server-side
  * session is left unrevoked, but nothing on the device holds its tokens.
  *
+ * A stalled network (captive portal, Supabase not answering) can hold
+ * the request open indefinitely on Android, so the network step gets
+ * SIGN_OUT_TIMEOUT_MS before the same local clear. Its requests are
+ * aborted then (see sessionRequests), and the signal stays aborted until
+ * the abandoned signOut() settles, so none of its retries land after the
+ * clear.
+ *
  * Throws only if that local clear fails too.
  */
 export async function signOutFromSupabase(): Promise<void> {
-  try {
-    const { error } = await supabase.auth.signOut();
-    if (!error) return;
-  } catch {
+  const pending = supabase.auth.signOut().catch((e: unknown) => ({
     // Same fallback as a returned error.
+    error: e instanceof Error ? e : new Error(String(e)),
+  }));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const overrun = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), SIGN_OUT_TIMEOUT_MS);
+  });
+  const result = await Promise.race([pending, overrun]);
+  clearTimeout(timer);
+  if (result && !result.error) return;
+  if (!result) {
+    const aborted = sessionRequests;
+    aborted.abort();
+    void pending.then(() => {
+      if (sessionRequests === aborted) sessionRequests = new AbortController();
+    });
   }
   await clearLocalSession();
 }
