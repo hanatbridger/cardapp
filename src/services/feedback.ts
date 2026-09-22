@@ -28,14 +28,29 @@ function context() {
   };
 }
 
+function readAsArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as ArrayBuffer);
+    reader.onerror = () => reject(reader.error ?? new Error('Could not read the screenshot.'));
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
 // Returns the OBJECT PATH, not a URL — the bucket is private, so viewing
 // goes through short-lived signed URLs (admin-feedback.ts).
 async function uploadShot(userId: string, uri: string): Promise<string> {
   const blob = await (await fetch(uri)).blob();
-  const ext = blob.type === 'image/png' ? 'png' : 'jpg';
+  const contentType = blob.type || 'image/jpeg';
+  const ext = contentType === 'image/png' ? 'png' : 'jpg';
   const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    contentType: blob.type || 'image/jpeg',
+  // Native sends raw bytes. storage-js wraps a Blob in FormData, and RN's
+  // FormData cannot carry a Blob part: Android rejects the request
+  // ("Unrecognized FormData part."). RN's FileReader decodes the blob to
+  // an ArrayBuffer, which storage-js sends as the body with contentType.
+  const body = Platform.OS === 'web' ? blob : await readAsArrayBuffer(blob);
+  const { error } = await supabase.storage.from(BUCKET).upload(path, body, {
+    contentType,
     upsert: false,
   });
   if (error) throw new Error(error.message);
