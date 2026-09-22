@@ -33,8 +33,8 @@ These terms are CardPulse's own. Each has one canonical definition, on one page.
   at that moment, never estimated and never backdated to a purchase price the app
   does not know. https://getcardpulse.app/returns
 - **Today's return** — the same card measured against yesterday's recorded close
-  rather than against the starting price. Prints an em dash, not a zero, when no
-  previous close exists. https://getcardpulse.app/returns
+  rather than against the starting price. Says "No previous close yet", not a
+  zero, when no previous close exists. https://getcardpulse.app/returns
 - **Demand pressure** — a seven-day demand metric over a card's eBay listings,
   shown as a percentage on a scale from heavy supply to very tight. Higher means
   a tighter market. The metric is supplied by Collectrics from

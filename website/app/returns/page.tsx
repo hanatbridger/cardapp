@@ -82,10 +82,10 @@ export default function Page() {
           </div>
         </dl>
         <p className="note">
-          A card with no close recorded yet shows an em dash for today&rsquo;s
-          return rather than a zero. Zero would read as &ldquo;flat today&rdquo;,
-          and the truth is that we do not know yesterday&rsquo;s number for that
-          card yet.
+          A card with no close recorded yet reads &ldquo;No previous close
+          yet&rdquo; for today&rsquo;s return rather than a zero. Zero would read
+          as &ldquo;flat today&rdquo;, and the truth is that we do not know
+          yesterday&rsquo;s number for that card yet.
         </p>
       </section>
 

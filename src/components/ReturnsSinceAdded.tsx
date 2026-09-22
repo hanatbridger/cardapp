@@ -54,9 +54,9 @@ const finitePositive = (n: unknown): n is number =>
  *
  * Three states in one shell: the full table, a prompt to add the card
  * when there is no baseline to measure from, and a locked preview for
- * free accounts. Any number we don't actually have prints an em dash —
- * a zero would read as "flat today" when the truth is "we don't know
- * yesterday's close for this card".
+ * free accounts. Any number we don't actually have prints an em dash, or
+ * the reason in its place — a zero would read as "flat today" when the
+ * truth is "we don't know yesterday's close for this card".
  */
 export function ReturnsSinceAdded({
   cardId,
@@ -129,18 +129,20 @@ export function ReturnsSinceAdded({
     value: { amount: number; pct: number } | null,
     spokenTail: string,
     first: boolean,
+    // Why the value is missing, printed in its place instead of the dash.
+    unavailable?: string,
   ) => {
     // Rounded figure decides the sign shown, so a "+0.0%" never prints a
-    // plus (same rule as SinceAddedLabel).
+    // plus.
     const shownPct = value ? Math.round(value.pct * 10) / 10 : 0;
     const absMoney = value ? formatMoney(Math.abs(value.amount)) : UNKNOWN;
     // One string, money and percent together, exactly as drawn.
     const shown = value
       ? `${shownPct > 0 ? '+' : shownPct < 0 ? '−' : ''}${absMoney} (${Math.abs(shownPct).toFixed(2)}%)`
-      : UNKNOWN;
+      : unavailable ?? UNKNOWN;
     const spoken = value
       ? `${label}, ${shownPct > 0 ? 'up' : shownPct < 0 ? 'down' : 'flat'} ${absMoney}, ${Math.abs(shownPct).toFixed(1)} percent ${spokenTail}`
-      : `${label}, not available`;
+      : `${label}, not available${unavailable ? `: ${unavailable}` : ''}`;
 
     return (
       <View
@@ -164,6 +166,7 @@ export function ReturnsSinceAdded({
             variant="bodyMd"
             color={value ? colors.onSurface : colors.onSurfaceMuted}
             style={{ flex: 1, textAlign: 'right', fontVariant: ['tabular-nums'] }}
+            numberOfLines={1}
           >
             {shown}
           </Text>
@@ -219,15 +222,21 @@ export function ReturnsSinceAdded({
           {/* outline, not outlineVariant: on the card's own fill the
               subtler token is invisible, which is no divider at all. */}
           <View style={{ height: 1, backgroundColor: colors.outline }} />
-          {returnRow("Today's return", today, prevCloseTail, true)}
+          {/* A missing previous close is said in the row itself, where
+              the figure would be, rather than in a note underneath. */}
+          {returnRow(
+            "Today's return",
+            today,
+            prevCloseTail,
+            true,
+            finitePositive(currentPrice) ? 'No previous close yet' : undefined,
+          )}
           {returnRow('Total return', totalValue, baselineTail, false)}
 
-          {/* Say why a row is dashed rather than leaving it unexplained. */}
-          {!today && (
+          {/* Without a live price both rows are dashed; say why. */}
+          {!finitePositive(currentPrice) && (
             <Text variant="caption" color={colors.onSurfaceMuted}>
-              {finitePositive(currentPrice)
-                ? "We don't have a previous close for this card yet, so today's return isn't available."
-                : "Waiting on a live price — returns fill in once it loads."}
+              Waiting on a live price — returns fill in once it loads.
             </Text>
           )}
         </View>
