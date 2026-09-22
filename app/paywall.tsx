@@ -18,6 +18,7 @@ import {
   Text,
   Button,
   Card,
+  Skeleton,
   withErrorBoundary,
   pillGeometry,
   pillTextStyle,
@@ -139,9 +140,14 @@ function PaywallScreen() {
   const [selected, setSelected] = useState<PlanId>('monthly');
   const [purchasing, setPurchasing] = useState(false);
   const [offerings, setOfferings] = useState<any>(null);
+  // Tells a price still loading apart from a store with no product.
+  const [offeringsLoaded, setOfferingsLoaded] = useState(false);
 
   useEffect(() => {
-    getOfferings().then(setOfferings);
+    getOfferings().then((o) => {
+      setOfferings(o);
+      setOfferingsLoaded(true);
+    });
   }, []);
 
   const close = () => {
@@ -164,14 +170,14 @@ function PaywallScreen() {
     );
   };
 
-  // Real store prices drive the annual hint + save badge once offerings
-  // load. The PLANS literals are the fallback: always while offerings
-  // are null, and per-field when the loaded packages lack a usable
-  // price/currency (the visible prices fall back to the same literals
-  // then, so the chrome stays consistent).
+  // On native, prices, the annual hint and the save badge come only from
+  // the store. The PLANS USD literals are web-only (no store there): on
+  // native they showed prices Play and the App Store never charge, to
+  // non-US users and to everyone while products were missing.
+  const storePriced = Platform.OS !== 'web';
   const annualPlan = PLANS.find((p) => p.id === 'annual')!;
-  let annualHint = annualPlan.hint;
-  let annualBadge = annualPlan.badge;
+  let annualHint = storePriced ? undefined : annualPlan.hint;
+  let annualBadge = storePriced ? undefined : annualPlan.badge;
   if (offerings) {
     const annual = packageForPlan('annual')?.product;
     const monthly = packageForPlan('monthly')?.product;
@@ -183,7 +189,7 @@ function PaywallScreen() {
         }).format(annual.price / 12);
         annualHint = `Just ${perMonth}/mo`;
       } catch {
-        // Unknown currency code — keep the USD literal.
+        // Unknown currency code — no hint rather than a wrong one.
       }
     }
     if (
@@ -198,20 +204,29 @@ function PaywallScreen() {
     }
   }
 
+  // Offerings loaded without this plan: the CTA reads Try again and
+  // reloads them rather than offering a purchase it cannot start.
+  const selectedUnavailable = storePriced && offeringsLoaded && !packageForPlan(selected);
+
   const purchase = async () => {
     let pkg = packageForPlan(selected);
 
-    if (!pkg && Platform.OS !== 'web') {
+    if (!pkg && storePriced) {
       // Offerings load once on mount, so a failed or empty fetch (flaky
       // network, store products not live yet) kept this CTA dead until
-      // the paywall was reopened. Fetch again before giving up.
+      // the paywall was reopened. Fetch again before giving up. From Try
+      // again, stop once the price is back so the user sees it first.
+      const reloadOnly = selectedUnavailable;
       setPurchasing(true);
       const fresh = await getOfferings();
       if (fresh) setOfferings(fresh);
+      setOfferingsLoaded(true);
       pkg = packageForPlan(selected, fresh);
-      if (!pkg) {
+      if (!pkg || reloadOnly) {
         setPurchasing(false);
-        notify('Error', 'Subscription products are not available yet. Please try again later.');
+        if (!pkg) {
+          notify('Error', 'Subscription products are not available yet. Please try again later.');
+        }
         return;
       }
     }
@@ -428,6 +443,9 @@ function PaywallScreen() {
             const isSelected = plan.id === selected;
             const badge = plan.id === 'annual' ? annualBadge : plan.badge;
             const hint = plan.id === 'annual' ? annualHint : plan.hint;
+            const price = storePriced
+              ? packageForPlan(plan.id)?.product?.priceString
+              : plan.price;
             return (
               <Pressable
                 key={plan.id}
@@ -477,14 +495,23 @@ function PaywallScreen() {
                   )}
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                  {/* Store-localized price when offerings have loaded;
-                      USD literal is only the loading fallback. */}
-                  <Text variant="headingSm">
-                    {packageForPlan(plan.id)?.product?.priceString ?? plan.price}
-                  </Text>
-                  <Text variant="caption" color={colors.onSurfaceVariant}>
-                    {plan.period}
-                  </Text>
+                  {/* Store-localized price on native: a pulse while
+                      offerings load, Unavailable when the store has no
+                      product for the plan. */}
+                  {price ? (
+                    <>
+                      <Text variant="headingSm">{price}</Text>
+                      <Text variant="caption" color={colors.onSurfaceVariant}>
+                        {plan.period}
+                      </Text>
+                    </>
+                  ) : offeringsLoaded ? (
+                    <Text variant="labelMd" color={colors.onSurfaceVariant}>
+                      Unavailable
+                    </Text>
+                  ) : (
+                    <Skeleton width={spacing[12]} height={spacing[5]} />
+                  )}
                 </View>
               </Pressable>
             );
@@ -493,7 +520,7 @@ function PaywallScreen() {
 
         {/* CTA */}
         <Button onPress={purchase} fullWidth size="lg" loading={purchasing}>
-          Start Premium
+          {selectedUnavailable ? 'Try again' : 'Start Premium'}
         </Button>
 
         {/* Footer */}
