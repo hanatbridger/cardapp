@@ -13,8 +13,7 @@ import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { safeGoBack } from '../src/utils/safeGoBack';
 import { useUserStore } from '../src/stores';
-import { useCollapsingHeader } from '../src/hooks';
-import { useKeyboardAvoidance } from '../src/hooks/use-keyboard-avoidance';
+import { useCollapsingHeader, useKeyboardAvoidance } from '../src/hooks';
 
 function EditProfileScreen() {
   const { colors } = useTheme();

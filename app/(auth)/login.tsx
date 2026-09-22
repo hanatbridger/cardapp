@@ -13,7 +13,7 @@ import {
 } from '../../src/services/google-auth';
 import { spacing } from '../../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../../src/constants/layout';
-import { useKeyboardAvoidance } from '../../src/hooks/use-keyboard-avoidance';
+import { useKeyboardAvoidance } from '../../src/hooks';
 
 function LoginScreen() {
   const { colors } = useTheme();

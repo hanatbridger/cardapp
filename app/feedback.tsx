@@ -15,8 +15,7 @@ import {
 import { spacing, radius } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { safeGoBack } from '../src/utils/safeGoBack';
-import { useCollapsingHeader } from '../src/hooks';
-import { useKeyboardAvoidance } from '../src/hooks/use-keyboard-avoidance';
+import { useCollapsingHeader, useKeyboardAvoidance } from '../src/hooks';
 import { useUserStore } from '../src/stores';
 import { submitFeedback, type FeedbackKind } from '../src/services/feedback';
 

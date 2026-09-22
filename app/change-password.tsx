@@ -11,8 +11,7 @@ import {
 import { spacing } from '../src/theme/tokens';
 import { HORIZONTAL_PADDING } from '../src/constants/layout';
 import { safeGoBack } from '../src/utils/safeGoBack';
-import { useCollapsingHeader } from '../src/hooks';
-import { useKeyboardAvoidance } from '../src/hooks/use-keyboard-avoidance';
+import { useCollapsingHeader, useKeyboardAvoidance } from '../src/hooks';
 import { supabase } from '../src/services/supabase';
 
 function ChangePasswordScreen() {
