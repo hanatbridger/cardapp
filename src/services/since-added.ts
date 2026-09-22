@@ -7,8 +7,8 @@
  * rather than "what did it do today".
  *
  * Pure functions only. The store owns the baseline fields
- * (watchlist-store.ts); the checker (alert-checker.ts) and Home call in
- * here with whatever live price they have.
+ * (watchlist-store.ts); the checker (alert-checker.ts) and the card
+ * screen call in here with whatever live price they have.
  */
 
 export const RETURN_ALERT_THRESHOLD_PCT = 20;
@@ -66,18 +66,6 @@ export function returnAlertCrossing(
   if (pct >= RETURN_ALERT_THRESHOLD_PCT && !alerted.up) return 'up';
   if (pct <= -RETURN_ALERT_THRESHOLD_PCT && !alerted.down) return 'down';
   return null;
-}
-
-/** Equal-weighted mean across items that have a baseline; null if none. */
-export function averageSinceAdded(returns: ReadonlyArray<SinceAdded | null>): number | null {
-  let sum = 0;
-  let n = 0;
-  for (const r of returns) {
-    if (!r) continue;
-    sum += r.pct;
-    n++;
-  }
-  return n === 0 ? null : sum / n;
 }
 
 /** "Mar 15", or "Mar 15, 2025" once the baseline is in another year. */

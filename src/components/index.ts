@@ -7,7 +7,6 @@ export { Input } from './Input';
 export { Badge, pillGeometry, pillTextVariant, pillTextStyle, chipGeometry } from './Badge';
 export { GradeBadge } from './GradeBadge';
 export { PriceChange } from './PriceChange';
-export { SinceAddedLabel } from './SinceAddedLabel';
 export { ReturnsSinceAdded } from './ReturnsSinceAdded';
 export { PriceChart } from './PriceChart';
 export { Avatar } from './Avatar';

@@ -6,8 +6,6 @@ import { router } from 'expo-router';
 import { Text } from './Text';
 import { Badge } from './Badge';
 import { PriceChange } from './PriceChange';
-import { SinceAddedLabel } from './SinceAddedLabel';
-import { sinceAddedReturn } from '../services/since-added';
 import { useWatchlistStore } from '../stores/watchlist-store';
 import { useTheme } from '../theme/ThemeProvider';
 import { spacing, radius } from '../theme/tokens';
@@ -26,11 +24,6 @@ interface SealedWatchlistCardProps {
   imageUrl: string;
   fallbackPrice?: number;
   fallbackPriceChange?: number;
-  /** Since-added baseline (Premium); see services/since-added.ts. */
-  baselinePrice?: number;
-  baselineAt?: string;
-  /** Premium gate for the since-added line. */
-  showSinceAdded?: boolean;
 }
 
 /**
@@ -48,9 +41,6 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
   imageUrl,
   fallbackPrice,
   fallbackPriceChange,
-  baselinePrice,
-  baselineAt,
-  showSinceAdded,
 }: SealedWatchlistCardProps) {
   const { colors, isDark } = useTheme();
   const formatMoney = useMoney();
@@ -71,15 +61,12 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
   const stampBaselines = useWatchlistStore((s) => s.stampBaselines);
   useEffect(() => {
     if (liveCurrent === undefined || !(liveCurrent > 0)) return;
-    // Keeps the persisted fallback fresh (the watchlist aggregate reads
-    // it) and gives a pre-baseline row its start. Both bail unchanged.
+    // Keeps the persisted fallback fresh and gives a pre-baseline row its
+    // start (the card screen's returns panel and the ±20% return push
+    // measure from it). Both bail unchanged.
     updatePrice(productId, liveCurrent, liveChange ?? 0);
     stampBaselines([{ id: productId, price: liveCurrent }]);
   }, [productId, liveCurrent, liveChange, updatePrice, stampBaselines]);
-  const sinceAdded =
-    showSinceAdded && liveCurrent !== undefined
-      ? sinceAddedReturn({ baselinePrice, baselineAt }, liveCurrent)
-      : null;
 
   // Touchable = RectButton on native, Pressable on web (see
   // components/Touchable.tsx) — reliable taps on both.
@@ -150,9 +137,6 @@ export const SealedWatchlistCard = React.memo(function SealedWatchlistCard({
               {formatMoney(currentPrice)}
             </Text>
             {percentChange !== undefined ? <PriceChange percent={percentChange} size="sm" /> : null}
-            {sinceAdded ? (
-              <SinceAddedLabel pct={sinceAdded.pct} baselineAt={sinceAdded.baselineAt} />
-            ) : null}
           </>
         ) : (
           <Text variant="bodySm" color={colors.onSurfaceMuted}>--</Text>

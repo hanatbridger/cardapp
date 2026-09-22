@@ -15,7 +15,6 @@ import {
   ScreenBackground,
   BrandMark,
   MarketIndexBar,
-  SinceAddedLabel,
   Touchable,
   withErrorBoundary,
 } from '../../src/components';
@@ -31,8 +30,6 @@ import {
   sessionActiveMs,
   MIN_SESSION_ACTIVE_MS,
 } from '../../src/utils/review-prompt';
-import { sinceAddedReturn, averageSinceAdded } from '../../src/services/since-added';
-import { isSealedPriceLive } from '../../src/services/tcgplayer';
 import type { TrendingTile } from '../../src/services/trending';
 
 /**
@@ -45,11 +42,9 @@ import type { TrendingTile } from '../../src/services/trending';
 const HomeCardRow = React.memo(function HomeCardRow({
   item,
   livePrice,
-  showSinceAdded,
 }: {
   item: Extract<WatchlistItem, { kind: 'card' }>;
   livePrice: { currentPrice: number; percentChange: number } | null | undefined;
-  showSinceAdded: boolean;
 }) {
   // Last-known price ONLY — never the seeded mock. This fallback paints
   // on every cold start, on every watchlist add/remove, and forever for
@@ -91,9 +86,6 @@ const HomeCardRow = React.memo(function HomeCardRow({
       rarity={rarity}
       livePrice={livePrice}
       fallbackPrice={fallbackPrice}
-      baselinePrice={item.baselinePrice}
-      baselineAt={item.baselineAt}
-      showSinceAdded={showSinceAdded}
     />
   );
 });
@@ -156,22 +148,6 @@ function WatchlistScreen() {
     if (!batchPrices || batchQuery.isPlaceholderData) return;
     stampBatchPrices(batchPrices);
   }, [batchPrices, batchQuery.isPlaceholderData, stampBatchPrices]);
-
-  // Watchlist return since added (Premium): equal-weighted mean of the
-  // rows that have one. Cards read the live batch; sealed read their
-  // live-refreshed stamp, and only for live-priced products.
-  const avgSinceAdded = useMemo(() => {
-    if (!isPremium) return null;
-    return averageSinceAdded(
-      items.map((i) =>
-        i.kind === 'card'
-          ? sinceAddedReturn(i, batchPrices?.[i.cardId]?.currentPrice)
-          : isSealedPriceLive(i.productId)
-            ? sinceAddedReturn(i, i.lastPrice)
-            : null,
-      ),
-    );
-  }, [isPremium, items, batchPrices]);
 
   // Rating prompt — second trigger. The alert-fired moment in
   // Notifications is the better one but most users never reach it, so
@@ -402,8 +378,7 @@ function WatchlistScreen() {
 
             {/* Section label — hidden on first launch, where the empty
                 state below carries its own Search CTA. Free users keep the
-                cap count on the right; Premium gets the watchlist's
-                average return since added. */}
+                cap count on the right; Premium has no cap to show. */}
             {items.length > 0 && (
               <View
                 style={{
@@ -416,11 +391,7 @@ function WatchlistScreen() {
                 <Text variant="labelLg" color={colors.onSurfaceVariant}>
                   Watchlist
                 </Text>
-                {isPremium ? (
-                  avgSinceAdded !== null ? (
-                    <SinceAddedLabel pct={avgSinceAdded} prefix="Avg" />
-                  ) : null
-                ) : (
+                {isPremium ? null : (
                   <Text variant="caption" color={colors.onSurfaceMuted}>
                     {items.length}/{maxFreeItems}
                   </Text>
@@ -460,9 +431,6 @@ function WatchlistScreen() {
                 imageUrl={item.imageUrl}
                 fallbackPrice={item.lastPrice}
                 fallbackPriceChange={item.lastPriceChange}
-                baselinePrice={item.baselinePrice}
-                baselineAt={item.baselineAt}
-                showSinceAdded={isPremium}
               />
             ) : (
               // Batched live price for this row. Passing null (batch
@@ -474,7 +442,6 @@ function WatchlistScreen() {
               <HomeCardRow
                 item={item}
                 livePrice={batchQuery.isError ? undefined : batchPrices?.[item.cardId] ?? null}
-                showSinceAdded={isPremium}
               />
             )}
           </View>

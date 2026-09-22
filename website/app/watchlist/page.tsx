@@ -93,13 +93,6 @@ export default function Page() {
               rows show the product type instead.
             </dd>
           </div>
-          <div>
-            <dt>Return since added</dt>
-            <dd>
-              On Premium, what the item has made or lost since you added it.
-              See <Link href="/returns">returns since added</Link>.
-            </dd>
-          </div>
         </dl>
         <p className="note">
           A sealed product with no live price source is labelled Sample data on
