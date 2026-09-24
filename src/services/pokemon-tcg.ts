@@ -3,7 +3,7 @@ import type { PokemonCard } from '../types/card';
 import { fetchWithTimeout } from './api-client';
 
 /**
- * The catalog goes through our own edge proxy (api/pokemontcg/[...path].ts)
+ * The catalog goes through our own edge proxy (api/pokemontcg.ts)
  * rather than api.pokemontcg.io directly: upstream load-sheds (four 200s
  * and two 500/502 across six identical requests, measured 2026-09-23),
  * sends no CORS headers so the web build cannot reach it, and charges
@@ -25,6 +25,19 @@ const PROXY_ORIGIN = (() => {
 const BASE_URL = `${PROXY_ORIGIN}/api/pokemontcg`;
 
 /**
+ * The proxy is one flat route: the upstream collection and id travel as
+ * `resource` and `id` parameters, not as path segments (a nested
+ * catch-all 404s on Vercel — see api/pokemontcg.ts).
+ */
+function catalogUrl(resource: 'cards' | 'sets', query?: string): string {
+  return `${BASE_URL}?resource=${resource}${query ? `&${query}` : ''}`;
+}
+
+function catalogItemUrl(resource: 'cards' | 'sets', id: string): string {
+  return `${BASE_URL}?resource=${resource}&id=${encodeURIComponent(id)}`;
+}
+
+/**
  * These retries cover only the hop the proxy cannot: the phone-to-edge
  * leg. HTTP responses — 5xx included — are returned as-is now, because a
  * 502 from the proxy already means it exhausted its own upstream attempts,
@@ -44,7 +57,7 @@ const TCG_RETRY_DELAYS_MS = [400];
 /**
  * 25s rather than the 12s default: a cache miss on a set-detail screen
  * asks the proxy for 250 rows, and the proxy's worst case is ~20s (see the
- * budget comment in api/pokemontcg/[...path].ts). Aborting before it
+ * budget comment in api/pokemontcg.ts). Aborting before it
  * answers throws away work that would have filled the edge cache for
  * every other user, and turns a slow success into a failed screen.
  */
@@ -282,7 +295,7 @@ export async function searchCards(
     select: CARD_SELECT,
   });
 
-  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(catalogUrl('cards', String(params)));
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -312,7 +325,7 @@ export async function getSimilarCards(
     orderBy: '-set.releaseDate',
     select: 'id,name,images,set,number',
   });
-  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(catalogUrl('cards', String(params)));
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -359,7 +372,7 @@ export async function searchSets(
     params.set('q', `name:"${escapeLucene(query)}*"`);
   }
 
-  const response = await tcgFetch(`${BASE_URL}/sets?${params}`);
+  const response = await tcgFetch(catalogUrl('sets', String(params)));
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -372,7 +385,7 @@ export async function searchSets(
 }
 
 export async function getSet(id: string): Promise<PokemonSet | null> {
-  const response = await tcgFetch(`${BASE_URL}/sets/${encodeURIComponent(id)}`);
+  const response = await tcgFetch(catalogItemUrl('sets', id));
   if (!response.ok) {
     // 400 is the proxy rejecting the id's shape (it allows [A-Za-z0-9._-]
     // only). These lookups send no query string, so an id is the only
@@ -419,7 +432,7 @@ export async function searchArtists(
     orderBy: '-set.releaseDate',
   });
 
-  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(catalogUrl('cards', String(params)));
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -468,7 +481,7 @@ export async function getCardsByArtist(
     orderBy: '-set.releaseDate',
   });
 
-  const response = await tcgFetch(`${BASE_URL}/cards?${params}`);
+  const response = await tcgFetch(catalogUrl('cards', String(params)));
   if (!response.ok) {
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
@@ -481,7 +494,7 @@ export async function getCardsByArtist(
 }
 
 export async function getCard(id: string): Promise<PokemonCard | null> {
-  const response = await tcgFetch(`${BASE_URL}/cards/${encodeURIComponent(id)}`);
+  const response = await tcgFetch(catalogItemUrl('cards', id));
   if (!response.ok) {
     // 400 means the proxy rejected the id's shape — same as a 404 here,
     // see getSet above.

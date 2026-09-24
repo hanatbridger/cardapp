@@ -16,36 +16,39 @@
 //   4. The API key stops shipping inside the client bundle — it is read
 //      from the Vercel project env here instead.
 //
-// Routes (path passthrough, catch-all so the query string survives
-// verbatim — it carries Lucene queries full of quotes and spaces):
-//   GET /api/pokemontcg/cards?q=...   → /v2/cards?q=...
-//   GET /api/pokemontcg/cards/{id}    → /v2/cards/{id}
-//   GET /api/pokemontcg/sets?q=...    → /v2/sets?q=...
-//   GET /api/pokemontcg/sets/{id}     → /v2/sets/{id}
-// Anything else is 400 — both the path and the query string are checked
-// against what the app actually builds. This is not an open relay onto
-// the upstream API.
+// Routes — one flat endpoint, the upstream route chosen by `resource`
+// and `id` rather than by path segments:
+//   GET /api/pokemontcg?resource=cards&q=...        → /v2/cards?q=...
+//   GET /api/pokemontcg?resource=cards&id=sv3pt5-1  → /v2/cards/sv3pt5-1
+//   GET /api/pokemontcg?resource=sets&q=...         → /v2/sets?q=...
+//   GET /api/pokemontcg?resource=sets&id=sv3pt5     → /v2/sets/sv3pt5
+// Anything else is 400 — resource, id and every other parameter are
+// checked against what the app actually builds. This is not an open
+// relay onto the upstream API.
+//
+// Flat rather than a catch-all file: on Vercel a nested catch-all
+// ([...path].ts) 404s for a two-segment request like /cards/{id}, and it
+// injects the matched segments back as a `path` query parameter, which
+// then fails this handler's own query allowlist. Both were observed on
+// the 2026-09-23 deployment. One static route has neither problem.
 
-import { fetchWithTimeout } from '../_lib/http';
+import { fetchWithTimeout } from './_lib/http';
 
 export const config = { runtime: 'edge' };
 
 const UPSTREAM = 'https://api.pokemontcg.io/v2';
 
-const PREFIX = '/api/pokemontcg/';
+/** The only two upstream collections the app reads. */
+const ALLOWED_RESOURCES = new Set(['cards', 'sets']);
 
 /**
- * Exactly the endpoints src/services/pokemon-tcg.ts builds: the two
- * collections plus a single id each. Ids are [A-Za-z0-9._-]
- * ("sv8pt5-161", "sv3pt5") and contain no slashes, so this also rules
- * out path traversal and any deeper upstream route.
- *
- * Tested against the *decoded* path, so an id carrying a character that
- * percent-encodes (a space from a mistyped deep link) is judged on what
- * it is rather than on its `%` escapes. The upstream URL is rebuilt from
- * the original encoded segment — see the handler.
+ * Card and set ids as upstream issues them ("sv8pt5-161", "sv3pt5").
+ * No slashes and no dots-only, so this rules out path traversal and any
+ * deeper upstream route. Tested against the DECODED id, so one carrying
+ * a character that percent-encodes (a space from a mistyped deep link)
+ * is judged on what it is rather than on its `%` escapes.
  */
-const ALLOWED_PATH = /^(?:cards|sets)(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,47})?$/;
+const ALLOWED_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/;
 
 /**
  * Query allowlist — every parameter src/services/pokemon-tcg.ts sends,
@@ -61,7 +64,10 @@ const ALLOWED_PATH = /^(?:cards|sets)(?:\/[A-Za-z0-9][A-Za-z0-9._-]{0,47})?$/;
  * Validation reads the parsed params but never rebuilds them: the handler
  * still forwards `url.search` byte-for-byte.
  */
-const ALLOWED_PARAMS = new Set(['q', 'page', 'pageSize', 'orderBy', 'select']);
+const ALLOWED_PARAMS = new Set(['resource', 'id', 'q', 'page', 'pageSize', 'orderBy', 'select']);
+
+/** Ours to route on; everything else is forwarded upstream verbatim. */
+const ROUTING_PARAMS = new Set(['resource', 'id']);
 
 function isBoundedInt(value: string, min: number, max: number): boolean {
   const n = Number(value);
@@ -197,28 +203,29 @@ export default async function handler(req: Request): Promise<Response> {
   // opaque CORS failure, and no Cache-Control.
   try {
     const url = new URL(req.url);
-    if (!url.pathname.startsWith(PREFIX)) return jsonError(400, 'unsupported path');
-    const encodedPath = url.pathname.slice(PREFIX.length);
-    // Decoded for the allowlist test, encoded for the upstream URL:
-    // "cards/sv8pt5 161" must be judged as a bad id (and rejected) rather
-    // than as the literal "%20" its encoding contains.
-    let path: string;
-    try {
-      path = decodeURIComponent(encodedPath);
-    } catch {
-      return jsonError(400, 'unsupported path');
+
+    const resource = url.searchParams.get('resource');
+    if (resource === null || !ALLOWED_RESOURCES.has(resource)) {
+      return jsonError(400, 'unsupported resource');
     }
-    if (!ALLOWED_PATH.test(path)) return jsonError(400, 'unsupported path');
+    const id = url.searchParams.get('id');
+    if (id !== null && !ALLOWED_ID.test(id)) return jsonError(400, 'unsupported id');
 
     const reason = rejectReason(url.searchParams);
     if (reason !== null) return jsonError(400, reason);
 
-    // url.search goes through verbatim. The WHATWG URL parser leaves
-    // existing percent-encoding alone, so the client's Lucene query
+    // The forwarded query is the client's own search string with the two
+    // routing parameters cut out — sliced from the raw string rather than
+    // rebuilt through URLSearchParams, so the Lucene query
     // (q=name%3A%22charizard*%22+supertype%3A%22Pok%C3%A9mon%22) reaches
-    // upstream byte-identical. Rebuilding it through URLSearchParams risks
-    // changing what the query means.
-    const upstream = await fetchUpstream(`${UPSTREAM}/${encodedPath}${url.search}`);
+    // upstream byte-identical. Re-encoding it risks changing what it means.
+    const forwarded = url.search
+      .slice(1)
+      .split('&')
+      .filter((pair) => pair && !ROUTING_PARAMS.has(decodeURIComponent(pair.split('=')[0])))
+      .join('&');
+    const path = id === null ? resource : `${resource}/${encodeURIComponent(id)}`;
+    const upstream = await fetchUpstream(`${UPSTREAM}/${path}${forwarded ? `?${forwarded}` : ''}`);
 
     if (upstream === null || upstream.status >= 500) {
       console.error('[pokemontcg]', path, upstream?.status ?? 'network failure');
