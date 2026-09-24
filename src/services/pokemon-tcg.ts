@@ -1,32 +1,45 @@
+import { Platform } from 'react-native';
 import type { PokemonCard } from '../types/card';
 import { fetchWithTimeout } from './api-client';
 
-const BASE_URL = 'https://api.pokemontcg.io/v2';
+/**
+ * The catalog goes through our own edge proxy (api/pokemontcg/[...path].ts)
+ * rather than api.pokemontcg.io directly: upstream load-sheds (four 200s
+ * and two 500/502 across six identical requests, measured 2026-09-23),
+ * sends no CORS headers so the web build cannot reach it, and charges
+ * every phone the full round trip. The proxy caches at the edge, retries
+ * upstream server-side, and keeps the API key out of the app bundle.
+ *
+ * Same dev-vs-prod origin resolution as trending.ts / card-stats.ts:
+ * native and dev-web hit the production deployment cross-origin (the
+ * function returns CORS *), production web hits it relative same-origin.
+ */
+const PROXY_ORIGIN = (() => {
+  if (Platform.OS !== 'web') {
+    return process.env.EXPO_PUBLIC_API_URL ?? 'https://strange-saha.vercel.app';
+  }
+  if (__DEV__) return 'https://strange-saha.vercel.app';
+  return '';
+})();
 
-// Keyless clients get pokemontcg.io's throttled tier (slow responses,
-// load-shed 500s under pressure). A key from dev.pokemontcg.io lifts the
-// rate limit substantially; requests work without one, just worse.
-const API_KEY = process.env.EXPO_PUBLIC_POKEMONTCG_API_KEY;
+const BASE_URL = `${PROXY_ORIGIN}/api/pokemontcg`;
 
 /**
- * pokemontcg.io load-sheds under pressure — measured at 5 of 12 requests
- * returning 500/502 during one sustained spell, on identical queries that
- * succeed moments later. Only the search hook carried a React Query
- * retry, so every other caller (card detail, sets, similar cards) turned
- * a transient upstream blip into an empty screen.
+ * Kept even though the proxy retries upstream itself: these retries now
+ * cover the hop the proxy cannot, i.e. a flaky phone connection or a
+ * cold edge region, and they are what keeps a 502 from the proxy (its
+ * own upstream attempts exhausted) from becoming an empty screen.
  *
- * Two quick retries on 5xx and on network failure, which converts a ~40%
- * per-request failure rate into roughly 6%. 4xx is returned untouched —
- * a 404 or a malformed query is an answer, not a blip.
+ * Two quick retries on 5xx and on network failure. 4xx is returned
+ * untouched — a 404 or a malformed query is an answer, not a blip.
  */
 const TCG_RETRY_DELAYS_MS = [400, 1200];
 
 async function tcgFetch(url: string): Promise<Response> {
-  const init = API_KEY ? { headers: { 'X-Api-Key': API_KEY } } : {};
   let lastError: unknown;
   for (let attempt = 0; attempt <= TCG_RETRY_DELAYS_MS.length; attempt++) {
     try {
-      const res = await fetchWithTimeout(url, init);
+      const res = await fetchWithTimeout(url);
       if (res.status < 500 || attempt === TCG_RETRY_DELAYS_MS.length) return res;
     } catch (e) {
       lastError = e;
@@ -37,7 +50,7 @@ async function tcgFetch(url: string): Promise<Response> {
     await new Promise((r) => setTimeout(r, TCG_RETRY_DELAYS_MS[attempt]));
   }
   // Unreachable — the loop always returns or throws on its last pass.
-  throw lastError ?? new Error('pokemontcg.io request failed');
+  throw lastError ?? new Error('catalog request failed');
 }
 
 /**
@@ -350,7 +363,7 @@ export async function searchSets(
 }
 
 export async function getSet(id: string): Promise<PokemonSet | null> {
-  const response = await tcgFetch(`${BASE_URL}/sets/${id}`);
+  const response = await tcgFetch(`${BASE_URL}/sets/${encodeURIComponent(id)}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);
@@ -455,7 +468,7 @@ export async function getCardsByArtist(
 }
 
 export async function getCard(id: string): Promise<PokemonCard | null> {
-  const response = await tcgFetch(`${BASE_URL}/cards/${id}`);
+  const response = await tcgFetch(`${BASE_URL}/cards/${encodeURIComponent(id)}`);
   if (!response.ok) {
     if (response.status === 404) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);
