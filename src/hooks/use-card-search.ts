@@ -100,11 +100,14 @@ export function useRelatedCards(card: { id: string; name: string } | null | unde
     },
     enabled: Boolean(card) && base.length >= 2,
     staleTime: 30 * 60 * 1000,
-    // api.pokemontcg.io sheds load with intermittent 500s (~50% observed
-    // during incidents). The rail is below the fold and hides itself
-    // while empty, so patient retries beat giving up: 5 attempts at 50%
-    // is a ~97% eventual render vs ~87% with the default 2 retries.
-    retry: 4,
+    // Was 4 attempts against api.pokemontcg.io's ~50% incident failure
+    // rate. That premise is gone: the catalog goes through our edge proxy,
+    // which retries upstream itself and serves a week of
+    // stale-while-revalidate, so a 502 reaching here means upstream was
+    // down for the proxy's whole budget — more client attempts won't
+    // change that, they just stack on the proxy's. The rail hides itself
+    // while empty, so one retry is enough.
+    retry: 1,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
   });
 }

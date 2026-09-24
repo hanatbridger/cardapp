@@ -25,32 +25,41 @@ const PROXY_ORIGIN = (() => {
 const BASE_URL = `${PROXY_ORIGIN}/api/pokemontcg`;
 
 /**
- * Kept even though the proxy retries upstream itself: these retries now
- * cover the hop the proxy cannot, i.e. a flaky phone connection or a
- * cold edge region, and they are what keeps a 502 from the proxy (its
- * own upstream attempts exhausted) from becoming an empty screen.
+ * These retries cover only the hop the proxy cannot: the phone-to-edge
+ * leg. HTTP responses — 5xx included — are returned as-is now, because a
+ * 502 from the proxy already means it exhausted its own upstream attempts,
+ * and retrying it here re-runs that entire chain (proxy errors are
+ * no-store, so nothing short-circuits) while React Query retries on top
+ * of that. Three stacked retry layers turned one rail render into dozens
+ * of upstream calls and tens of seconds before the UI could report
+ * failure.
  *
- * Two quick retries on 5xx and on network failure. 4xx is returned
- * untouched — a 404 or a malformed query is an answer, not a blip.
+ * A thrown error is the case worth retrying: a dropped connection or a
+ * DNS blip fails fast and one retry clears it. An abort is excluded — the
+ * whole timeout was already spent waiting, so retrying just doubles the
+ * wait; React Query's own retry covers that.
  */
-const TCG_RETRY_DELAYS_MS = [400, 1200];
+const TCG_RETRY_DELAYS_MS = [400];
+
+/**
+ * 25s rather than the 12s default: a cache miss on a set-detail screen
+ * asks the proxy for 250 rows, and the proxy's worst case is ~20s (see the
+ * budget comment in api/pokemontcg/[...path].ts). Aborting before it
+ * answers throws away work that would have filled the edge cache for
+ * every other user, and turns a slow success into a failed screen.
+ */
+const CATALOG_TIMEOUT_MS = 25000;
 
 async function tcgFetch(url: string): Promise<Response> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt <= TCG_RETRY_DELAYS_MS.length; attempt++) {
+  for (let attempt = 0; ; attempt++) {
     try {
-      const res = await fetchWithTimeout(url);
-      if (res.status < 500 || attempt === TCG_RETRY_DELAYS_MS.length) return res;
+      return await fetchWithTimeout(url, {}, CATALOG_TIMEOUT_MS);
     } catch (e) {
-      lastError = e;
-      // Timeouts and network errors retry on the same schedule; the
-      // final attempt rethrows so callers still see a real failure.
-      if (attempt === TCG_RETRY_DELAYS_MS.length) throw e;
+      const aborted = (e as Error | undefined)?.name === 'AbortError';
+      if (aborted || attempt === TCG_RETRY_DELAYS_MS.length) throw e;
+      await new Promise((r) => setTimeout(r, TCG_RETRY_DELAYS_MS[attempt]));
     }
-    await new Promise((r) => setTimeout(r, TCG_RETRY_DELAYS_MS[attempt]));
   }
-  // Unreachable — the loop always returns or throws on its last pass.
-  throw lastError ?? new Error('catalog request failed');
 }
 
 /**
@@ -365,7 +374,11 @@ export async function searchSets(
 export async function getSet(id: string): Promise<PokemonSet | null> {
   const response = await tcgFetch(`${BASE_URL}/sets/${encodeURIComponent(id)}`);
   if (!response.ok) {
-    if (response.status === 404) return null;
+    // 400 is the proxy rejecting the id's shape (it allows [A-Za-z0-9._-]
+    // only). These lookups send no query string, so an id is the only
+    // thing it can reject — which is a not-found, not an error worth an
+    // error screen. Stale watchlist entries and bad deep links land here.
+    if (response.status === 404 || response.status === 400) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
   const data = await response.json();
@@ -470,7 +483,9 @@ export async function getCardsByArtist(
 export async function getCard(id: string): Promise<PokemonCard | null> {
   const response = await tcgFetch(`${BASE_URL}/cards/${encodeURIComponent(id)}`);
   if (!response.ok) {
-    if (response.status === 404) return null;
+    // 400 means the proxy rejected the id's shape — same as a 404 here,
+    // see getSet above.
+    if (response.status === 404 || response.status === 400) return null;
     throw new Error(`Pokemon TCG API error: ${response.status}`);
   }
 
